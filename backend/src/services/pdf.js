@@ -66,12 +66,15 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
         y += 25;
 
         try {
+          // Ensure we have a proper Node.js Buffer (Prisma Bytes may return Uint8Array)
+          const imgBuf = Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer);
           const imgOptions = {
             fit: [475, 500],
             align: 'center',
           };
-          doc.image(imageBuffer, 40, y, imgOptions);
+          doc.image(imgBuf, 40, y, imgOptions);
         } catch (imgErr) {
+          console.error('[pdf] Image embed error:', imgErr.message);
           doc.fontSize(9).fillColor('#999').text('(Image non disponible)', 40, y);
         }
       } else if (isUpdate) {

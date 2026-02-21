@@ -414,8 +414,12 @@ router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
         const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}.pdf`;
 
         // Retrieve stored receipt image for PDF regeneration
-        const storedImage = existing.receipt_image;
+        // Prisma Bytes may return Uint8Array — ensure proper Node.js Buffer
+        const rawImage = existing.receipt_image;
+        const storedImage = rawImage ? Buffer.from(rawImage) : null;
         const hasStoredImage = storedImage && storedImage.length > 0;
+
+        console.log(`[expense] PDF regen #${expenseId}: hasStoredImage=${hasStoredImage}, bufferSize=${storedImage?.length || 0}`);
 
         const pdfBuffer = await generatePDF({
           imageBuffer: hasStoredImage ? storedImage : null,
