@@ -6,24 +6,21 @@ let driveClient = null;
 function getDriveClient() {
   if (driveClient) return driveClient;
 
-  const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!keyJson) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY non configurée');
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      'Google Drive non configuré. Variables requises: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN'
+    );
   }
 
-  let credentials;
-  try {
-    credentials = JSON.parse(keyJson);
-  } catch (e) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY JSON invalide');
-  }
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
 
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-
-  driveClient = google.drive({ version: 'v3', auth });
+  driveClient = google.drive({ version: 'v3', auth: oauth2Client });
+  console.log('[drive] OAuth2 client initialized');
   return driveClient;
 }
 
@@ -45,7 +42,6 @@ async function uploadToDrive(pdfBuffer, fileName, folderId) {
       body: stream,
     },
     fields: 'id, webViewLink',
-    supportsAllDrives: true, // Support Shared Drives (service accounts need this)
   });
 
   return {
@@ -62,8 +58,6 @@ async function listDriveFiles(folderId) {
     fields: 'files(id, name, webViewLink, createdTime, size)',
     orderBy: 'createdTime desc',
     pageSize: 100,
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
   });
 
   return response.data.files || [];
