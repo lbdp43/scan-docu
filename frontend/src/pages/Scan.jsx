@@ -76,10 +76,12 @@ export default function Scan() {
     setImagePreview(URL.createObjectURL(file));
     setStep('compressing');
 
+    // Compress first (all client-side, works offline)
+    const compressed = await compressImage(file);
+    setImageFile(compressed);
+    console.log('[scan] Image compressed, size:', (compressed.size / 1024).toFixed(0), 'KB');
+
     try {
-      // Compress image client-side before upload
-      const compressed = await compressImage(file);
-      setImageFile(compressed);
       setStep('scanning');
 
       // Send to OCR
@@ -104,7 +106,7 @@ export default function Scan() {
       setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (err) {
       console.error('OCR error:', err);
-      setImageFile(file);
+      // imageFile is already set to compressed above — no need to override
       setToast({ message: 'Erreur OCR — remplissez manuellement', type: 'warning' });
       setDateTicket(new Date().toISOString().slice(0, 10));
       setStep('form');

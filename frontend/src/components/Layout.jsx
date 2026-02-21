@@ -75,6 +75,7 @@ export default function Layout() {
         if (expense.description) formData.append('description', expense.description);
         // Reconstruct image file from IndexedDB stored data
         const imageFile = storableToFile(expense.imageData);
+        console.log('[offline] Syncing expense:', expense.id, 'hasImageData:', !!expense.imageData, 'reconstructedFile:', !!imageFile, 'fileSize:', imageFile?.size || 0);
         if (imageFile) formData.append('image', imageFile);
         await api.submitScan(formData);
       });
