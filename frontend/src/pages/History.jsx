@@ -1,0 +1,188 @@
+import React, { useEffect, useState } from 'react';
+import { api } from '../utils/api';
+
+const TYPE_ICONS = {
+  carburant: { icon: '⛽', color: 'bg-green-mid/20 text-green-light' },
+  repas: { icon: '🍽️', color: 'bg-orange-500/20 text-orange-300' },
+  peage: { icon: '🛣️', color: 'bg-blue-500/20 text-blue-300' },
+  autre: { icon: '📄', color: 'bg-gray-500/20 text-gray-300' },
+};
+
+const STATUS_ICONS = {
+  uploaded: '✅',
+  pending: '⏳',
+  error: '❌',
+};
+
+const MONTHS = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
+
+export default function History() {
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState('');
+  const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth() + 1));
+  const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+
+  useEffect(() => {
+    loadExpenses();
+  }, [filterType, filterMonth, filterYear]);
+
+  async function loadExpenses(page = 1) {
+    setLoading(true);
+    try {
+      const params = { page, limit: 20 };
+      if (filterType) params.type = filterType;
+      if (filterMonth) params.month = filterMonth;
+      if (filterYear) params.year = filterYear;
+
+      const data = await api.getExpenses(params);
+      setExpenses(data.expenses);
+      setPagination(data.pagination);
+    } catch (err) {
+      console.error('Load expenses error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+  return (
+    <div className="space-y-6 animate-fade-up">
+      <h1 className="font-serif text-xl font-semibold">Historique</h1>
+
+      {/* Filters */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        <button
+          onClick={() => setFilterType('')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+            !filterType ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-card border border-card-border text-text-muted'
+          }`}
+        >
+          Tous
+        </button>
+        {Object.entries(TYPE_ICONS).map(([key, val]) => (
+          <button
+            key={key}
+            onClick={() => setFilterType(key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+              filterType === key ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-card border border-card-border text-text-muted'
+            }`}
+          >
+            {val.icon} {key}
+          </button>
+        ))}
+      </div>
+
+      {/* Month/Year filter */}
+      <div className="flex gap-2">
+        <select
+          value={filterMonth}
+          onChange={(e) => setFilterMonth(e.target.value)}
+          className="flex-1 bg-card border border-card-border rounded-xl px-3 py-2.5 text-text text-sm focus:outline-none focus:border-green-mid"
+        >
+          <option value="">Tous les mois</option>
+          {MONTHS.map((m, i) => (
+            <option key={i} value={String(i + 1)}>{m}</option>
+          ))}
+        </select>
+        <select
+          value={filterYear}
+          onChange={(e) => setFilterYear(e.target.value)}
+          className="bg-card border border-card-border rounded-xl px-3 py-2.5 text-text text-sm focus:outline-none focus:border-green-mid"
+        >
+          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+        </select>
+      </div>
+
+      {/* Total */}
+      <div className="p-4 rounded-2xl bg-card border border-card-border flex items-center justify-between">
+        <span className="text-text-muted text-sm">Total affiché</span>
+        <span className="font-serif text-xl font-semibold text-green-light">{total.toFixed(2)} €</span>
+      </div>
+
+      {/* Loading */}
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+        </div>
+      ) : (
+        <>
+          {/* Expense List */}
+          <div className="space-y-3">
+            {expenses.map((expense) => {
+              const typeInfo = TYPE_ICONS[expense.type] || TYPE_ICONS.autre;
+              const date = new Date(expense.date_ticket).toLocaleDateString('fr-FR', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              });
+              return (
+                <div
+                  key={expense.id}
+                  className="flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border"
+                >
+                  <div className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl ${typeInfo.color}`}>
+                    {expense.has_receipt ? typeInfo.icon : '✏️'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-text text-sm font-medium truncate">
+                      {expense.merchant || 'Sans commerçant'}
+                    </p>
+                    <p className="text-text-muted text-xs">
+                      {date}
+                      {expense.description && ` · ${expense.description}`}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-serif text-lg font-semibold text-text">
+                      {Number(expense.amount).toFixed(2)}€
+                    </p>
+                    <div className="flex items-center justify-end gap-1 text-xs">
+                      {expense.has_receipt ? (
+                        expense.drive_file_url ? (
+                          <a href={expense.drive_file_url} target="_blank" rel="noreferrer" className="text-green-light hover:underline">
+                            📄 Drive
+                          </a>
+                        ) : (
+                          <span>{STATUS_ICONS[expense.upload_status] || '⏳'}</span>
+                        )
+                      ) : (
+                        <span className="text-amber-400">⚠️ Sans ticket</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {expenses.length === 0 && (
+              <p className="text-text-dim text-center py-12 text-sm">Aucune dépense trouvée</p>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex justify-center gap-2">
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => loadExpenses(page)}
+                  className={`w-8 h-8 rounded-full text-sm ${
+                    pagination.page === page
+                      ? 'bg-green-mid text-white'
+                      : 'bg-card text-text-muted'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
