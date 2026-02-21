@@ -12,6 +12,7 @@ const History = lazy(() => import('./pages/History'));
 const Admin = lazy(() => import('./pages/Admin'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Stats = lazy(() => import('./pages/Stats'));
 
 function PageFallback() {
   return (
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="/scan" element={<Suspense fallback={<PageFallback />}><Scan /></Suspense>} />
               <Route path="/manual" element={<Suspense fallback={<PageFallback />}><Manual /></Suspense>} />
               <Route path="/history" element={<Suspense fallback={<PageFallback />}><History /></Suspense>} />
+              <Route path="/stats" element={<Suspense fallback={<PageFallback />}><Stats /></Suspense>} />
               <Route path="/profile" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
               <Route path="/admin" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><Admin /></Suspense></PrivateRoute>} />
               <Route path="/admin/users" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><AdminUsers /></Suspense></PrivateRoute>} />

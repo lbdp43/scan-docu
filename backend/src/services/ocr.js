@@ -31,18 +31,22 @@ const TYPE_KEYWORDS = {
 function detectType(text) {
   const lower = text.toLowerCase();
   const scores = { carburant: 0, repas: 0, peage: 0 };
+  const matches = { carburant: [], repas: [], peage: [] };
 
   for (const [type, keywords] of Object.entries(TYPE_KEYWORDS)) {
     for (const kw of keywords) {
       if (lower.includes(kw)) {
         scores[type]++;
+        matches[type].push(kw);
       }
     }
   }
 
   // Return the type with the most keyword hits
   const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
-  return best[1] > 0 ? best[0] : 'autre';
+  const detectedType = best[1] > 0 ? best[0] : 'autre';
+
+  return { type: detectedType, scores, matches };
 }
 
 function extractAmount(text) {
@@ -223,17 +227,29 @@ async function performOCR(imageBuffer) {
     console.log(`[ocr] Done in ${elapsed}ms — confidence: ${confidence}%, text length: ${rawText.length}`);
     console.log('[ocr] Raw text (first 500 chars):', rawText.substring(0, 500));
 
+    const typeDetection = detectType(rawText);
+
     const extracted = {
       amount: extractAmount(rawText),
       date: extractDate(rawText),
       merchant: extractMerchant(rawText),
-      type: detectType(rawText),
+      type: typeDetection.type,
       description: extractDescription(rawText),
     };
 
     console.log('[ocr] Extracted:', JSON.stringify(extracted));
+    console.log('[ocr] Type detection:', JSON.stringify(typeDetection));
 
-    return { rawText, extracted, confidence };
+    return {
+      rawText,
+      extracted,
+      confidence,
+      typeDetection: {
+        type: typeDetection.type,
+        scores: typeDetection.scores,
+        matches: typeDetection.matches,
+      },
+    };
   } catch (err) {
     // If worker fails, kill it so next call gets a fresh one
     try { await workerInstance?.terminate(); } catch {}

@@ -90,6 +90,12 @@ export const api = {
     request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteExpense: (id) =>
     request(`/expenses/${id}`, { method: 'DELETE' }),
+  getAdvancedStats: () =>
+    request('/expenses/stats/advanced'),
+  getReceiptUrl: (id) => {
+    const token = localStorage.getItem('token');
+    return `${API_BASE}/expenses/${id}/receipt?token=${encodeURIComponent(token)}`;
+  },
   exportCSV: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/expenses/export/csv?${qs}`);

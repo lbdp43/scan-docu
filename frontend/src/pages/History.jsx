@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
 
@@ -33,8 +33,10 @@ export default function History() {
   const [filterType, setFilterType] = useState('');
   const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth() + 1));
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+  const [searchQuery, setSearchQuery] = useState('');
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
   const [toast, setToast] = useState(null);
+  const searchTimeout = useRef(null);
 
   // Edit modal state
   const [editingExpense, setEditingExpense] = useState(null);
@@ -45,17 +47,30 @@ export default function History() {
   const [editDescription, setEditDescription] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
+  // Receipt viewer state
+  const [showReceipt, setShowReceipt] = useState(false);
+
   useEffect(() => {
     loadExpenses();
   }, [filterType, filterMonth, filterYear]);
 
-  async function loadExpenses(page = 1) {
+  // Debounced search
+  const handleSearchChange = useCallback((value) => {
+    setSearchQuery(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      loadExpenses(1, value);
+    }, 400);
+  }, [filterType, filterMonth, filterYear]);
+
+  async function loadExpenses(page = 1, q = searchQuery) {
     setLoading(true);
     try {
       const params = { page, limit: 20 };
       if (filterType) params.type = filterType;
       if (filterMonth) params.month = filterMonth;
       if (filterYear) params.year = filterYear;
+      if (q && q.trim()) params.q = q.trim();
 
       const data = await api.getExpenses(params);
       setExpenses(data.expenses);
@@ -74,11 +89,13 @@ export default function History() {
     setEditType(expense.type);
     setEditMerchant(expense.merchant || '');
     setEditDescription(expense.description || '');
+    setShowReceipt(false);
   }
 
   function closeEdit() {
     setEditingExpense(null);
     setEditSaving(false);
+    setShowReceipt(false);
   }
 
   async function handleEditSubmit(e) {
@@ -123,6 +140,28 @@ export default function History() {
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <h1 className="font-serif text-xl font-semibold">Historique</h1>
+
+      {/* Search bar */}
+      <div className="relative">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted text-sm">
+          {'\uD83D\uDD0D'}
+        </span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Rechercher (commercant, description...)"
+          className="w-full bg-card border border-card-border rounded-2xl pl-10 pr-4 py-3 text-text text-sm focus:outline-none focus:border-green-mid"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => { setSearchQuery(''); loadExpenses(1, ''); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-lg leading-none"
+          >
+            {'\u00D7'}
+          </button>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2">
@@ -171,8 +210,8 @@ export default function History() {
 
       {/* Total */}
       <div className="p-4 rounded-2xl bg-card border border-card-border flex items-center justify-between">
-        <span className="text-text-muted text-sm">Total affich\u00E9</span>
-        <span className="font-serif text-xl font-semibold text-green-light">{total.toFixed(2)} \u20AC</span>
+        <span className="text-text-muted text-sm">Total affich{'\u00E9'}</span>
+        <span className="font-serif text-xl font-semibold text-green-light">{total.toFixed(2)} {'\u20AC'}</span>
       </div>
 
       {/* Loading */}
@@ -218,7 +257,7 @@ export default function History() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-serif text-lg font-semibold text-text">
-                      {Number(expense.amount).toFixed(2)}\u20AC
+                      {Number(expense.amount).toFixed(2)}{'\u20AC'}
                     </p>
                     <div className="flex items-center justify-end gap-1 text-xs">
                       {expense.has_receipt ? (
@@ -227,13 +266,13 @@ export default function History() {
                             onClick={(e) => { e.stopPropagation(); window.open(expense.drive_file_url, '_blank'); }}
                             className="text-green-light hover:underline cursor-pointer"
                           >
-                            \uD83D\uDCC4 Drive
+                            {'\uD83D\uDCC4'} Drive
                           </span>
                         ) : (
                           <span>{STATUS_ICONS[expense.upload_status] || '\u23F3'}</span>
                         )
                       ) : (
-                        <span className="text-amber-400">\u26A0\uFE0F Sans ticket</span>
+                        <span className="text-amber-400">{'\u26A0\uFE0F'} Sans ticket</span>
                       )}
                     </div>
                   </div>
@@ -241,7 +280,7 @@ export default function History() {
               );
             })}
             {expenses.length === 0 && (
-              <p className="text-text-dim text-center py-12 text-sm">Aucune d\u00E9pense trouv\u00E9e</p>
+              <p className="text-text-dim text-center py-12 text-sm">Aucune d{'\u00E9'}pense trouv{'\u00E9'}e</p>
             )}
           </div>
 
@@ -274,13 +313,52 @@ export default function History() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h3 className="font-serif text-lg font-semibold text-text">Modifier la d\u00E9pense</h3>
-              <button onClick={closeEdit} className="text-text-muted text-xl leading-none">\u00D7</button>
+              <h3 className="font-serif text-lg font-semibold text-text">Modifier la d{'\u00E9'}pense</h3>
+              <button onClick={closeEdit} className="text-text-muted text-xl leading-none">{'\u00D7'}</button>
             </div>
 
+            {/* Receipt viewer toggle */}
             {editingExpense.drive_file_id && (
-              <div className="p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20 text-xs text-green-light mb-4">
-                Le fichier PDF sera mis \u00E0 jour sur Google Drive
+              <div className="mb-4 space-y-3">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20">
+                  <span className="text-xs text-green-light">
+                    {'\uD83D\uDCC4'} Justificatif disponible sur Drive
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceipt(!showReceipt)}
+                      className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
+                    >
+                      {showReceipt ? 'Masquer' : 'Voir'}
+                    </button>
+                    <a
+                      href={api.getReceiptUrl(editingExpense.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
+                    >
+                      {'\u2B07'} PDF
+                    </a>
+                  </div>
+                </div>
+
+                {showReceipt && (
+                  <div className="rounded-2xl overflow-hidden border border-card-border bg-white">
+                    <iframe
+                      src={api.getReceiptUrl(editingExpense.id)}
+                      className="w-full h-[300px]"
+                      title="Justificatif"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {editingExpense.drive_file_id && !showReceipt && (
+              <div className="p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20 text-xs text-green-light mb-4 hidden">
+                Le fichier PDF sera mis {'\u00E0'} jour sur Google Drive
               </div>
             )}
 
@@ -288,7 +366,7 @@ export default function History() {
               {/* Amount */}
               <div>
                 <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Montant (\u20AC)
+                  Montant ({'\u20AC'})
                 </label>
                 <input
                   type="number"
@@ -343,7 +421,7 @@ export default function History() {
               {/* Merchant */}
               <div>
                 <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Commer\u00E7ant
+                  Commer{'\u00E7'}ant
                 </label>
                 <input
                   type="text"

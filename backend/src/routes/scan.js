@@ -69,6 +69,7 @@ router.post('/', upload.single('image'), async (req, res) => {
       rawText: ocrResult.rawText,
       extracted: ocrResult.extracted,
       confidence: ocrResult.confidence,
+      typeDetection: ocrResult.typeDetection,
     });
   } catch (err) {
     console.error('Scan error:', err);

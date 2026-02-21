@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../utils/api';
+import { savePendingExpense } from '../utils/offline';
 import Toast from '../components/Toast';
 
 const EXPENSE_TYPES = [
@@ -50,6 +51,7 @@ function compressImage(file, maxWidth = 1800, quality = 0.82) {
 
 export default function Scan() {
   const navigate = useNavigate();
+  const { isOnline, refreshPendingCount } = useOutletContext() || {};
   const fileInputRef = useRef(null);
   const formRef = useRef(null);
 
@@ -119,6 +121,27 @@ export default function Scan() {
 
     setStep('submitting');
 
+    // If offline, save to IndexedDB queue
+    if (!navigator.onLine) {
+      try {
+        await savePendingExpense({
+          amount,
+          date_ticket: dateTicket || new Date().toISOString().slice(0, 10),
+          type,
+          merchant,
+          description,
+        });
+        refreshPendingCount?.();
+        setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
+        setTimeout(() => navigate('/'), 2000);
+      } catch (offlineErr) {
+        console.error('Offline save error:', offlineErr);
+        setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
+        setStep('form');
+      }
+      return;
+    }
+
     try {
       const formData = new FormData();
       if (imageFile) formData.append('image', imageFile);
@@ -139,6 +162,22 @@ export default function Scan() {
       setTimeout(() => navigate('/'), 2000);
     } catch (err) {
       console.error('Submit error:', err);
+      // If network error, try saving offline
+      if (!navigator.onLine || err.message?.includes('fetch')) {
+        try {
+          await savePendingExpense({
+            amount,
+            date_ticket: dateTicket || new Date().toISOString().slice(0, 10),
+            type,
+            merchant,
+            description,
+          });
+          refreshPendingCount?.();
+          setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
+          setTimeout(() => navigate('/'), 2000);
+          return;
+        } catch {}
+      }
       setToast({ message: err.message || 'Erreur lors de l\'envoi', type: 'error' });
       setStep('form');
     }
@@ -255,6 +294,35 @@ export default function Scan() {
                 ? `Confiance OCR : ${Math.round(ocrResult.confidence)}% — Vérifiez les données`
                 : `Confiance OCR faible : ${Math.round(ocrResult.confidence || 0)}% — Corrigez les données`
               }
+            </div>
+          )}
+
+          {/* Type detection explanation */}
+          {ocrResult?.typeDetection && ocrResult.typeDetection.type !== 'autre' && (
+            <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/10 text-xs space-y-1.5">
+              <p className="text-blue-300 font-medium">
+                Type détecté : {EXPENSE_TYPES.find(t => t.value === ocrResult.typeDetection.type)?.icon}{' '}
+                {EXPENSE_TYPES.find(t => t.value === ocrResult.typeDetection.type)?.label}
+              </p>
+              {ocrResult.typeDetection.matches[ocrResult.typeDetection.type]?.length > 0 && (
+                <p className="text-blue-300/70">
+                  Mots-clés trouvés : {ocrResult.typeDetection.matches[ocrResult.typeDetection.type].join(', ')}
+                </p>
+              )}
+              {Object.entries(ocrResult.typeDetection.scores).filter(([k, v]) => v > 0 && k !== ocrResult.typeDetection.type).length > 0 && (
+                <p className="text-blue-300/50">
+                  Autres possibilités : {Object.entries(ocrResult.typeDetection.scores)
+                    .filter(([k, v]) => v > 0 && k !== ocrResult.typeDetection.type)
+                    .map(([k, v]) => `${k} (${v})`)
+                    .join(', ')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {ocrResult?.typeDetection && ocrResult.typeDetection.type === 'autre' && (
+            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-900/10 text-xs text-amber-300/80">
+              Aucun type détecté automatiquement — sélectionnez le type manuellement ci-dessous.
             </div>
           )}
 

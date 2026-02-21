@@ -99,4 +99,27 @@ async function deleteDriveFile(fileId) {
   await drive.files.delete({ fileId });
 }
 
-module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles };
+async function downloadDriveFile(fileId) {
+  const drive = getDriveClient();
+
+  // Get file metadata first
+  const meta = await drive.files.get({
+    fileId,
+    fields: 'id, name, mimeType, size',
+  });
+
+  // Download file content
+  const response = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'arraybuffer' }
+  );
+
+  return {
+    buffer: Buffer.from(response.data),
+    name: meta.data.name,
+    mimeType: meta.data.mimeType,
+    size: meta.data.size,
+  };
+}
+
+module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile };

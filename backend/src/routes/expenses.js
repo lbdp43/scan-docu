@@ -3,11 +3,55 @@ const { z } = require('zod');
 const { authenticateToken } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { generatePDF } = require('../services/pdf');
-const { updateDriveFile, uploadToDrive } = require('../services/drive');
+const { updateDriveFile, uploadToDrive, downloadDriveFile } = require('../services/drive');
 
 const router = express.Router();
 
-// All routes require authentication
+// Receipt proxy — handles its own auth (supports ?token= for inline viewing)
+router.get('/:id/receipt', (req, res, next) => {
+  if (!req.headers['authorization'] && req.query.token) {
+    req.headers['authorization'] = `Bearer ${req.query.token}`;
+  }
+  next();
+}, authenticateToken, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
+
+    const expense = await req.prisma.expense.findUnique({
+      where: { id },
+    });
+
+    if (!expense) {
+      return res.status(404).json({ error: 'Dépense non trouvée' });
+    }
+
+    if (req.user.role !== 'admin' && expense.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Accès non autorisé' });
+    }
+
+    if (!expense.drive_file_id) {
+      return res.status(404).json({ error: 'Aucun fichier associé' });
+    }
+
+    const file = await downloadDriveFile(expense.drive_file_id);
+
+    res.setHeader('Content-Type', file.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.name || 'receipt.pdf'}"`);
+    res.setHeader('Content-Length', file.buffer.length);
+    res.send(file.buffer);
+  } catch (err) {
+    console.error('Receipt download error:', err);
+    if (err.code === 404 || err.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Fichier introuvable sur Drive' });
+    }
+    res.status(500).json({ error: 'Erreur lors du téléchargement' });
+  }
+});
+
+// All other routes require authentication
 router.use(authenticateToken);
 
 // Validation schemas
@@ -54,7 +98,7 @@ function parsePagination(rawPage, rawLimit) {
 // GET /api/expenses — user sees own, admin sees all
 router.get('/', async (req, res) => {
   try {
-    const { type, month, year } = req.query;
+    const { type, month, year, q } = req.query;
     const { page, limit, skip } = parsePagination(req.query.page, req.query.limit);
 
     const where = {};
@@ -81,6 +125,15 @@ router.get('/', async (req, res) => {
         gte: new Date(parseInt(year), 0, 1),
         lte: new Date(parseInt(year), 11, 31),
       };
+    }
+
+    // Full-text search on merchant and description
+    if (q && q.trim().length > 0) {
+      const search = q.trim();
+      where.OR = [
+        { merchant: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     const [expenses, total] = await Promise.all([
@@ -181,6 +234,86 @@ router.get('/recent', async (req, res) => {
     res.json({ expenses });
   } catch (err) {
     console.error('Recent expenses error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/expenses/stats/advanced — monthly trends + type breakdown
+router.get('/stats/advanced', async (req, res) => {
+  try {
+    const where = {};
+    if (req.user.role !== 'admin') {
+      where.user_id = req.user.userId;
+    }
+
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const expenses = await req.prisma.expense.findMany({
+      where: {
+        ...where,
+        date_ticket: { gte: sixMonthsAgo },
+      },
+      select: {
+        amount: true,
+        type: true,
+        date_ticket: true,
+        has_receipt: true,
+        upload_status: true,
+      },
+      orderBy: { date_ticket: 'asc' },
+    });
+
+    // Build monthly breakdown
+    const monthlyMap = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyMap[key] = { month: key, total: 0, count: 0, byType: {} };
+    }
+
+    let grandTotal = 0;
+    const typeTotals = {};
+    let withReceipt = 0;
+    let withoutReceipt = 0;
+
+    for (const exp of expenses) {
+      const d = new Date(exp.date_ticket);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const amt = Number(exp.amount);
+
+      if (monthlyMap[key]) {
+        monthlyMap[key].total += amt;
+        monthlyMap[key].count++;
+        monthlyMap[key].byType[exp.type] = (monthlyMap[key].byType[exp.type] || 0) + amt;
+      }
+
+      grandTotal += amt;
+      typeTotals[exp.type] = (typeTotals[exp.type] || 0) + amt;
+
+      if (exp.has_receipt) withReceipt++;
+      else withoutReceipt++;
+    }
+
+    const monthly = Object.values(monthlyMap);
+    const activeMonths = monthly.filter(m => m.count > 0);
+    const avgMonthly = activeMonths.length > 0
+      ? monthly.reduce((s, m) => s + m.total, 0) / activeMonths.length
+      : 0;
+
+    res.json({
+      monthly,
+      typeTotals: Object.entries(typeTotals).map(([type, total]) => ({ type, total })),
+      summary: {
+        grandTotal,
+        totalExpenses: expenses.length,
+        avgMonthly: Math.round(avgMonthly * 100) / 100,
+        withReceipt,
+        withoutReceipt,
+      },
+    });
+  } catch (err) {
+    console.error('Advanced stats error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
