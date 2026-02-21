@@ -17,7 +17,11 @@ export default function Layout() {
 
   const items = useMemo(() => {
     const list = [...navItems];
-    list.push(user?.role === 'admin' ? adminNavItem : profileNavItem);
+    if (user?.role === 'admin') {
+      list.push(adminNavItem, profileNavItem);
+    } else {
+      list.push(profileNavItem);
+    }
     return list;
   }, [user?.role]);
 
