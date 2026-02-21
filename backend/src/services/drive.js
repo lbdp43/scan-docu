@@ -20,7 +20,7 @@ function getDriveClient() {
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    scopes: ['https://www.googleapis.com/auth/drive'],
   });
 
   driveClient = google.drive({ version: 'v3', auth });
@@ -45,6 +45,7 @@ async function uploadToDrive(pdfBuffer, fileName, folderId) {
       body: stream,
     },
     fields: 'id, webViewLink',
+    supportsAllDrives: true, // Support Shared Drives (service accounts need this)
   });
 
   return {
@@ -61,6 +62,8 @@ async function listDriveFiles(folderId) {
     fields: 'files(id, name, webViewLink, createdTime, size)',
     orderBy: 'createdTime desc',
     pageSize: 100,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   return response.data.files || [];

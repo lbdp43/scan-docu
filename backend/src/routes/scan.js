@@ -51,9 +51,8 @@ router.post('/', upload.single('image'), async (req, res) => {
     if (req.file.mimetype.startsWith('image/')) {
       processedBuffer = await sharp(req.file.buffer)
         .grayscale()
-        .normalize()
-        .linear(1.3, -(128 * 0.3)) // Increase contrast
-        .sharpen({ sigma: 1.5 })
+        .normalize() // Auto contrast stretching
+        .sharpen({ sigma: 1.2 })
         .resize(2400, null, { withoutEnlargement: true, fit: 'inside' })
         .png() // PNG lossless for better OCR
         .toBuffer();

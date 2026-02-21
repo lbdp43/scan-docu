@@ -121,12 +121,12 @@ function extractDescription(text) {
 
 async function performOCR(imageBuffer) {
   console.log('[ocr] Starting Tesseract with lang:', LANG);
-  const worker = await Tesseract.createWorker(LANG);
+  // OEM 3 = default (LSTM), passed at initialization (cannot be set later)
+  const worker = await Tesseract.createWorker(LANG, 3);
 
   try {
     await worker.setParameters({
       tessedit_pageseg_mode: '4', // Single column of text (better for receipts)
-      tessedit_ocr_engine_mode: '3', // LSTM neural net
       preserve_interword_spaces: '1', // Keep spacing for amounts
     });
 
