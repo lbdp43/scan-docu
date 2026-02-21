@@ -14,7 +14,7 @@ const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
 // Rate limiting for login
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
