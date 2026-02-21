@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import Toast from '../components/Toast';
+import EditExpenseModal from '../components/EditExpenseModal';
 
 const TYPE_ICONS = {
   carburant: { icon: '⛽', color: 'bg-green-mid/20 text-green-light' },
@@ -21,6 +23,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -65,6 +69,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-up">
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -157,7 +163,8 @@ export default function Dashboard() {
             return (
               <div
                 key={expense.id}
-                className={`flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border opacity-0 animate-fade-up stagger-${i + 1}`}
+                onClick={() => setEditingExpense(expense)}
+                className={`flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border cursor-pointer transition-colors hover:border-green-mid/40 active:scale-[0.99] opacity-0 animate-fade-up stagger-${i + 1}`}
               >
                 <div className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl ${typeInfo.color}`}>
                   {expense.has_receipt ? typeInfo.icon : '✏️'}
@@ -188,6 +195,18 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      <EditExpenseModal
+        expense={editingExpense}
+        onClose={() => setEditingExpense(null)}
+        onSaved={(driveUpdated) => {
+          setToast({
+            message: driveUpdated ? 'D\u00E9pense modifi\u00E9e et Drive mis \u00E0 jour' : 'D\u00E9pense modifi\u00E9e',
+            type: 'success',
+          });
+          loadData();
+        }}
+      />
     </div>
   );
 }

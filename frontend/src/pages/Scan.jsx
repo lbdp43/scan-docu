@@ -121,7 +121,7 @@ export default function Scan() {
 
     setStep('submitting');
 
-    // If offline, save to IndexedDB queue
+    // If offline, save to IndexedDB queue (including the image)
     if (!navigator.onLine) {
       try {
         await savePendingExpense({
@@ -130,7 +130,7 @@ export default function Scan() {
           type,
           merchant,
           description,
-        });
+        }, imageFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
         setTimeout(() => navigate('/'), 2000);
@@ -162,7 +162,7 @@ export default function Scan() {
       setTimeout(() => navigate('/'), 2000);
     } catch (err) {
       console.error('Submit error:', err);
-      // If network error, try saving offline
+      // If network error, try saving offline (with image)
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
           await savePendingExpense({
@@ -171,7 +171,7 @@ export default function Scan() {
             type,
             merchant,
             description,
-          });
+          }, imageFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
           setTimeout(() => navigate('/'), 2000);

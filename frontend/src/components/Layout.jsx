@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getPendingExpenses, syncPendingExpenses, removePendingExpense } from '../utils/offline';
+import { getPendingExpenses, syncPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
 import { api } from '../utils/api';
 
 const navItems = [
@@ -73,8 +73,9 @@ export default function Layout() {
         formData.append('type', expense.type);
         if (expense.merchant) formData.append('merchant', expense.merchant);
         if (expense.description) formData.append('description', expense.description);
-        // Note: image data from IndexedDB can't be sent as file easily
-        // The expense will be saved without the image
+        // Reconstruct image file from IndexedDB stored data
+        const imageFile = storableToFile(expense.imageData);
+        if (imageFile) formData.append('image', imageFile);
         await api.submitScan(formData);
       });
 

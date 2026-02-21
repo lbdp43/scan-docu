@@ -19,7 +19,20 @@ function openDB() {
   });
 }
 
-export async function savePendingExpense(expense) {
+// Convert a File/Blob to an ArrayBuffer for IndexedDB storage
+async function fileToStorable(file) {
+  if (!file) return null;
+  const buffer = await file.arrayBuffer();
+  return { buffer, name: file.name, type: file.type };
+}
+
+// Reconstruct a File from stored ArrayBuffer data
+function storableToFile(stored) {
+  if (!stored || !stored.buffer) return null;
+  return new File([stored.buffer], stored.name || 'image.jpg', { type: stored.type || 'image/jpeg' });
+}
+
+export async function savePendingExpense(expense, imageFile = null) {
   const db = await openDB();
   const tx = db.transaction(STORE_NAME, 'readwrite');
   const store = tx.objectStore(STORE_NAME);
@@ -27,6 +40,7 @@ export async function savePendingExpense(expense) {
   const record = {
     id: crypto.randomUUID(),
     ...expense,
+    imageData: await fileToStorable(imageFile),
     timestamp: Date.now(),
     retries: 0,
     status: 'pending',
@@ -39,6 +53,8 @@ export async function savePendingExpense(expense) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+export { storableToFile };
 
 export async function getPendingExpenses() {
   const db = await openDB();

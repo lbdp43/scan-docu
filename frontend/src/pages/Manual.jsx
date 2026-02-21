@@ -99,10 +99,10 @@ export default function Manual() {
       description: description.trim(),
     };
 
-    // If offline, save to IndexedDB queue
+    // If offline, save to IndexedDB queue (with optional photo)
     if (!navigator.onLine) {
       try {
-        await savePendingExpense(expenseData);
+        await savePendingExpense(expenseData, photoFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
         setTimeout(() => navigate('/'), 2000);
@@ -131,10 +131,10 @@ export default function Manual() {
       }
       setTimeout(() => navigate('/'), 2000);
     } catch (err) {
-      // If network error, try offline save
+      // If network error, try offline save (with optional photo)
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
-          await savePendingExpense(expenseData);
+          await savePendingExpense(expenseData, photoFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
           setTimeout(() => navigate('/'), 2000);

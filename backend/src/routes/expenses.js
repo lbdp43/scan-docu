@@ -247,6 +247,10 @@ router.get('/stats/advanced', async (req, res) => {
     const where = {};
     if (req.user.role !== 'admin') {
       where.user_id = req.user.userId;
+    } else if (req.query.userId) {
+      // Admin can filter by specific user
+      const userId = parseInt(req.query.userId, 10);
+      if (!isNaN(userId)) where.user_id = userId;
     }
 
     const now = new Date();

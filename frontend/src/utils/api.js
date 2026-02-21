@@ -90,8 +90,10 @@ export const api = {
     request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteExpense: (id) =>
     request(`/expenses/${id}`, { method: 'DELETE' }),
-  getAdvancedStats: () =>
-    request('/expenses/stats/advanced'),
+  getAdvancedStats: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/expenses/stats/advanced${qs ? `?${qs}` : ''}`);
+  },
   getReceiptUrl: (id) => {
     const token = localStorage.getItem('token');
     return `${API_BASE}/expenses/${id}/receipt?token=${encodeURIComponent(token)}`;
