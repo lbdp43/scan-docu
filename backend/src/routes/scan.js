@@ -101,9 +101,27 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     const hasImage = !!req.file;
     const prefix = hasImage ? 'ticket' : 'sans-ticket';
     const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.pdf`;
+
+    // Compress image for PDF (much smaller than raw mobile photo)
+    let pdfImageBuffer = null;
+    let pdfImageMime = null;
+    if (hasImage && req.file.mimetype.startsWith('image/')) {
+      pdfImageBuffer = await sharp(req.file.buffer)
+        .rotate()
+        .resize(1400, null, { withoutEnlargement: true, fit: 'inside' })
+        .jpeg({ quality: 75, mozjpeg: true })
+        .toBuffer();
+      pdfImageMime = 'image/jpeg';
+      console.log(`[pdf] Image compressed: ${req.file.buffer.length} -> ${pdfImageBuffer.length} bytes (${Math.round(pdfImageBuffer.length / 1024)}KB)`);
+    } else if (hasImage) {
+      // PDF file passed directly
+      pdfImageBuffer = req.file.buffer;
+      pdfImageMime = req.file.mimetype;
+    }
+
     const pdfBuffer = await generatePDF({
-      imageBuffer: hasImage ? req.file.buffer : null,
-      imageMime: hasImage ? req.file.mimetype : null,
+      imageBuffer: pdfImageBuffer,
+      imageMime: pdfImageMime,
       date: ticketDate,
       amount: parsedAmount,
       type: expenseType,

@@ -6,6 +6,7 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
       const doc = new PDFDocument({
         size: 'A4',
         margin: 40,
+        compress: true,
         info: {
           Title: `Ticket ${type} - ${userName}`,
           Author: 'LBDP Notes de Frais',
