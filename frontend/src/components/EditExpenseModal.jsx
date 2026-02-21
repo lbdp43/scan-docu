@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const EXPENSE_TYPES = [
   { value: 'carburant', label: 'Carburant', icon: '\u26FD' },
@@ -9,6 +10,8 @@ const EXPENSE_TYPES = [
 ];
 
 export default function EditExpenseModal({ expense, onClose, onSaved }) {
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === 'admin';
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
   const [type, setType] = useState('autre');
@@ -66,7 +69,12 @@ export default function EditExpenseModal({ expense, onClose, onSaved }) {
       >
         {/* Fixed header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
-          <h3 className="font-serif text-lg font-semibold text-text">Modifier la d{'\u00E9'}pense</h3>
+          <div>
+            <h3 className="font-serif text-lg font-semibold text-text">Modifier la d{'\u00E9'}pense</h3>
+            {isAdmin && expense.user?.name && (
+              <p className="text-xs text-green-light/80 mt-0.5">Par {expense.user.name}</p>
+            )}
+          </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-card text-text-muted text-lg leading-none">{'\u00D7'}</button>
         </div>
 
