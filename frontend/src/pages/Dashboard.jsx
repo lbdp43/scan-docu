@@ -173,7 +173,12 @@ export default function Dashboard() {
                   <p className="text-text text-sm font-medium truncate">
                     {expense.merchant || 'Sans commerçant'}
                   </p>
-                  <p className="text-text-muted text-xs">{date} · {expense.type}</p>
+                  <p className="text-text-muted text-xs truncate">
+                    {user?.role === 'admin' && expense.user?.name && (
+                      <span className="text-green-light/80 font-medium">{expense.user.name} &middot; </span>
+                    )}
+                    {date} · {expense.type}
+                  </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-serif text-lg font-semibold text-text">

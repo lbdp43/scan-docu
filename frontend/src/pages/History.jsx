@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 
@@ -22,6 +23,8 @@ const MONTHS = [
 ];
 
 export default function History() {
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === 'admin';
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
@@ -181,7 +184,10 @@ export default function History() {
                     <p className="text-text text-sm font-medium truncate">
                       {expense.merchant || 'Sans commer\u00E7ant'}
                     </p>
-                    <p className="text-text-muted text-xs">
+                    <p className="text-text-muted text-xs truncate">
+                      {isAdmin && expense.user?.name && (
+                        <span className="text-green-light/80 font-medium">{expense.user.name} &middot; </span>
+                      )}
                       {date}
                       {expense.description && ` \u00B7 ${expense.description}`}
                     </p>
