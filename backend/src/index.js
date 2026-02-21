@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const expensesRoutes = require('./routes/expenses');
 const adminRoutes = require('./routes/admin');
 const scanRoutes = require('./routes/scan');
+const driveSetupRoutes = require('./routes/driveSetup');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -82,6 +83,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/scan', scanRoutes);
+app.use('/api/drive', driveSetupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
