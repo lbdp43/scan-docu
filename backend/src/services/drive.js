@@ -16,6 +16,12 @@ function getDriveClient() {
     );
   }
 
+  // Log masked credentials for debugging
+  const mask = (s) => s ? `${s.slice(0, 8)}...${s.slice(-4)} (len=${s.length})` : 'MISSING';
+  console.log('[drive] Client ID:', mask(clientId));
+  console.log('[drive] Client Secret:', mask(clientSecret));
+  console.log('[drive] Refresh Token:', mask(refreshToken));
+
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 

@@ -132,6 +132,9 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         console.log(`[drive] Upload OK: ${driveFileUrl}`);
       } catch (driveErr) {
         console.error('[drive] Upload error:', driveErr.message);
+        if (driveErr.response) {
+          console.error('[drive] Error details:', JSON.stringify(driveErr.response.data));
+        }
         uploadStatus = 'error';
       }
     } else {
