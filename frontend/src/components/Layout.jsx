@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,12 +15,11 @@ export default function Layout() {
   const { user } = useAuth();
   const location = useLocation();
 
-  const items = [...navItems];
-  if (user?.role === 'admin') {
-    items.push(adminNavItem);
-  } else {
-    items.push(profileNavItem);
-  }
+  const items = useMemo(() => {
+    const list = [...navItems];
+    list.push(user?.role === 'admin' ? adminNavItem : profileNavItem);
+    return list;
+  }, [user?.role]);
 
   return (
     <div className="min-h-screen bg-bg pb-24">

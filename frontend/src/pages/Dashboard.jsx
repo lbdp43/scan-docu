@@ -45,8 +45,20 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-7 bg-card rounded-xl w-44" />
+            <div className="h-4 bg-card rounded-lg w-32 mt-2" />
+          </div>
+          <div className="w-[42px] h-[42px] rounded-full bg-card" />
+        </div>
+        <div className="rounded-4xl p-7 bg-card h-52" />
+        <div className="h-20 bg-card rounded-3xl" />
+        <div className="h-16 bg-card rounded-3xl" />
+        <div className="space-y-3 mt-4">
+          {[1,2,3].map(i => <div key={i} className="h-[78px] bg-card rounded-3xl" />)}
+        </div>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../utils/api';
 
 const TYPE_ICONS = {
@@ -49,7 +49,7 @@ export default function History() {
     }
   }
 
-  const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const total = useMemo(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0), [expenses]);
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -108,8 +108,17 @@ export default function History() {
 
       {/* Loading */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+        <div className="space-y-3 animate-pulse">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border">
+              <div className="w-[46px] h-[46px] rounded-2xl bg-white/5" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-white/5 rounded w-3/4" />
+                <div className="h-3 bg-white/5 rounded w-1/2" />
+              </div>
+              <div className="h-5 bg-white/5 rounded w-16" />
+            </div>
+          ))}
         </div>
       ) : (
         <>
