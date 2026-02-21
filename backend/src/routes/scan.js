@@ -51,10 +51,11 @@ router.post('/', upload.single('image'), async (req, res) => {
     if (req.file.mimetype.startsWith('image/')) {
       processedBuffer = await sharp(req.file.buffer)
         .rotate() // Auto-orient from EXIF (critical for mobile photos)
+        .resize(1800, null, { withoutEnlargement: true, fit: 'inside' })
         .grayscale()
         .normalize() // Auto contrast stretching
-        .sharpen({ sigma: 1.2 })
-        .resize(2400, null, { withoutEnlargement: true, fit: 'inside' })
+        .linear(1.3, -(255 * 0.15)) // Boost contrast for faded thermal receipts
+        .sharpen({ sigma: 1.5, m1: 1.5, m2: 0.7 })
         .png() // PNG lossless for better OCR
         .toBuffer();
       console.log(`[scan] Image preprocessed: ${req.file.buffer.length} -> ${processedBuffer.length} bytes`);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
@@ -10,11 +10,50 @@ const EXPENSE_TYPES = [
   { value: 'autre', label: 'Autre', icon: '📄' },
 ];
 
+// Compress image client-side before uploading (critical for mobile)
+function compressImage(file, maxWidth = 1800, quality = 0.82) {
+  return new Promise((resolve) => {
+    // If file is small enough or not an image, send as-is
+    if (file.size < 500_000 || !file.type.startsWith('image/')) {
+      return resolve(file);
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          const compressed = new File([blob], file.name, { type: 'image/jpeg' });
+          console.log(`[scan] Compressed: ${(file.size / 1024).toFixed(0)}KB -> ${(compressed.size / 1024).toFixed(0)}KB`);
+          resolve(compressed);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function Scan() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const formRef = useRef(null);
 
-  const [step, setStep] = useState('capture'); // capture | scanning | form | submitting
+  const [step, setStep] = useState('capture'); // capture | compressing | scanning | form | submitting
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [ocrResult, setOcrResult] = useState(null);
@@ -27,18 +66,23 @@ export default function Scan() {
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleCapture = async (e) => {
+  const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageFile(file);
+    // Show preview immediately
     setImagePreview(URL.createObjectURL(file));
-    setStep('scanning');
+    setStep('compressing');
 
-    // Send to OCR
     try {
+      // Compress image client-side before upload
+      const compressed = await compressImage(file);
+      setImageFile(compressed);
+      setStep('scanning');
+
+      // Send to OCR
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', compressed);
       const result = await api.scanImage(formData);
 
       setOcrResult(result);
@@ -53,13 +97,17 @@ export default function Scan() {
       }
 
       setStep('form');
+
+      // Scroll to form on mobile
+      setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (err) {
       console.error('OCR error:', err);
+      setImageFile(file);
       setToast({ message: 'Erreur OCR — remplissez manuellement', type: 'warning' });
       setDateTicket(new Date().toISOString().slice(0, 10));
       setStep('form');
     }
-  };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -99,6 +147,7 @@ export default function Scan() {
   const resetScan = () => {
     setStep('capture');
     setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     setOcrResult(null);
     setAmount('');
@@ -106,6 +155,8 @@ export default function Scan() {
     setType('autre');
     setMerchant('');
     setDescription('');
+    // Reset file input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -146,26 +197,43 @@ export default function Scan() {
         </div>
       )}
 
-      {/* Scanning Step */}
-      {step === 'scanning' && (
-        <div className="flex flex-col items-center py-12 gap-4">
-          <div className="w-12 h-12 border-3 border-green-mid border-t-transparent rounded-full animate-spin" />
-          <p className="text-green-light font-medium">Tesseract analyse le ticket…</p>
-          <p className="text-text-muted text-xs">Extraction des données en cours</p>
-
+      {/* Scanning Step (compressing + OCR) */}
+      {(step === 'compressing' || step === 'scanning') && (
+        <div className="flex flex-col items-center py-8 gap-4">
           {imagePreview && (
-            <img src={imagePreview} alt="Ticket" className="mt-4 w-48 rounded-2xl opacity-50" />
+            <div className="relative w-48">
+              <img src={imagePreview} alt="Ticket" className="w-full rounded-2xl opacity-60" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-14 h-14 border-3 border-green-mid border-t-transparent rounded-full animate-spin" />
+              </div>
+            </div>
           )}
+
+          {/* Progress steps */}
+          <div className="flex flex-col items-center gap-2 mt-2">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${step === 'compressing' ? 'bg-green-mid animate-pulse' : 'bg-green-mid'}`} />
+              <span className={`text-xs ${step === 'compressing' ? 'text-green-light' : 'text-text-muted'}`}>
+                Compression de l'image
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${step === 'scanning' ? 'bg-green-mid animate-pulse' : 'bg-card'}`} />
+              <span className={`text-xs ${step === 'scanning' ? 'text-green-light' : 'text-text-dim'}`}>
+                Analyse OCR en cours…
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Form Step */}
       {(step === 'form' || step === 'submitting') && (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           {/* Image preview */}
           {imagePreview && (
             <div className="relative">
-              <img src={imagePreview} alt="Ticket" className="w-full rounded-2xl" />
+              <img src={imagePreview} alt="Ticket" className="w-full rounded-2xl max-h-64 object-cover" />
               <button
                 type="button"
                 onClick={resetScan}
@@ -178,9 +246,15 @@ export default function Scan() {
 
           {/* OCR confidence */}
           {ocrResult && (
-            <div className="p-3 rounded-xl bg-card border border-card-border text-xs text-text-muted">
-              Confiance OCR : {Math.round(ocrResult.confidence || 0)}%
-              {ocrResult.confidence < 60 && ' — Vérifiez les données'}
+            <div className={`p-3 rounded-xl border text-xs ${
+              ocrResult.confidence >= 60
+                ? 'bg-green-mid/10 border-green-mid/30 text-green-light'
+                : 'bg-amber-900/20 border-amber-500/20 text-amber-300'
+            }`}>
+              {ocrResult.confidence >= 60
+                ? `Confiance OCR : ${Math.round(ocrResult.confidence)}% — Vérifiez les données`
+                : `Confiance OCR faible : ${Math.round(ocrResult.confidence || 0)}% — Corrigez les données`
+              }
             </div>
           )}
 
@@ -191,6 +265,7 @@ export default function Scan() {
             </label>
             <input
               type="number"
+              inputMode="decimal"
               step="0.01"
               min="0.01"
               max="9999.99"
