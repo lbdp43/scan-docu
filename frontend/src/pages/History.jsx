@@ -309,174 +309,172 @@ export default function History() {
       {editingExpense && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={closeEdit}>
           <div
-            className="bg-[#1a2a1c] border border-card-border rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="bg-[#1a2a1c] border border-card-border rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[85vh] sm:max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-5">
+            {/* Fixed header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
               <h3 className="font-serif text-lg font-semibold text-text">Modifier la d{'\u00E9'}pense</h3>
-              <button onClick={closeEdit} className="text-text-muted text-xl leading-none">{'\u00D7'}</button>
+              <button onClick={closeEdit} className="w-8 h-8 flex items-center justify-center rounded-full bg-card text-text-muted text-lg leading-none">{'\u00D7'}</button>
             </div>
 
-            {/* Receipt viewer toggle */}
-            {editingExpense.drive_file_id && (
-              <div className="mb-4 space-y-3">
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20">
-                  <span className="text-xs text-green-light">
-                    {'\uD83D\uDCC4'} Justificatif disponible sur Drive
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowReceipt(!showReceipt)}
-                      className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
-                    >
-                      {showReceipt ? 'Masquer' : 'Voir'}
-                    </button>
-                    <a
-                      href={api.getReceiptUrl(editingExpense.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
-                    >
-                      {'\u2B07'} PDF
-                    </a>
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 px-5 pb-5 overscroll-contain">
+              {/* Receipt viewer toggle */}
+              {editingExpense.drive_file_id && (
+                <div className="mb-4 space-y-3">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20">
+                    <span className="text-xs text-green-light">
+                      {'\uD83D\uDCC4'} Justificatif sur Drive
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowReceipt(!showReceipt)}
+                        className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
+                      >
+                        {showReceipt ? 'Masquer' : 'Voir'}
+                      </button>
+                      <a
+                        href={api.getReceiptUrl(editingExpense.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
+                      >
+                        {'\u2B07'} PDF
+                      </a>
+                    </div>
                   </div>
-                </div>
 
-                {showReceipt && (
-                  <div className="rounded-2xl overflow-hidden border border-card-border bg-white">
-                    <iframe
-                      src={api.getReceiptUrl(editingExpense.id)}
-                      className="w-full h-[300px]"
-                      title="Justificatif"
+                  {showReceipt && (
+                    <div className="rounded-2xl overflow-hidden border border-card-border bg-white">
+                      <iframe
+                        src={api.getReceiptUrl(editingExpense.id)}
+                        className="w-full h-[250px] sm:h-[300px]"
+                        title="Justificatif"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <form onSubmit={handleEditSubmit} className="space-y-3">
+                {/* Amount + Date row */}
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
+                      Montant ({'\u20AC'})
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0.01"
+                      max="9999.99"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      required
+                      className="w-full bg-bg border border-card-border rounded-xl px-3 py-2.5 text-text text-lg font-serif focus:outline-none focus:border-green-mid"
                     />
                   </div>
-                )}
-              </div>
-            )}
-
-            {editingExpense.drive_file_id && !showReceipt && (
-              <div className="p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20 text-xs text-green-light mb-4 hidden">
-                Le fichier PDF sera mis {'\u00E0'} jour sur Google Drive
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              {/* Amount */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Montant ({'\u20AC'})
-                </label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
-                  max="9999.99"
-                  value={editAmount}
-                  onChange={(e) => setEditAmount(e.target.value)}
-                  required
-                  className="w-full bg-bg border border-card-border rounded-2xl px-4 py-3.5 text-text text-lg font-serif focus:outline-none focus:border-green-mid"
-                />
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Date du ticket
-                </label>
-                <input
-                  type="date"
-                  value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  max={new Date().toISOString().slice(0, 10)}
-                  className="w-full bg-bg border border-card-border rounded-2xl px-4 py-3.5 text-text focus:outline-none focus:border-green-mid [color-scheme:dark]"
-                />
-              </div>
-
-              {/* Type pills */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Type
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {EXPENSE_TYPES.map(t => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => setEditType(t.value)}
-                      className={`px-3.5 py-2 rounded-full text-sm font-medium transition-all ${
-                        editType === t.value
-                          ? 'bg-green-mid/20 border border-green-mid text-green-light'
-                          : 'bg-card border border-card-border text-text-muted'
-                      }`}
-                    >
-                      {t.icon} {t.label}
-                    </button>
-                  ))}
+                  <div className="flex-1">
+                    <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      max={new Date().toISOString().slice(0, 10)}
+                      className="w-full bg-bg border border-card-border rounded-xl px-3 py-2.5 text-text text-sm focus:outline-none focus:border-green-mid [color-scheme:dark]"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Merchant */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Commer{'\u00E7'}ant
-                </label>
-                <input
-                  type="text"
-                  value={editMerchant}
-                  onChange={(e) => setEditMerchant(e.target.value)}
-                  maxLength={255}
-                  placeholder="Nom du commer\u00E7ant"
-                  className="w-full bg-bg border border-card-border rounded-2xl px-4 py-3.5 text-text focus:outline-none focus:border-green-mid"
-                />
-              </div>
+                {/* Type pills */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
+                    Type
+                  </label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {EXPENSE_TYPES.map(t => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setEditType(t.value)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          editType === t.value
+                            ? 'bg-green-mid/20 border border-green-mid text-green-light'
+                            : 'bg-card border border-card-border text-text-muted'
+                        }`}
+                      >
+                        {t.icon} {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  maxLength={500}
-                  placeholder="Description courte"
-                  className="w-full bg-bg border border-card-border rounded-2xl px-4 py-3.5 text-text focus:outline-none focus:border-green-mid"
-                />
-              </div>
+                {/* Merchant */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
+                    Commer{'\u00E7'}ant
+                  </label>
+                  <input
+                    type="text"
+                    value={editMerchant}
+                    onChange={(e) => setEditMerchant(e.target.value)}
+                    maxLength={255}
+                    placeholder="Nom du commer\u00E7ant"
+                    className="w-full bg-bg border border-card-border rounded-xl px-3 py-2.5 text-text text-sm focus:outline-none focus:border-green-mid"
+                  />
+                </div>
 
-              {/* Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeEdit}
-                  className="flex-1 py-3.5 rounded-2xl bg-card border border-card-border text-text-muted font-medium text-sm transition-transform active:scale-[0.97]"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={editSaving}
-                  className="flex-1 py-3.5 rounded-2xl text-white font-semibold text-sm transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
-                  style={{
-                    background: 'linear-gradient(135deg, #2D6A27, #4A9E40)',
-                    boxShadow: '0 4px 20px rgba(77, 158, 64, 0.3)',
-                  }}
-                >
-                  {editSaving ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Envoi...
-                    </>
-                  ) : (
-                    'Enregistrer'
-                  )}
-                </button>
-              </div>
-            </form>
+                {/* Description */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    maxLength={500}
+                    placeholder="Description courte"
+                    className="w-full bg-bg border border-card-border rounded-xl px-3 py-2.5 text-text text-sm focus:outline-none focus:border-green-mid"
+                  />
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 pt-1 pb-2">
+                  <button
+                    type="button"
+                    onClick={closeEdit}
+                    className="flex-1 py-3 rounded-2xl bg-card border border-card-border text-text-muted font-medium text-sm transition-transform active:scale-[0.97]"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="flex-1 py-3 rounded-2xl text-white font-semibold text-sm transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{
+                      background: 'linear-gradient(135deg, #2D6A27, #4A9E40)',
+                      boxShadow: '0 4px 20px rgba(77, 158, 64, 0.3)',
+                    }}
+                  >
+                    {editSaving ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Envoi...
+                      </>
+                    ) : (
+                      'Enregistrer'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

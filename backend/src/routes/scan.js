@@ -160,7 +160,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
       console.warn('[drive] Skipped upload — no folder ID configured (set DRIVE_ROOT_FOLDER_ID or user.drive_folder_id)');
     }
 
-    // Save expense to database
+    // Save expense to database (store compressed image for PDF regeneration on updates)
     const expense = await req.prisma.expense.create({
       data: {
         user_id: user.id,
@@ -171,6 +171,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         merchant: merchant || null,
         description: description || null,
         has_receipt: !!req.file,
+        receipt_image: pdfImageBuffer || null,
         drive_file_id: driveFileId,
         drive_file_url: driveFileUrl,
         file_name: fileName,
@@ -178,9 +179,12 @@ router.post('/submit', upload.single('image'), async (req, res) => {
       },
     });
 
+    // Exclude receipt_image blob from response
+    const { receipt_image: _img, ...expenseResponse } = expense;
+
     res.status(201).json({
       success: true,
-      expense,
+      expense: expenseResponse,
       driveUrl: driveFileUrl,
       uploadStatus,
     });

@@ -22,6 +22,7 @@ router.get('/:id/receipt', (req, res, next) => {
 
     const expense = await req.prisma.expense.findUnique({
       where: { id },
+      omit: { receipt_image: true },
     });
 
     if (!expense) {
@@ -139,6 +140,7 @@ router.get('/', async (req, res) => {
     const [expenses, total] = await Promise.all([
       req.prisma.expense.findMany({
         where,
+        omit: { receipt_image: true },
         include: {
           user: {
             select: { id: true, name: true, card_id: true },
@@ -222,6 +224,7 @@ router.get('/recent', async (req, res) => {
   try {
     const expenses = await req.prisma.expense.findMany({
       where: { user_id: req.user.userId },
+      omit: { receipt_image: true },
       orderBy: { created_at: 'desc' },
       take: 5,
       include: {
@@ -390,6 +393,7 @@ router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
     const expense = await req.prisma.expense.update({
       where: { id: expenseId },
       data: updateData,
+      omit: { receipt_image: true },
       include: {
         user: {
           select: { id: true, name: true, card_id: true, drive_folder_id: true },
@@ -405,9 +409,13 @@ router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
         const prefix = existing.has_receipt ? 'ticket' : 'sans-ticket';
         const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}.pdf`;
 
+        // Retrieve stored receipt image for PDF regeneration
+        const storedImage = existing.receipt_image;
+        const hasStoredImage = storedImage && storedImage.length > 0;
+
         const pdfBuffer = await generatePDF({
-          imageBuffer: null,
-          imageMime: null,
+          imageBuffer: hasStoredImage ? storedImage : null,
+          imageMime: hasStoredImage ? 'image/jpeg' : null,
           date: ticketDate,
           amount: Number(expense.amount),
           type: expense.type,
@@ -415,7 +423,7 @@ router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
           description: expense.description || '',
           userName: expense.user.name,
           cardId: expense.user.card_id,
-          isUpdate: existing.has_receipt,
+          isUpdate: !hasStoredImage && existing.has_receipt,
         });
 
         let driveResult;
@@ -472,6 +480,7 @@ router.delete('/:id', async (req, res) => {
 
     const existing = await req.prisma.expense.findUnique({
       where: { id: expenseId },
+      omit: { receipt_image: true },
     });
 
     if (!existing) {
@@ -510,6 +519,7 @@ router.get('/export/csv', async (req, res) => {
 
     const expenses = await req.prisma.expense.findMany({
       where,
+      omit: { receipt_image: true },
       include: {
         user: { select: { name: true, card_id: true } },
       },

@@ -32,6 +32,7 @@ model Expense {
   merchant       String?  @db.VarChar(255)
   description    String?
   has_receipt    Boolean  @default(true)
+  receipt_image  Bytes?
   drive_file_id  String?
   drive_file_url String?
   file_name      String?  @db.VarChar(255)
