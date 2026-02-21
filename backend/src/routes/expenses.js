@@ -237,6 +237,34 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/expenses/:id — admin only
+router.delete('/:id', async (req, res) => {
+  try {
+    const expenseId = parseInt(req.params.id);
+
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Suppression réservée aux administrateurs' });
+    }
+
+    const existing = await req.prisma.expense.findUnique({
+      where: { id: expenseId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Dépense non trouvée' });
+    }
+
+    await req.prisma.expense.delete({
+      where: { id: expenseId },
+    });
+
+    res.json({ success: true, message: 'Dépense supprimée' });
+  } catch (err) {
+    console.error('Delete expense error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // GET /api/expenses/export/csv — CSV export
 router.get('/export/csv', async (req, res) => {
   try {

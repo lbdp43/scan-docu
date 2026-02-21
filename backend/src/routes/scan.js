@@ -50,6 +50,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     let processedBuffer = req.file.buffer;
     if (req.file.mimetype.startsWith('image/')) {
       processedBuffer = await sharp(req.file.buffer)
+        .rotate() // Auto-orient from EXIF (critical for mobile photos)
         .grayscale()
         .normalize() // Auto contrast stretching
         .sharpen({ sigma: 1.2 })

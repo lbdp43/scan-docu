@@ -86,6 +86,8 @@ export const api = {
     request('/expenses/stats'),
   createExpense: (data) =>
     request('/expenses', { method: 'POST', body: JSON.stringify(data) }),
+  deleteExpense: (id) =>
+    request(`/expenses/${id}`, { method: 'DELETE' }),
   exportCSV: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/expenses/export/csv?${qs}`);

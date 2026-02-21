@@ -19,6 +19,7 @@ export default function Admin() {
   const [toast, setToast] = useState(null);
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -51,6 +52,20 @@ export default function Admin() {
       setExpenses(data.expenses);
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function handleDelete(expenseId) {
+    try {
+      await api.deleteExpense(expenseId);
+      setDeleteConfirm(null);
+      setToast({ message: 'Dépense supprimée', type: 'success' });
+      await loadExpenses();
+      // Refresh stats too
+      const statsData = await api.getAdminStats();
+      setStats(statsData);
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur lors de la suppression', type: 'error' });
     }
   }
 
@@ -216,9 +231,19 @@ export default function Admin() {
                   </div>
                   <p className="text-text-muted text-xs">{expense.user?.name} · {date}</p>
                 </div>
-                <p className="font-serif text-base font-semibold text-text shrink-0">
+                <p className="font-serif text-base font-semibold text-text shrink-0 mr-1">
                   {Number(expense.amount).toFixed(2)}€
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(expense)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                  title="Supprimer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
               </div>
             );
           })}
@@ -227,6 +252,35 @@ export default function Admin() {
           )}
         </div>
       </div>
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1a2a1c] border border-card-border rounded-3xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="font-serif text-lg font-semibold text-text">Supprimer cette dépense ?</h3>
+            <div className="p-3 rounded-xl bg-card border border-card-border">
+              <p className="text-text text-sm font-medium">{deleteConfirm.merchant || 'Sans commerçant'}</p>
+              <p className="text-text-muted text-xs">
+                {deleteConfirm.user?.name} · {Number(deleteConfirm.amount).toFixed(2)} € · {new Date(deleteConfirm.date_ticket).toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+            <p className="text-red-400/80 text-xs">Cette action est irréversible.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-3 rounded-2xl bg-card border border-card-border text-text-muted font-medium text-sm transition-transform active:scale-[0.97]"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm.id)}
+                className="flex-1 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-400 font-medium text-sm transition-transform active:scale-[0.97]"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
