@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const hpp = require('hpp');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 
@@ -124,7 +125,8 @@ async function ensureAdminExists() {
     console.log(`[startup] Users in DB: ${count}`);
     if (count === 0) {
       console.log('[startup] No users found, creating default admin...');
-      const hash = await bcrypt.hash('admin1234', 10);
+      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+      const hash = await bcrypt.hash(defaultPassword, 12);
       await prisma.user.create({
         data: {
           email: 'guillaume@lbdp.fr',
@@ -134,7 +136,12 @@ async function ensureAdminExists() {
           card_id: 'CARTE-001',
         },
       });
-      console.log('[startup] Admin user created: guillaume@lbdp.fr / admin1234');
+      if (process.env.DEFAULT_ADMIN_PASSWORD) {
+        console.log('[startup] Admin user created: guillaume@lbdp.fr — change password after first login');
+      } else {
+        console.log(`[startup] Admin user created: guillaume@lbdp.fr — generated password: ${defaultPassword}`);
+        console.log('[startup] Set DEFAULT_ADMIN_PASSWORD env var to control this');
+      }
     } else {
       console.log('[startup] Users already exist, skipping admin creation');
     }
@@ -143,9 +150,25 @@ async function ensureAdminExists() {
   }
 }
 
+// Cleanup expired blacklisted tokens periodically
+async function cleanupExpiredTokens() {
+  try {
+    const result = await prisma.tokenBlacklist.deleteMany({
+      where: { expires_at: { lt: new Date() } },
+    });
+    if (result.count > 0) {
+      console.log(`[cleanup] Removed ${result.count} expired blacklisted tokens`);
+    }
+  } catch (err) {
+    console.error('[cleanup] Token cleanup error:', err.message);
+  }
+}
+
 app.listen(PORT, async () => {
   console.log(`LBDP API running on port ${PORT}`);
   await ensureAdminExists();
+  await cleanupExpiredTokens();
+  setInterval(cleanupExpiredTokens, 60 * 60 * 1000); // Cleanup every hour
 });
 
 module.exports = app;

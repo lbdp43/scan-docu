@@ -96,20 +96,12 @@ router.get('/callback', async (req, res) => {
     res.send(`
       <html><body style="font-family:sans-serif;padding:2rem;max-width:700px;margin:0 auto">
         <h2 style="color:green">✅ Refresh Token obtenu !</h2>
-        <p>Copie ces 3 variables dans Railway → Variables d'environnement :</p>
+        <p>Copie cette variable dans Railway → Variables d'environnement :</p>
 
         <table style="width:100%;border-collapse:collapse;margin:1rem 0">
           <tr style="background:#f0f0f0">
             <th style="padding:.5rem;text-align:left;border:1px solid #ccc">Variable</th>
             <th style="padding:.5rem;text-align:left;border:1px solid #ccc">Valeur</th>
-          </tr>
-          <tr>
-            <td style="padding:.5rem;border:1px solid #ccc;font-weight:bold">GOOGLE_CLIENT_ID</td>
-            <td style="padding:.5rem;border:1px solid #ccc;font-family:monospace">${process.env.GOOGLE_CLIENT_ID}</td>
-          </tr>
-          <tr>
-            <td style="padding:.5rem;border:1px solid #ccc;font-weight:bold">GOOGLE_CLIENT_SECRET</td>
-            <td style="padding:.5rem;border:1px solid #ccc;font-family:monospace">${process.env.GOOGLE_CLIENT_SECRET}</td>
           </tr>
           <tr style="background:#fffde7">
             <td style="padding:.5rem;border:1px solid #ccc;font-weight:bold">GOOGLE_REFRESH_TOKEN</td>
@@ -123,7 +115,7 @@ router.get('/callback', async (req, res) => {
 
         <h3>Étapes suivantes :</h3>
         <ol>
-          <li>Ajoute ces 3 variables dans Railway</li>
+          <li>Ajoute <strong>GOOGLE_REFRESH_TOKEN</strong> dans Railway (GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET doivent déjà être configurés)</li>
           <li>Ajoute aussi <strong>DRIVE_ROOT_FOLDER_ID</strong> = l'ID de ton dossier Google Drive (visible dans l'URL du dossier)</li>
           <li>Redémarre le service Railway</li>
         </ol>

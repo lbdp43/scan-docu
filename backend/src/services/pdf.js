@@ -1,6 +1,6 @@
 const PDFDocument = require('pdfkit');
 
-async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId }) {
+async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId, isUpdate = false }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -43,7 +43,7 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
         ['Type', type],
         ['Commerçant', merchant || 'N/A'],
         ['Description', description || 'N/A'],
-        ['Soumis le', new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR')],
+        [isUpdate ? 'Modifié le' : 'Soumis le', new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR')],
       ];
 
       let y = tableTop;
@@ -74,6 +74,22 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
         } catch (imgErr) {
           doc.fontSize(9).fillColor('#999').text('(Image non disponible)', 40, y);
         }
+      } else if (isUpdate) {
+        // Updated document banner (blue/green)
+        y += 20;
+        const bannerHeight = 120;
+        doc.save();
+        doc.roundedRect(40, y, 515, bannerHeight, 12)
+          .fillColor('#F0FFF4').fill()
+          .strokeColor('#2D6A27').lineWidth(2).stroke();
+
+        doc.fontSize(20).fillColor('#2D6A27').font('Helvetica-Bold')
+          .text('DOCUMENT MIS A JOUR', 40, y + 30, { width: 515, align: 'center' });
+        doc.fontSize(10).fillColor('#4A7A46').font('Helvetica')
+          .text('Les informations de cette dépense ont été modifiées', 40, y + 65, { width: 515, align: 'center' });
+        doc.fontSize(9).fillColor('#6B9A67').font('Helvetica')
+          .text('Le ticket original a été scanné lors de la soumission initiale', 40, y + 85, { width: 515, align: 'center' });
+        doc.restore();
       } else {
         // No receipt — big visible banner
         y += 20;

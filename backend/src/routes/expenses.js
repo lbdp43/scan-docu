@@ -2,6 +2,8 @@ const express = require('express');
 const { z } = require('zod');
 const { authenticateToken } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { generatePDF } = require('../services/pdf');
+const { updateDriveFile, uploadToDrive } = require('../services/drive');
 
 const router = express.Router();
 
@@ -16,17 +18,44 @@ const createExpenseSchema = z.object({
   merchant: z.string().min(1).max(255).trim().optional(),
   description: z.string().max(500).trim().optional(),
   has_receipt: z.boolean().optional().default(true),
-  drive_file_id: z.string().optional(),
-  drive_file_url: z.string().optional(),
-  file_name: z.string().optional(),
-  upload_status: z.string().optional(),
 });
+
+const updateExpenseSchema = z.object({
+  date_ticket: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format de date invalide (AAAA-MM-JJ)').optional(),
+  amount: z.number().positive('Le montant doit être positif').max(9999.99, 'Montant trop élevé').optional(),
+  type: z.enum(['carburant', 'repas', 'peage', 'autre']).optional(),
+  merchant: z.string().max(255).trim().optional(),
+  description: z.string().max(500).trim().optional(),
+});
+
+const MAX_PAGE_SIZE = 100;
+
+// CSV injection protection: escape fields that could be interpreted as formulas
+function escapeCsvField(value) {
+  if (value == null) return '';
+  const str = String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return "'" + str;
+  }
+  return str.replace(/"/g, '""');
+}
+
+function parseId(raw) {
+  const id = parseInt(raw, 10);
+  return isNaN(id) ? null : id;
+}
+
+function parsePagination(rawPage, rawLimit) {
+  const page = Math.max(parseInt(rawPage, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(rawLimit, 10) || 50, 1), MAX_PAGE_SIZE);
+  return { page, limit, skip: (page - 1) * limit };
+}
 
 // GET /api/expenses — user sees own, admin sees all
 router.get('/', async (req, res) => {
   try {
-    const { type, month, year, page = 1, limit = 50 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { type, month, year } = req.query;
+    const { page, limit, skip } = parsePagination(req.query.page, req.query.limit);
 
     const where = {};
 
@@ -64,7 +93,7 @@ router.get('/', async (req, res) => {
         },
         orderBy: { date_ticket: 'desc' },
         skip,
-        take: parseInt(limit),
+        take: limit,
       }),
       req.prisma.expense.count({ where }),
     ]);
@@ -73,9 +102,9 @@ router.get('/', async (req, res) => {
       expenses,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit)),
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (err) {
@@ -175,10 +204,7 @@ router.post('/', validate(createExpenseSchema), async (req, res) => {
         merchant: data.merchant || null,
         description: data.description || null,
         has_receipt: data.has_receipt !== undefined ? data.has_receipt : true,
-        drive_file_id: data.drive_file_id || null,
-        drive_file_url: data.drive_file_url || null,
-        file_name: data.file_name || null,
-        upload_status: data.upload_status || 'pending',
+        upload_status: 'pending',
       },
       include: {
         user: {
@@ -194,10 +220,13 @@ router.post('/', validate(createExpenseSchema), async (req, res) => {
   }
 });
 
-// PUT /api/expenses/:id
-router.put('/:id', async (req, res) => {
+// PUT /api/expenses/:id — update expense and regenerate Drive PDF
+router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
   try {
-    const expenseId = parseInt(req.params.id);
+    const expenseId = parseId(req.params.id);
+    if (!expenseId) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
 
     // Check ownership
     const existing = await req.prisma.expense.findUnique({
@@ -212,23 +241,82 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Accès non autorisé' });
     }
 
+    const data = req.validatedBody;
     const updateData = {};
-    const allowedFields = ['date_ticket', 'amount', 'type', 'merchant', 'description', 'drive_file_id', 'drive_file_url', 'file_name', 'upload_status'];
 
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        if (field === 'date_ticket') {
-          updateData[field] = new Date(req.body[field]);
-        } else {
-          updateData[field] = req.body[field];
-        }
-      }
+    if (data.date_ticket !== undefined) updateData.date_ticket = new Date(data.date_ticket);
+    if (data.amount !== undefined) updateData.amount = data.amount;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.merchant !== undefined) updateData.merchant = data.merchant || null;
+    if (data.description !== undefined) updateData.description = data.description || null;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'Aucun champ à modifier' });
     }
 
     const expense = await req.prisma.expense.update({
       where: { id: expenseId },
       data: updateData,
+      include: {
+        user: {
+          select: { id: true, name: true, card_id: true, drive_folder_id: true },
+        },
+      },
     });
+
+    // Regenerate PDF and update Drive if file was previously uploaded
+    if (existing.drive_file_id) {
+      try {
+        const ticketDate = new Date(expense.date_ticket);
+        const userName = expense.user.name.split(' ')[0];
+        const prefix = existing.has_receipt ? 'ticket' : 'sans-ticket';
+        const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}.pdf`;
+
+        const pdfBuffer = await generatePDF({
+          imageBuffer: null,
+          imageMime: null,
+          date: ticketDate,
+          amount: Number(expense.amount),
+          type: expense.type,
+          merchant: expense.merchant || '',
+          description: expense.description || '',
+          userName: expense.user.name,
+          cardId: expense.user.card_id,
+          isUpdate: existing.has_receipt,
+        });
+
+        let driveResult;
+        try {
+          driveResult = await updateDriveFile(existing.drive_file_id, pdfBuffer, fileName);
+        } catch (updateErr) {
+          // File may have been deleted on Drive — try creating a new one
+          console.error('[drive] Update failed, creating new file:', updateErr.message);
+          const folderId = expense.user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+          if (folderId) {
+            driveResult = await uploadToDrive(pdfBuffer, fileName, folderId);
+          }
+        }
+
+        if (driveResult) {
+          await req.prisma.expense.update({
+            where: { id: expenseId },
+            data: {
+              file_name: fileName,
+              drive_file_id: driveResult.fileId,
+              drive_file_url: driveResult.webViewLink,
+            },
+          });
+          expense.file_name = fileName;
+          expense.drive_file_id = driveResult.fileId;
+          expense.drive_file_url = driveResult.webViewLink;
+        }
+
+        console.log(`[expense] Updated expense #${expenseId} and Drive file`);
+      } catch (driveErr) {
+        console.error('[drive] Error updating Drive file:', driveErr.message);
+        // Don't fail the whole update if Drive update fails
+      }
+    }
 
     res.json({ expense });
   } catch (err) {
@@ -240,7 +328,10 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/expenses/:id — admin only
 router.delete('/:id', async (req, res) => {
   try {
-    const expenseId = parseInt(req.params.id);
+    const expenseId = parseId(req.params.id);
+    if (!expenseId) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
 
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Suppression réservée aux administrateurs' });
@@ -274,7 +365,9 @@ router.get('/export/csv', async (req, res) => {
     }
 
     const { month, year, type } = req.query;
-    if (type) where.type = type;
+    if (type && ['carburant', 'repas', 'peage', 'autre'].includes(type)) {
+      where.type = type;
+    }
     if (month && year) {
       where.date_ticket = {
         gte: new Date(parseInt(year), parseInt(month) - 1, 1),
@@ -290,10 +383,20 @@ router.get('/export/csv', async (req, res) => {
       orderBy: { date_ticket: 'desc' },
     });
 
-    const header = 'Date,Collaborateur,Carte,Type,Commerçant,Montant (€),Description,Justificatif,Lien Drive\n';
+    const header = 'Date,Collaborateur,Carte,Type,Commercant,Montant (EUR),Description,Justificatif,Lien Drive\n';
     const rows = expenses.map(e => {
       const date = new Date(e.date_ticket).toLocaleDateString('fr-FR');
-      return `${date},"${e.user.name}","${e.card_id || ''}","${e.type}","${e.merchant || ''}",${e.amount},"${e.description || ''}",${e.has_receipt ? 'Oui' : 'Non'},"${e.drive_file_url || ''}"`;
+      return [
+        escapeCsvField(date),
+        `"${escapeCsvField(e.user.name)}"`,
+        `"${escapeCsvField(e.card_id)}"`,
+        `"${escapeCsvField(e.type)}"`,
+        `"${escapeCsvField(e.merchant)}"`,
+        e.amount,
+        `"${escapeCsvField(e.description)}"`,
+        e.has_receipt ? 'Oui' : 'Non',
+        `"${escapeCsvField(e.drive_file_url)}"`,
+      ].join(',');
     }).join('\n');
 
     const bom = '\uFEFF';

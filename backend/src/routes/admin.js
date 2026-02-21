@@ -99,7 +99,8 @@ router.post('/users', validate(createUserSchema), async (req, res) => {
 // PUT /api/admin/users/:id — Update user
 router.put('/users/:id', validate(updateUserSchema), async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) return res.status(400).json({ error: 'ID invalide' });
     const data = req.validatedBody;
 
     const user = await req.prisma.user.update({
@@ -130,11 +131,12 @@ router.put('/users/:id', validate(updateUserSchema), async (req, res) => {
 // PUT /api/admin/users/:id/reset-password
 router.put('/users/:id/reset-password', async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) return res.status(400).json({ error: 'ID invalide' });
     const { newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Mot de passe minimum 8 caractères' });
+    if (!newPassword || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe entre 8 et 128 caractères requis' });
     }
 
     const password_hash = await bcrypt.hash(newPassword, 12);
@@ -228,12 +230,17 @@ router.get('/stats', async (req, res) => {
 // GET /api/admin/expenses — all expenses with user filter
 router.get('/expenses', async (req, res) => {
   try {
-    const { user_id, type, month, year, page = 1, limit = 50 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { user_id, type, month, year } = req.query;
+    const rawPage = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const rawLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const skip = (rawPage - 1) * rawLimit;
     const where = {};
 
-    if (user_id) where.user_id = parseInt(user_id);
-    if (type) where.type = type;
+    if (user_id) {
+      const uid = parseInt(user_id, 10);
+      if (!isNaN(uid)) where.user_id = uid;
+    }
+    if (type && ['carburant', 'repas', 'peage', 'autre'].includes(type)) where.type = type;
     if (month && year) {
       where.date_ticket = {
         gte: new Date(parseInt(year), parseInt(month) - 1, 1),
@@ -249,7 +256,7 @@ router.get('/expenses', async (req, res) => {
         },
         orderBy: { date_ticket: 'desc' },
         skip,
-        take: parseInt(limit),
+        take: rawLimit,
       }),
       req.prisma.expense.count({ where }),
     ]);
@@ -258,9 +265,9 @@ router.get('/expenses', async (req, res) => {
       expenses,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit)),
+        page: rawPage,
+        limit: rawLimit,
+        totalPages: Math.ceil(total / rawLimit),
       },
     });
   } catch (err) {

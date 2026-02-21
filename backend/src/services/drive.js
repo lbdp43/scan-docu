@@ -69,4 +69,34 @@ async function listDriveFiles(folderId) {
   return response.data.files || [];
 }
 
-module.exports = { uploadToDrive, listDriveFiles };
+async function updateDriveFile(fileId, pdfBuffer, fileName) {
+  const drive = getDriveClient();
+
+  const stream = new Readable();
+  stream.push(pdfBuffer);
+  stream.push(null);
+
+  const response = await drive.files.update({
+    fileId,
+    requestBody: {
+      name: fileName,
+    },
+    media: {
+      mimeType: 'application/pdf',
+      body: stream,
+    },
+    fields: 'id, webViewLink',
+  });
+
+  return {
+    fileId: response.data.id,
+    webViewLink: response.data.webViewLink,
+  };
+}
+
+async function deleteDriveFile(fileId) {
+  const drive = getDriveClient();
+  await drive.files.delete({ fileId });
+}
+
+module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles };

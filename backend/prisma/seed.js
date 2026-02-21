@@ -1,13 +1,18 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
 
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || crypto.randomBytes(12).toString('hex');
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.warn('[seed] WARNING: No SEED_ADMIN_PASSWORD set — generated password:', adminPassword);
+  }
   // Create admin user (Guillaume)
-  const adminHash = await bcrypt.hash('admin1234', 10);
+  const adminHash = await bcrypt.hash(adminPassword, 12);
   const admin = await prisma.user.upsert({
     where: { email: 'guillaume@lbdp.fr' },
     update: { password_hash: adminHash },
@@ -22,7 +27,11 @@ async function main() {
   console.log('Admin created:', admin.name);
 
   // Create team users
-  const userHash = await bcrypt.hash('user1234', 10);
+  const userPassword = process.env.SEED_USER_PASSWORD || crypto.randomBytes(12).toString('hex');
+  if (!process.env.SEED_USER_PASSWORD) {
+    console.warn('[seed] WARNING: No SEED_USER_PASSWORD set — generated password:', userPassword);
+  }
+  const userHash = await bcrypt.hash(userPassword, 12);
 
   const users = [
     { email: 'loic@lbdp.fr', name: 'Loïc', card_id: 'CARTE-002' },

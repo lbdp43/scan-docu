@@ -9,7 +9,11 @@ const { validate } = require('../middleware/validate');
 
 const router = express.Router();
 
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
+if (!process.env.JWT_REFRESH_SECRET) {
+  console.error('FATAL: JWT_REFRESH_SECRET environment variable is required');
+  process.exit(1);
+}
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 // Rate limiting for login
 const loginLimiter = rateLimit({

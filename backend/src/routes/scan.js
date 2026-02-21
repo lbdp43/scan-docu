@@ -192,7 +192,10 @@ router.post('/submit', upload.single('image'), async (req, res) => {
 // POST /api/scan/retry/:id — Retry Drive upload for failed expense
 router.post('/retry/:id', async (req, res) => {
   try {
-    const expenseId = parseInt(req.params.id);
+    const expenseId = parseInt(req.params.id, 10);
+    if (isNaN(expenseId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
     const expense = await req.prisma.expense.findUnique({
       where: { id: expenseId },
     });
