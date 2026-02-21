@@ -120,17 +120,22 @@ function extractDescription(text) {
 }
 
 async function performOCR(imageBuffer) {
+  console.log('[ocr] Starting Tesseract with lang:', LANG);
   const worker = await Tesseract.createWorker(LANG);
 
   try {
     await worker.setParameters({
-      tessedit_pageseg_mode: '6', // Uniform block of text
+      tessedit_pageseg_mode: '4', // Single column of text (better for receipts)
       tessedit_ocr_engine_mode: '3', // LSTM neural net
+      preserve_interword_spaces: '1', // Keep spacing for amounts
     });
 
     const { data } = await worker.recognize(imageBuffer);
     const rawText = data.text;
     const confidence = data.confidence;
+
+    console.log(`[ocr] Confidence: ${confidence}%, text length: ${rawText.length}`);
+    console.log('[ocr] Raw text (first 300 chars):', rawText.substring(0, 300));
 
     const extracted = {
       amount: extractAmount(rawText),
@@ -139,6 +144,8 @@ async function performOCR(imageBuffer) {
       type: detectType(rawText),
       description: extractDescription(rawText),
     };
+
+    console.log('[ocr] Extracted:', JSON.stringify(extracted));
 
     return { rawText, extracted, confidence };
   } finally {

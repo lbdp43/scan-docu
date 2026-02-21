@@ -52,10 +52,12 @@ router.post('/', upload.single('image'), async (req, res) => {
       processedBuffer = await sharp(req.file.buffer)
         .grayscale()
         .normalize()
-        .sharpen()
-        .resize(2000, null, { withoutEnlargement: true, fit: 'inside' })
-        .jpeg({ quality: 90 })
+        .linear(1.3, -(128 * 0.3)) // Increase contrast
+        .sharpen({ sigma: 1.5 })
+        .resize(2400, null, { withoutEnlargement: true, fit: 'inside' })
+        .png() // PNG lossless for better OCR
         .toBuffer();
+      console.log(`[scan] Image preprocessed: ${req.file.buffer.length} -> ${processedBuffer.length} bytes`);
     }
 
     // Perform OCR
@@ -118,16 +120,23 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     let driveFileUrl = null;
     let uploadStatus = 'pending';
 
-    if (pdfBuffer && user.drive_folder_id) {
+    // Use user-specific folder or fall back to global root folder
+    const folderId = user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+
+    if (pdfBuffer && folderId) {
       try {
-        const driveResult = await uploadToDrive(pdfBuffer, fileName, user.drive_folder_id);
+        console.log(`[drive] Uploading ${fileName} to folder ${folderId}`);
+        const driveResult = await uploadToDrive(pdfBuffer, fileName, folderId);
         driveFileId = driveResult.fileId;
         driveFileUrl = driveResult.webViewLink;
         uploadStatus = 'uploaded';
+        console.log(`[drive] Upload OK: ${driveFileUrl}`);
       } catch (driveErr) {
-        console.error('Drive upload error:', driveErr);
+        console.error('[drive] Upload error:', driveErr.message);
         uploadStatus = 'error';
       }
+    } else {
+      console.warn('[drive] Skipped upload — no folder ID configured (set DRIVE_ROOT_FOLDER_ID or user.drive_folder_id)');
     }
 
     // Save expense to database
