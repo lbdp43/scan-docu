@@ -59,7 +59,7 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
       doc.moveTo(40, y).lineTo(555, y).strokeColor('#E0E0E0').lineWidth(0.5).stroke();
       y += 15;
 
-      // Ticket image
+      // Ticket image or "no receipt" banner
       if (imageBuffer && imageMime && imageMime.startsWith('image/')) {
         doc.fontSize(12).fillColor('#1A3A1C').text('Image du ticket', 40, y);
         y += 25;
@@ -73,6 +73,29 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
         } catch (imgErr) {
           doc.fontSize(9).fillColor('#999').text('(Image non disponible)', 40, y);
         }
+      } else {
+        // No receipt — big visible banner
+        y += 20;
+        const bannerHeight = 200;
+        doc.save();
+        doc.roundedRect(40, y, 515, bannerHeight, 12)
+          .fillColor('#FEF2F2').fill()
+          .strokeColor('#DC2626').lineWidth(3).stroke();
+
+        // Red X icon
+        const cx = 297, cy = y + 60;
+        doc.save();
+        doc.circle(cx, cy, 30).fillColor('#FEE2E2').fill()
+          .strokeColor('#DC2626').lineWidth(2).stroke();
+        doc.moveTo(cx - 12, cy - 12).lineTo(cx + 12, cy + 12).strokeColor('#DC2626').lineWidth(4).stroke();
+        doc.moveTo(cx + 12, cy - 12).lineTo(cx - 12, cy + 12).strokeColor('#DC2626').lineWidth(4).stroke();
+        doc.restore();
+
+        doc.fontSize(28).fillColor('#DC2626').font('Helvetica-Bold')
+          .text('TICKET NON DISPONIBLE', 40, y + 110, { width: 515, align: 'center' });
+        doc.fontSize(10).fillColor('#991B1B').font('Helvetica')
+          .text('Saisie manuelle sans justificatif', 40, y + 150, { width: 515, align: 'center' });
+        doc.restore();
       }
 
       // Footer

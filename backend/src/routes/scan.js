@@ -97,23 +97,21 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     const expenseType = type || 'autre';
     const userName = user.name.split(' ')[0];
 
-    // Generate PDF
-    let pdfBuffer = null;
-    let fileName = null;
-    if (req.file) {
-      fileName = `ticket_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.pdf`;
-      pdfBuffer = await generatePDF({
-        imageBuffer: req.file.buffer,
-        imageMime: req.file.mimetype,
-        date: ticketDate,
-        amount: parsedAmount,
-        type: expenseType,
-        merchant: merchant || '',
-        description: description || '',
-        userName: user.name,
-        cardId: user.card_id,
-      });
-    }
+    // Generate PDF (with image or "TICKET NON DISPONIBLE" banner)
+    const hasImage = !!req.file;
+    const prefix = hasImage ? 'ticket' : 'sans-ticket';
+    const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.pdf`;
+    const pdfBuffer = await generatePDF({
+      imageBuffer: hasImage ? req.file.buffer : null,
+      imageMime: hasImage ? req.file.mimetype : null,
+      date: ticketDate,
+      amount: parsedAmount,
+      type: expenseType,
+      merchant: merchant || '',
+      description: description || '',
+      userName: user.name,
+      cardId: user.card_id,
+    });
 
     // Upload to Google Drive
     let driveFileId = null;

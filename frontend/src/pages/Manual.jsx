@@ -40,17 +40,21 @@ export default function Manual() {
     setLoading(true);
 
     try {
-      await api.createExpense({
-        date_ticket: dateTicket,
-        amount: parseFloat(amount),
-        type,
-        merchant: merchant.trim(),
-        description: description.trim(),
-        has_receipt: false,
-        upload_status: 'uploaded', // No Drive upload needed for manual
-      });
+      // Submit via scan/submit to generate PDF and upload to Drive
+      const formData = new FormData();
+      formData.append('amount', amount);
+      formData.append('date_ticket', dateTicket);
+      formData.append('type', type);
+      formData.append('merchant', merchant.trim());
+      formData.append('description', description.trim());
 
-      setToast({ message: 'Dépense enregistrée', type: 'success' });
+      const result = await api.submitScan(formData);
+
+      if (result.driveUrl) {
+        setToast({ message: 'Dépense enregistrée et PDF envoyé sur Drive', type: 'success' });
+      } else {
+        setToast({ message: 'Dépense enregistrée', type: 'success' });
+      }
       setTimeout(() => navigate('/'), 2000);
     } catch (err) {
       setToast({ message: err.message || 'Erreur', type: 'error' });
@@ -182,7 +186,7 @@ export default function Manual() {
               Envoi…
             </>
           ) : (
-            'Enregistrer la dépense'
+            'Enregistrer et envoyer sur Drive'
           )}
         </button>
       </form>
