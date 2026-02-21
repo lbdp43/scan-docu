@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique @db.VarChar(255)
+  password_hash  String
+  name           String    @db.VarChar(100)
+  role           String    @default("user") @db.VarChar(10)
+  card_id        String?   @db.VarChar(50)
+  drive_folder_id String?
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  expenses       Expense[]
+
+  @@map("users")
+}
+
+model Expense {
+  id             Int      @id @default(autoincrement())
+  user_id        Int
+  card_id        String?  @db.VarChar(50)
+  date_ticket    DateTime @db.Date
+  amount         Decimal  @db.Decimal(10, 2)
+  type           String   @db.VarChar(20)
+  merchant       String?  @db.VarChar(255)
+  description    String?
+  has_receipt    Boolean  @default(true)
+  drive_file_id  String?
+  drive_file_url String?
+  file_name      String?  @db.VarChar(255)
+  upload_status  String   @default("pending") @db.VarChar(20)
+  created_at     DateTime @default(now())
+  user           User     @relation(fields: [user_id], references: [id])
+
+  @@map("expenses")
+}
+
+model DriveConfig {
+  id                    Int      @id @default(autoincrement())
+  root_folder_id        String
+  service_account_email String?
+  updated_at            DateTime @default(now()) @updatedAt
+
+  @@map("drive_config")
+}
+
+model TokenBlacklist {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@map("token_blacklist")
+}

@@ -1,0 +1,309 @@
+const express = require('express');
+const bcrypt = require('bcrypt');
+const { z } = require('zod');
+const { authenticateToken, checkAdmin } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+
+const router = express.Router();
+
+// All admin routes require auth + admin role
+router.use(authenticateToken);
+router.use(checkAdmin);
+
+// Validation schemas
+const createUserSchema = z.object({
+  email: z.string().email('Email invalide').toLowerCase().trim(),
+  password: z.string().min(8, 'Minimum 8 caractères').max(128),
+  name: z.string().min(1, 'Nom requis').max(100).trim(),
+  role: z.enum(['admin', 'user']).optional().default('user'),
+  card_id: z.string().max(50).optional(),
+  drive_folder_id: z.string().optional(),
+});
+
+const updateUserSchema = z.object({
+  email: z.string().email().toLowerCase().trim().optional(),
+  name: z.string().min(1).max(100).trim().optional(),
+  role: z.enum(['admin', 'user']).optional(),
+  card_id: z.string().max(50).optional().nullable(),
+  drive_folder_id: z.string().optional().nullable(),
+  is_active: z.boolean().optional(),
+});
+
+// GET /api/admin/users — List all users
+router.get('/users', async (req, res) => {
+  try {
+    const users = await req.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        card_id: true,
+        drive_folder_id: true,
+        is_active: true,
+        created_at: true,
+        _count: { select: { expenses: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    res.json({ users });
+  } catch (err) {
+    console.error('List users error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/admin/users — Create user
+router.post('/users', validate(createUserSchema), async (req, res) => {
+  try {
+    const data = req.validatedBody;
+
+    const existing = await req.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'Un compte avec cet email existe déjà' });
+    }
+
+    const password_hash = await bcrypt.hash(data.password, 12);
+
+    const user = await req.prisma.user.create({
+      data: {
+        email: data.email,
+        password_hash,
+        name: data.name,
+        role: data.role,
+        card_id: data.card_id || null,
+        drive_folder_id: data.drive_folder_id || null,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        card_id: true,
+        drive_folder_id: true,
+        is_active: true,
+        created_at: true,
+      },
+    });
+
+    res.status(201).json({ user });
+  } catch (err) {
+    console.error('Create user error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/admin/users/:id — Update user
+router.put('/users/:id', validate(updateUserSchema), async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const data = req.validatedBody;
+
+    const user = await req.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        card_id: true,
+        drive_folder_id: true,
+        is_active: true,
+        created_at: true,
+      },
+    });
+
+    res.json({ user });
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    console.error('Update user error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/admin/users/:id/reset-password
+router.put('/users/:id/reset-password', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Mot de passe minimum 8 caractères' });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 12);
+
+    await req.prisma.user.update({
+      where: { id: userId },
+      data: { password_hash },
+    });
+
+    res.json({ message: 'Mot de passe réinitialisé' });
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/admin/stats — Global stats for admin dashboard
+router.get('/stats', async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const monthWhere = {
+      date_ticket: { gte: startOfMonth, lte: endOfMonth },
+    };
+
+    const [monthTotal, monthByType, monthByUser, totalUsers, totalExpenses] = await Promise.all([
+      req.prisma.expense.aggregate({
+        where: monthWhere,
+        _sum: { amount: true },
+        _count: true,
+      }),
+      req.prisma.expense.groupBy({
+        by: ['type'],
+        where: monthWhere,
+        _sum: { amount: true },
+        _count: true,
+      }),
+      req.prisma.expense.groupBy({
+        by: ['user_id'],
+        where: monthWhere,
+        _sum: { amount: true },
+        _count: true,
+      }),
+      req.prisma.user.count({ where: { is_active: true } }),
+      req.prisma.expense.count(),
+    ]);
+
+    // Enrich user stats with names
+    const userIds = monthByUser.map(u => u.user_id);
+    const users = await req.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, card_id: true },
+    });
+    const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+
+    const userStats = monthByUser.map(u => ({
+      userId: u.user_id,
+      name: userMap[u.user_id]?.name || 'Inconnu',
+      card_id: userMap[u.user_id]?.card_id || null,
+      total: u._sum.amount || 0,
+      count: u._count,
+    }));
+
+    res.json({
+      month: {
+        total: monthTotal._sum.amount || 0,
+        count: monthTotal._count,
+      },
+      byType: monthByType.map(t => ({
+        type: t.type,
+        total: t._sum.amount || 0,
+        count: t._count,
+      })),
+      byUser: userStats,
+      totals: {
+        users: totalUsers,
+        expenses: totalExpenses,
+      },
+    });
+  } catch (err) {
+    console.error('Admin stats error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/admin/expenses — all expenses with user filter
+router.get('/expenses', async (req, res) => {
+  try {
+    const { user_id, type, month, year, page = 1, limit = 50 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const where = {};
+
+    if (user_id) where.user_id = parseInt(user_id);
+    if (type) where.type = type;
+    if (month && year) {
+      where.date_ticket = {
+        gte: new Date(parseInt(year), parseInt(month) - 1, 1),
+        lte: new Date(parseInt(year), parseInt(month), 0),
+      };
+    }
+
+    const [expenses, total] = await Promise.all([
+      req.prisma.expense.findMany({
+        where,
+        include: {
+          user: { select: { id: true, name: true, card_id: true } },
+        },
+        orderBy: { date_ticket: 'desc' },
+        skip,
+        take: parseInt(limit),
+      }),
+      req.prisma.expense.count({ where }),
+    ]);
+
+    res.json({
+      expenses,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('Admin expenses error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/admin/drive-config
+router.get('/drive-config', async (req, res) => {
+  try {
+    const config = await req.prisma.driveConfig.findFirst();
+    res.json({ config: config || null });
+  } catch (err) {
+    console.error('Drive config error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/admin/drive-config
+router.put('/drive-config', async (req, res) => {
+  try {
+    const { root_folder_id, service_account_email } = req.body;
+
+    const existing = await req.prisma.driveConfig.findFirst();
+
+    let config;
+    if (existing) {
+      config = await req.prisma.driveConfig.update({
+        where: { id: existing.id },
+        data: { root_folder_id, service_account_email },
+      });
+    } else {
+      config = await req.prisma.driveConfig.create({
+        data: { root_folder_id, service_account_email },
+      });
+    }
+
+    res.json({ config });
+  } catch (err) {
+    console.error('Update drive config error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+module.exports = router;
