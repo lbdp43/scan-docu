@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const hpp = require('hpp');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 
 const authRoutes = require('./routes/auth');
@@ -115,8 +116,34 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
+async function ensureAdminExists() {
+  try {
+    const count = await prisma.user.count();
+    console.log(`[startup] Users in DB: ${count}`);
+    if (count === 0) {
+      console.log('[startup] No users found, creating default admin...');
+      const hash = await bcrypt.hash('admin1234', 10);
+      await prisma.user.create({
+        data: {
+          email: 'guillaume@lbdp.fr',
+          password_hash: hash,
+          name: 'Guillaume Darinot',
+          role: 'admin',
+          card_id: 'CARTE-001',
+        },
+      });
+      console.log('[startup] Admin user created: guillaume@lbdp.fr / admin1234');
+    } else {
+      console.log('[startup] Users already exist, skipping admin creation');
+    }
+  } catch (err) {
+    console.error('[startup] Error checking/creating admin:', err.message);
+  }
+}
+
+app.listen(PORT, async () => {
   console.log(`LBDP API running on port ${PORT}`);
+  await ensureAdminExists();
 });
 
 module.exports = app;
