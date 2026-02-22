@@ -54,16 +54,17 @@ export default function Scan() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Form fields — péage pre-selected (most common use case)
+  // Form fields — no type pre-selected, user must choose
   const [amount, setAmount] = useState('');
   const [dateTicket, setDateTicket] = useState('');
-  const [type, setType] = useState('peage');
+  const [type, setType] = useState('');
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
+  const [ocrSuggestedType, setOcrSuggestedType] = useState(null);
 
   // Track which fields the user has already manually edited
   // so OCR result doesn't overwrite user input
-  const userEdited = useRef({ amount: false, type: false, merchant: false });
+  const userEdited = useRef({ amount: false, merchant: false });
 
   const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -76,8 +77,9 @@ export default function Scan() {
     setAmount('');
     setMerchant('');
     setDescription('');
-    setType('peage');
-    userEdited.current = { amount: false, type: false, merchant: false };
+    setType('');
+    setOcrSuggestedType(null);
+    userEdited.current = { amount: false, merchant: false };
     setOcrState('running');
     setOcrConfidence(null);
 
@@ -109,8 +111,9 @@ export default function Scan() {
         if (result.extracted.date) {
           setDateTicket(result.extracted.date);
         }
-        if (result.extracted.type && !userEdited.current.type) {
-          setType(result.extracted.type);
+        // Type is NEVER auto-selected — shown as a suggestion only
+        if (result.extracted.type && result.extracted.type !== 'autre') {
+          setOcrSuggestedType(result.extracted.type);
         }
         if (result.extracted.merchant && !userEdited.current.merchant) {
           setMerchant(result.extracted.merchant);
@@ -130,6 +133,10 @@ export default function Scan() {
 
     if (!amount || parseFloat(amount) <= 0) {
       setToast({ message: 'Montant requis', type: 'error' });
+      return;
+    }
+    if (!type) {
+      setToast({ message: 'Veuillez sélectionner un type de dépense', type: 'error' });
       return;
     }
 
@@ -191,7 +198,8 @@ export default function Scan() {
     setOcrConfidence(null);
     setAmount('');
     setDateTicket('');
-    setType('peage');
+    setType('');
+    setOcrSuggestedType(null);
     setMerchant('');
     setDescription('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -321,18 +329,35 @@ export default function Scan() {
 
         {/* Type pills */}
         <div>
-          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-            Type de dépense
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-[10px] uppercase tracking-widest text-text-muted">
+              Type de dépense <span className="text-red-400">*</span>
+            </label>
+            {ocrSuggestedType && !type && (
+              <span className="text-[10px] text-amber-300/80">
+                OCR suggère :&nbsp;
+                <button
+                  type="button"
+                  onClick={() => setType(ocrSuggestedType)}
+                  className="underline font-medium text-amber-300"
+                >
+                  {EXPENSE_TYPES.find(t => t.value === ocrSuggestedType)?.icon}{' '}
+                  {EXPENSE_TYPES.find(t => t.value === ocrSuggestedType)?.label}
+                </button>
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-4 gap-2">
             {EXPENSE_TYPES.map(t => (
               <button
                 key={t.value}
                 type="button"
-                onClick={() => { setType(t.value); userEdited.current.type = true; }}
+                onClick={() => setType(t.value)}
                 className={`py-3 rounded-2xl text-sm font-medium transition-all flex flex-col items-center gap-1 ${
                   type === t.value
                     ? 'bg-green-mid/20 border-2 border-green-mid text-green-light'
+                    : ocrSuggestedType === t.value && !type
+                    ? 'bg-amber-900/20 border border-amber-500/40 text-amber-300/80'
                     : 'bg-card border border-card-border text-text-muted'
                 }`}
               >
@@ -341,6 +366,9 @@ export default function Scan() {
               </button>
             ))}
           </div>
+          {!type && (
+            <p className="text-[10px] text-text-dim mt-1.5">Sélectionnez le type avant d'envoyer</p>
+          )}
         </div>
 
         {/* Merchant + Description (optional, collapsible label) */}
