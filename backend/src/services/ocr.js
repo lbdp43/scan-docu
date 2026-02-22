@@ -258,4 +258,15 @@ async function performOCR(imageBuffer) {
   }
 }
 
-module.exports = { performOCR };
+// Pre-warm the Tesseract worker so the first scan request is instant
+async function warmupWorker() {
+  try {
+    console.log('[ocr] Pre-warming Tesseract worker…');
+    await getWorker();
+    console.log('[ocr] Worker ready');
+  } catch (err) {
+    console.error('[ocr] Warmup failed (non-fatal):', err.message);
+  }
+}
+
+module.exports = { performOCR, warmupWorker };

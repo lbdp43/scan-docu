@@ -11,35 +11,25 @@ const EXPENSE_TYPES = [
   { value: 'autre', label: 'Autre', icon: '📄' },
 ];
 
-// Compress image client-side before uploading (critical for mobile)
-function compressImage(file, maxWidth = 1800, quality = 0.82) {
+// Compress image client-side — 1200px is enough for OCR + PDF
+function compressImage(file, maxWidth = 1200, quality = 0.78) {
   return new Promise((resolve) => {
-    // If file is small enough or not an image, send as-is
-    if (file.size < 500_000 || !file.type.startsWith('image/')) {
+    if (file.size < 300_000 || !file.type.startsWith('image/')) {
       return resolve(file);
     }
-
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       let { width, height } = img;
-
       if (width > maxWidth) {
         height = Math.round((height * maxWidth) / width);
         width = maxWidth;
       }
-
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
       canvas.toBlob(
-        (blob) => {
-          const compressed = new File([blob], file.name, { type: 'image/jpeg' });
-          console.log(`[scan] Compressed: ${(file.size / 1024).toFixed(0)}KB -> ${(compressed.size / 1024).toFixed(0)}KB`);
-          resolve(compressed);
-        },
+        (blob) => resolve(new File([blob], file.name, { type: 'image/jpeg' })),
         'image/jpeg',
         quality
       );
@@ -53,63 +43,85 @@ export default function Scan() {
   const navigate = useNavigate();
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
   const fileInputRef = useRef(null);
-  const formRef = useRef(null);
+  const amountRef = useRef(null);
 
-  const [step, setStep] = useState('capture'); // capture | compressing | scanning | form | submitting
+  const [hasImage, setHasImage] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [ocrResult, setOcrResult] = useState(null);
+  // 'idle' | 'running' | 'done' | 'failed'
+  const [ocrState, setOcrState] = useState('idle');
+  const [ocrConfidence, setOcrConfidence] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Form fields
+  // Form fields — péage pre-selected (most common use case)
   const [amount, setAmount] = useState('');
   const [dateTicket, setDateTicket] = useState('');
-  const [type, setType] = useState('autre');
+  const [type, setType] = useState('peage');
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
+
+  // Track which fields the user has already manually edited
+  // so OCR result doesn't overwrite user input
+  const userEdited = useRef({ amount: false, type: false, merchant: false });
 
   const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show preview immediately
+    // 1. Show preview + form IMMEDIATELY (no waiting)
     setImagePreview(URL.createObjectURL(file));
-    setStep('compressing');
+    setHasImage(true);
+    setDateTicket(new Date().toISOString().slice(0, 10));
+    setAmount('');
+    setMerchant('');
+    setDescription('');
+    setType('peage');
+    userEdited.current = { amount: false, type: false, merchant: false };
+    setOcrState('running');
+    setOcrConfidence(null);
 
-    // Compress first (all client-side, works offline)
+    // 2. Focus amount field for quick entry while OCR runs
+    setTimeout(() => amountRef.current?.focus(), 80);
+
+    // 3. Compress (client-side, works offline)
     const compressed = await compressImage(file);
     setImageFile(compressed);
-    console.log('[scan] Image compressed, size:', (compressed.size / 1024).toFixed(0), 'KB');
+
+    // 4. OCR in background — if offline or error, user already has the form
+    if (!navigator.onLine) {
+      setOcrState('failed');
+      return;
+    }
 
     try {
-      setStep('scanning');
-
-      // Send to OCR
       const formData = new FormData();
       formData.append('image', compressed);
       const result = await api.scanImage(formData);
 
-      setOcrResult(result);
+      setOcrConfidence(result.confidence);
 
-      // Pre-fill form with extracted data
+      // Update fields only if user hasn't already typed something
       if (result.extracted) {
-        if (result.extracted.amount) setAmount(String(result.extracted.amount));
-        if (result.extracted.date) setDateTicket(result.extracted.date);
-        if (result.extracted.type) setType(result.extracted.type);
-        if (result.extracted.merchant) setMerchant(result.extracted.merchant);
-        if (result.extracted.description) setDescription(result.extracted.description || '');
+        if (result.extracted.amount && !userEdited.current.amount) {
+          setAmount(String(result.extracted.amount));
+        }
+        if (result.extracted.date) {
+          setDateTicket(result.extracted.date);
+        }
+        if (result.extracted.type && !userEdited.current.type) {
+          setType(result.extracted.type);
+        }
+        if (result.extracted.merchant && !userEdited.current.merchant) {
+          setMerchant(result.extracted.merchant);
+        }
+        if (result.extracted.description && !userEdited.current.merchant) {
+          setDescription(result.extracted.description || '');
+        }
       }
-
-      setStep('form');
-
-      // Scroll to form on mobile
-      setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-    } catch (err) {
-      console.error('OCR error:', err);
-      // imageFile is already set to compressed above — no need to override
-      setToast({ message: 'Erreur OCR — remplissez manuellement', type: 'warning' });
-      setDateTicket(new Date().toISOString().slice(0, 10));
-      setStep('form');
+      setOcrState('done');
+    } catch {
+      setOcrState('failed');
     }
   }, []);
 
@@ -121,25 +133,20 @@ export default function Scan() {
       return;
     }
 
-    setStep('submitting');
+    setSubmitting(true);
 
-    // If offline, save to IndexedDB queue (including the image)
+    const date = dateTicket || new Date().toISOString().slice(0, 10);
+
+    // Offline: save to IndexedDB
     if (!navigator.onLine) {
       try {
-        await savePendingExpense({
-          amount,
-          date_ticket: dateTicket || new Date().toISOString().slice(0, 10),
-          type,
-          merchant,
-          description,
-        }, imageFile);
+        await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
-        setTimeout(() => navigate('/'), 2000);
-      } catch (offlineErr) {
-        console.error('Offline save error:', offlineErr);
+        setTimeout(() => navigate('/'), 1800);
+      } catch {
         setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
-        setStep('form');
+        setSubmitting(false);
       }
       return;
     }
@@ -148,293 +155,243 @@ export default function Scan() {
       const formData = new FormData();
       if (imageFile) formData.append('image', imageFile);
       formData.append('amount', amount);
-      formData.append('date_ticket', dateTicket || new Date().toISOString().slice(0, 10));
+      formData.append('date_ticket', date);
       formData.append('type', type);
       formData.append('merchant', merchant);
       formData.append('description', description);
 
       const result = await api.submitScan(formData);
 
-      if (result.driveUrl) {
-        setToast({ message: 'Ticket envoyé dans Google Drive', type: 'success' });
-      } else {
-        setToast({ message: 'Dépense enregistrée', type: 'success' });
-      }
-
-      setTimeout(() => navigate('/'), 2000);
+      setToast({
+        message: result.driveUrl ? 'Ticket envoyé dans Google Drive ✓' : 'Dépense enregistrée',
+        type: 'success',
+      });
+      setTimeout(() => navigate('/'), 1500);
     } catch (err) {
-      console.error('Submit error:', err);
-      // If network error, try saving offline (with image)
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
-          await savePendingExpense({
-            amount,
-            date_ticket: dateTicket || new Date().toISOString().slice(0, 10),
-            type,
-            merchant,
-            description,
-          }, imageFile);
+          await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
-          setTimeout(() => navigate('/'), 2000);
+          setTimeout(() => navigate('/'), 1800);
           return;
         } catch {}
       }
       setToast({ message: err.message || 'Erreur lors de l\'envoi', type: 'error' });
-      setStep('form');
+      setSubmitting(false);
     }
   };
 
-  const resetScan = () => {
-    setStep('capture');
+  const reset = () => {
+    setHasImage(false);
     setImageFile(null);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
-    setOcrResult(null);
+    setOcrState('idle');
+    setOcrConfidence(null);
     setAmount('');
     setDateTicket('');
-    setType('autre');
+    setType('peage');
     setMerchant('');
     setDescription('');
-    // Reset file input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // ── Capture screen ──────────────────────────────────────────
+  if (!hasImage) {
+    return (
+      <div className="space-y-6 animate-fade-up">
+        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+
+        <h1 className="font-serif text-xl font-semibold">Scanner un ticket</h1>
+
+        {/* Big capture button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full border-2 border-dashed border-green-mid/35 rounded-4xl p-14 flex flex-col items-center gap-4 bg-green-mid/[0.04] transition-colors hover:bg-green-mid/[0.08] active:scale-[0.97]"
+        >
+          <span className="text-[64px] drop-shadow-[0_0_12px_rgba(77,158,64,0.35)]">📷</span>
+          <div className="text-center">
+            <p className="text-text font-semibold text-lg">Prendre une photo</p>
+            <p className="text-text-muted text-sm mt-1">ou choisir depuis la galerie</p>
+          </div>
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          capture="environment"
+          onChange={handleCapture}
+          className="hidden"
+        />
+
+        <div className="p-4 rounded-2xl bg-card border border-card-border">
+          <p className="text-text-muted text-xs leading-relaxed">
+            💡 <strong className="text-text">Conseil péage :</strong> Ticket à plat, bonne lumière. L'OCR s'analyse en arrière-plan — vous pouvez saisir le montant pendant ce temps.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form (shown immediately after photo) ─────────────────────
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-5 animate-fade-up">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
-      <h1 className="font-serif text-xl font-semibold">Scanner un ticket</h1>
-
-      {/* Capture Step */}
-      {step === 'capture' && (
-        <div>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full border-2 border-dashed border-green-mid/35 rounded-4xl p-12 flex flex-col items-center gap-4 bg-green-mid/[0.04] transition-colors hover:bg-green-mid/[0.08] active:scale-[0.97]"
-          >
-            <span className="text-[52px] drop-shadow-[0_0_12px_rgba(77,158,64,0.3)]">📷</span>
-            <div className="text-center">
-              <p className="text-text font-medium">Prendre une photo</p>
-              <p className="text-text-muted text-xs mt-1">ou choisir une image</p>
-            </div>
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            capture="environment"
-            onChange={handleCapture}
-            className="hidden"
-          />
-
-          <div className="mt-4 p-4 rounded-2xl bg-card border border-card-border">
-            <p className="text-text-muted text-xs leading-relaxed">
-              💡 <strong className="text-text">Conseils :</strong> Posez le ticket sur une surface sombre,
-              bonne lumière, photo à plat pour un meilleur résultat.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Scanning Step (compressing + OCR) */}
-      {(step === 'compressing' || step === 'scanning') && (
-        <div className="flex flex-col items-center py-8 gap-4">
-          {imagePreview && (
-            <div className="relative w-48">
-              <img src={imagePreview} alt="Ticket" className="w-full rounded-2xl opacity-60" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-14 h-14 border-3 border-green-mid border-t-transparent rounded-full animate-spin" />
-              </div>
-            </div>
-          )}
-
-          {/* Progress steps */}
-          <div className="flex flex-col items-center gap-2 mt-2">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${step === 'compressing' ? 'bg-green-mid animate-pulse' : 'bg-green-mid'}`} />
-              <span className={`text-xs ${step === 'compressing' ? 'text-green-light' : 'text-text-muted'}`}>
-                Compression de l'image
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${step === 'scanning' ? 'bg-green-mid animate-pulse' : 'bg-card'}`} />
-              <span className={`text-xs ${step === 'scanning' ? 'text-green-light' : 'text-text-dim'}`}>
+      {/* Image preview + OCR status bar */}
+      <div className="relative">
+        <img
+          src={imagePreview}
+          alt="Ticket"
+          className="w-full rounded-2xl max-h-52 object-cover"
+        />
+        {/* OCR status overlay */}
+        <div className={`absolute bottom-2 left-2 right-2 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium backdrop-blur-sm transition-all ${
+          ocrState === 'running'
+            ? 'bg-amber-900/80 text-amber-200'
+            : ocrState === 'done'
+            ? 'bg-green-mid/80 text-white'
+            : ocrState === 'failed'
+            ? 'bg-black/70 text-text-muted'
+            : ''
+        }`}>
+          {ocrState === 'running' && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 border-2 border-amber-300/40 border-t-amber-200 rounded-full animate-spin shrink-0" />
                 Analyse OCR en cours…
               </span>
-            </div>
+              <span className="text-amber-300/70">Saisissez le montant maintenant</span>
+            </>
+          )}
+          {ocrState === 'done' && (
+            <span>
+              ✓ OCR terminé
+              {ocrConfidence != null && ` — confiance ${Math.round(ocrConfidence)}%`}
+            </span>
+          )}
+          {ocrState === 'failed' && (
+            <span>OCR non disponible — saisie manuelle</span>
+          )}
+        </div>
+        <button
+          onClick={reset}
+          className="absolute top-2 right-2 bg-black/70 rounded-full px-3 py-1 text-xs text-white"
+        >
+          Reprendre
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Amount — big and first, focused immediately */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Montant (€) *
+          </label>
+          <input
+            ref={amountRef}
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0.01"
+            max="9999.99"
+            value={amount}
+            onChange={(e) => { setAmount(e.target.value); userEdited.current.amount = true; }}
+            required
+            placeholder="0.00"
+            className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text text-2xl font-serif focus:outline-none focus:border-green-mid"
+          />
+        </div>
+
+        {/* Date */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Date du ticket
+          </label>
+          <input
+            type="date"
+            value={dateTicket}
+            onChange={(e) => setDateTicket(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+            className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid [color-scheme:dark]"
+          />
+        </div>
+
+        {/* Type pills */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Type de dépense
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {EXPENSE_TYPES.map(t => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => { setType(t.value); userEdited.current.type = true; }}
+                className={`py-3 rounded-2xl text-sm font-medium transition-all flex flex-col items-center gap-1 ${
+                  type === t.value
+                    ? 'bg-green-mid/20 border-2 border-green-mid text-green-light'
+                    : 'bg-card border border-card-border text-text-muted'
+                }`}
+              >
+                <span className="text-xl">{t.icon}</span>
+                <span className="text-[10px]">{t.label}</span>
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      {/* Form Step */}
-      {(step === 'form' || step === 'submitting') && (
-        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          {/* Image preview */}
-          {imagePreview && (
-            <div className="relative">
-              <img src={imagePreview} alt="Ticket" className="w-full rounded-2xl max-h-64 object-cover" />
-              <button
-                type="button"
-                onClick={resetScan}
-                className="absolute top-2 right-2 bg-black/70 rounded-full px-3 py-1 text-xs text-white"
-              >
-                Reprendre
-              </button>
-            </div>
+        {/* Merchant + Description (optional, collapsible label) */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Commerçant <span className="normal-case text-text-dim">(optionnel)</span>
+          </label>
+          <input
+            type="text"
+            value={merchant}
+            onChange={(e) => { setMerchant(e.target.value); userEdited.current.merchant = true; }}
+            maxLength={255}
+            placeholder="Ex: VINCI Autoroutes A71"
+            className="w-full bg-card border border-card-border rounded-2xl px-5 py-3.5 text-text text-sm focus:outline-none focus:border-green-mid"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Description <span className="normal-case text-text-dim">(optionnel)</span>
+          </label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
+            placeholder="Ex: Trajet Lyon → Paris"
+            className="w-full bg-card border border-card-border rounded-2xl px-5 py-3.5 text-text text-sm focus:outline-none focus:border-green-mid"
+          />
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full py-5 rounded-3xl text-white font-semibold text-base transition-transform active:scale-[0.97] disabled:opacity-60 flex items-center justify-center gap-3"
+          style={{
+            background: 'linear-gradient(135deg, #2D6A27, #4A9E40)',
+            boxShadow: '0 4px 20px rgba(77, 158, 64, 0.3)',
+          }}
+        >
+          {submitting ? (
+            <>
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Envoi en cours…
+            </>
+          ) : (
+            <>📁 Envoyer dans Google Drive</>
           )}
-
-          {/* OCR confidence */}
-          {ocrResult && (
-            <div className={`p-3 rounded-xl border text-xs ${
-              ocrResult.confidence >= 60
-                ? 'bg-green-mid/10 border-green-mid/30 text-green-light'
-                : 'bg-amber-900/20 border-amber-500/20 text-amber-300'
-            }`}>
-              {ocrResult.confidence >= 60
-                ? `Confiance OCR : ${Math.round(ocrResult.confidence)}% — Vérifiez les données`
-                : `Confiance OCR faible : ${Math.round(ocrResult.confidence || 0)}% — Corrigez les données`
-              }
-            </div>
-          )}
-
-          {/* Type detection explanation */}
-          {ocrResult?.typeDetection && ocrResult.typeDetection.type !== 'autre' && (
-            <div className="p-3 rounded-xl border border-blue-500/20 bg-blue-500/10 text-xs space-y-1.5">
-              <p className="text-blue-300 font-medium">
-                Type détecté : {EXPENSE_TYPES.find(t => t.value === ocrResult.typeDetection.type)?.icon}{' '}
-                {EXPENSE_TYPES.find(t => t.value === ocrResult.typeDetection.type)?.label}
-              </p>
-              {ocrResult.typeDetection.matches[ocrResult.typeDetection.type]?.length > 0 && (
-                <p className="text-blue-300/70">
-                  Mots-clés trouvés : {ocrResult.typeDetection.matches[ocrResult.typeDetection.type].join(', ')}
-                </p>
-              )}
-              {Object.entries(ocrResult.typeDetection.scores).filter(([k, v]) => v > 0 && k !== ocrResult.typeDetection.type).length > 0 && (
-                <p className="text-blue-300/50">
-                  Autres possibilités : {Object.entries(ocrResult.typeDetection.scores)
-                    .filter(([k, v]) => v > 0 && k !== ocrResult.typeDetection.type)
-                    .map(([k, v]) => `${k} (${v})`)
-                    .join(', ')}
-                </p>
-              )}
-            </div>
-          )}
-
-          {ocrResult?.typeDetection && ocrResult.typeDetection.type === 'autre' && (
-            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-900/10 text-xs text-amber-300/80">
-              Aucun type détecté automatiquement — sélectionnez le type manuellement ci-dessous.
-            </div>
-          )}
-
-          {/* Amount */}
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-              Montant (€)
-            </label>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0.01"
-              max="9999.99"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              placeholder="0.00"
-              className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text text-lg font-serif focus:outline-none focus:border-green-mid"
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-              Date du ticket
-            </label>
-            <input
-              type="date"
-              value={dateTicket}
-              onChange={(e) => setDateTicket(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
-              className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid [color-scheme:dark]"
-            />
-          </div>
-
-          {/* Type pills */}
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-              Type de dépense
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {EXPENSE_TYPES.map(t => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => setType(t.value)}
-                  className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    type === t.value
-                      ? 'bg-green-mid/20 border border-green-mid text-green-light'
-                      : 'bg-card border border-card-border text-text-muted'
-                  }`}
-                >
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Merchant */}
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-              Commerçant
-            </label>
-            <input
-              type="text"
-              value={merchant}
-              onChange={(e) => setMerchant(e.target.value)}
-              maxLength={255}
-              placeholder="Nom du commerçant"
-              className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-              Description
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={500}
-              placeholder="Description courte"
-              className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid"
-            />
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={step === 'submitting'}
-            className="w-full py-5 rounded-3xl text-white font-semibold text-base transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-3"
-            style={{
-              background: 'linear-gradient(135deg, #2D6A27, #4A9E40)',
-              boxShadow: '0 4px 20px rgba(77, 158, 64, 0.3)',
-            }}
-          >
-            {step === 'submitting' ? (
-              <>
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Envoi en cours…
-              </>
-            ) : (
-              <>📁 Envoyer dans Google Drive</>
-            )}
-          </button>
-        </form>
-      )}
+        </button>
+      </form>
     </div>
   );
 }

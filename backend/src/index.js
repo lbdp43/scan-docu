@@ -13,6 +13,7 @@ const expensesRoutes = require('./routes/expenses');
 const adminRoutes = require('./routes/admin');
 const scanRoutes = require('./routes/scan');
 const driveSetupRoutes = require('./routes/driveSetup');
+const { warmupWorker } = require('./services/ocr');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -169,6 +170,8 @@ app.listen(PORT, async () => {
   await ensureAdminExists();
   await cleanupExpiredTokens();
   setInterval(cleanupExpiredTokens, 60 * 60 * 1000); // Cleanup every hour
+  // Pre-warm Tesseract so the first scan request is instant
+  warmupWorker().catch(() => {});
 });
 
 module.exports = app;

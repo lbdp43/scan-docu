@@ -46,12 +46,12 @@ router.post('/', upload.single('image'), async (req, res) => {
       }
     }
 
-    // Preprocess image with Sharp for better OCR
+    // Preprocess image with Sharp for better OCR — 1000px is sufficient for text recognition
     let processedBuffer = req.file.buffer;
     if (req.file.mimetype.startsWith('image/')) {
       processedBuffer = await sharp(req.file.buffer)
         .rotate() // Auto-orient from EXIF (critical for mobile photos)
-        .resize(1800, null, { withoutEnlargement: true, fit: 'inside' })
+        .resize(1000, null, { withoutEnlargement: true, fit: 'inside' })
         .grayscale()
         .normalize() // Auto contrast stretching
         .linear(1.3, -(255 * 0.15)) // Boost contrast for faded thermal receipts
