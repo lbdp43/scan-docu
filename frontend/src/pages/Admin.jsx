@@ -177,7 +177,7 @@ export default function Admin() {
           📥 Export CSV
         </button>
         <Link
-          to="/scan"
+          to="/"
           className="flex-1 py-3 rounded-2xl bg-green-mid text-white font-medium text-sm text-center transition-transform active:scale-[0.97]"
         >
           📷 Scanner

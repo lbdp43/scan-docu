@@ -144,7 +144,7 @@ export default function Dashboard() {
 
       {/* Action Buttons */}
       <Link
-        to="/scan"
+        to="/"
         className="flex items-center gap-4 w-full p-5 rounded-3xl transition-transform active:scale-[0.97]"
         style={{
           background: 'linear-gradient(135deg, #2D6A27, #4A9E40)',

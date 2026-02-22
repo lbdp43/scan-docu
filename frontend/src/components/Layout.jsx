@@ -5,8 +5,8 @@ import { getPendingExpenses, syncPendingExpenses, removePendingExpense, storable
 import { api } from '../utils/api';
 
 const navItems = [
-  { path: '/', label: 'Accueil', icon: '🏠' },
-  { path: '/scan', label: 'Scanner', icon: '📷' },
+  { path: '/', label: 'Scanner', icon: '📷' },
+  { path: '/dashboard', label: 'Accueil', icon: '🏠' },
   { path: '/history', label: 'Historique', icon: '📋' },
   { path: '/stats', label: 'Stats', icon: '📊' },
 ];

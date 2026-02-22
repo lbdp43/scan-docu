@@ -57,8 +57,8 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route path="/" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-              <Route path="/scan" element={<Suspense fallback={<PageFallback />}><Scan /></Suspense>} />
+              <Route path="/" element={<Suspense fallback={<PageFallback />}><Scan /></Suspense>} />
+              <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
               <Route path="/manual" element={<Suspense fallback={<PageFallback />}><Manual /></Suspense>} />
               <Route path="/history" element={<Suspense fallback={<PageFallback />}><History /></Suspense>} />
               <Route path="/stats" element={<Suspense fallback={<PageFallback />}><Stats /></Suspense>} />

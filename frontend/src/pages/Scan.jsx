@@ -150,7 +150,7 @@ export default function Scan() {
         await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
-        setTimeout(() => navigate('/'), 1800);
+        setTimeout(() => navigate('/dashboard'), 1800);
       } catch {
         setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
         setSubmitting(false);
@@ -173,14 +173,14 @@ export default function Scan() {
         message: result.driveUrl ? 'Ticket envoyé dans Google Drive ✓' : 'Dépense enregistrée',
         type: 'success',
       });
-      setTimeout(() => navigate('/'), 1500);
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err) {
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
           await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
-          setTimeout(() => navigate('/'), 1800);
+          setTimeout(() => navigate('/dashboard'), 1800);
           return;
         } catch {}
       }

@@ -105,7 +105,7 @@ export default function Manual() {
         await savePendingExpense(expenseData, photoFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
-        setTimeout(() => navigate('/'), 2000);
+        setTimeout(() => navigate('/dashboard'), 2000);
       } catch (offlineErr) {
         setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
         setLoading(false);
@@ -129,7 +129,7 @@ export default function Manual() {
       } else {
         setToast({ message: 'Dépense enregistrée', type: 'success' });
       }
-      setTimeout(() => navigate('/'), 2000);
+      setTimeout(() => navigate('/dashboard'), 2000);
     } catch (err) {
       // If network error, try offline save (with optional photo)
       if (!navigator.onLine || err.message?.includes('fetch')) {
@@ -137,7 +137,7 @@ export default function Manual() {
           await savePendingExpense(expenseData, photoFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
-          setTimeout(() => navigate('/'), 2000);
+          setTimeout(() => navigate('/dashboard'), 2000);
           return;
         } catch {}
       }
