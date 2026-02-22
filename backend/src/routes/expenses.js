@@ -219,14 +219,14 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// GET /api/expenses/recent — last 5 expenses for user
+// GET /api/expenses/recent — last 3 expenses for user
 router.get('/recent', async (req, res) => {
   try {
     const expenses = await req.prisma.expense.findMany({
       where: { user_id: req.user.userId },
       omit: { receipt_image: true },
       orderBy: { created_at: 'desc' },
-      take: 5,
+      take: 3,
       include: {
         user: {
           select: { id: true, name: true },

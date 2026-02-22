@@ -1,9 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
+
+const CACHE_KEY = 'dash_v2';
+const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts < CACHE_TTL ? data : null;
+  } catch { return null; }
+}
+
+function writeCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
 
 const TYPE_ICONS = {
   carburant: { icon: '⛽', color: 'bg-green-mid/20 text-green-light' },
@@ -20,13 +38,19 @@ const STATUS_ICONS = {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState(null);
-  const [recent, setRecent] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readCache();
+  // Show cached data immediately — no spinner for returning users
+  const [stats, setStats] = useState(cached?.stats ?? null);
+  const [recent, setRecent] = useState(cached?.recent ?? []);
+  const [loading, setLoading] = useState(!cached);
+  const [refreshing, setRefreshing] = useState(!!cached); // silent background refresh
   const [editingExpense, setEditingExpense] = useState(null);
   const [toast, setToast] = useState(null);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     loadData();
   }, []);
 
@@ -38,10 +62,12 @@ export default function Dashboard() {
       ]);
       setStats(statsData);
       setRecent(recentData.expenses);
+      writeCache({ stats: statsData, recent: recentData.expenses });
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -151,9 +177,14 @@ export default function Dashboard() {
 
       {/* Recent Tickets */}
       <div>
-        <h2 className="text-text-muted text-xs uppercase tracking-widest mb-3 px-1">
-          Mes derniers tickets
-        </h2>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-text-muted text-xs uppercase tracking-widest">
+            3 derniers tickets
+          </h2>
+          {refreshing && (
+            <span className="w-3 h-3 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" />
+          )}
+        </div>
         <div className="space-y-3">
           {recent.map((expense, i) => {
             const typeInfo = TYPE_ICONS[expense.type] || TYPE_ICONS.autre;

@@ -5,29 +5,35 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
   });
-  const [loading, setLoading] = useState(true);
+
+  // If we already have a cached user + token, don't block the UI —
+  // validate in background and update silently.
+  const [loading, setLoading] = useState(
+    !localStorage.getItem('user') && !!localStorage.getItem('token')
+  );
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      api.me()
-        .then(data => {
-          setUser(data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
-        })
-        .catch(() => {
-          setUser(null);
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    if (!token) { setLoading(false); return; }
+
+    // Background validation — doesn't block the UI when cache exists
+    api.me()
+      .then(data => {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      })
+      .catch(() => {
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (email, password) => {
