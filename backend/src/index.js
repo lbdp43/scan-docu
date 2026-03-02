@@ -114,6 +114,11 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Prevent unhandled errors from crashing the server (e.g. Tesseract worker errors)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[process] Unhandled rejection:', reason);
+});
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   await prisma.$disconnect();

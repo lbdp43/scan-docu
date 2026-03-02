@@ -46,6 +46,13 @@ router.post('/', upload.single('image'), async (req, res) => {
       }
     }
 
+    // PDFs cannot be processed by Tesseract OCR — only images are supported
+    if (req.file.mimetype === 'application/pdf') {
+      return res.status(400).json({
+        error: 'Les fichiers PDF ne sont pas supportés pour le scan OCR. Veuillez prendre une photo du ticket (JPG, PNG ou WebP).',
+      });
+    }
+
     // Preprocess image with Sharp for better OCR — 1000px is sufficient for text recognition
     let processedBuffer = req.file.buffer;
     if (req.file.mimetype.startsWith('image/')) {
