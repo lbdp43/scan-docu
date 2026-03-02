@@ -169,11 +169,18 @@ export default function Scan() {
 
       const result = await api.submitScan(formData);
 
-      setToast({
-        message: result.driveUrl ? 'Ticket envoyé dans Google Drive ✓' : 'Dépense enregistrée',
-        type: 'success',
-      });
-      setTimeout(() => navigate('/dashboard'), 1500);
+      if (result.uploadStatus === 'error') {
+        setToast({
+          message: 'Dépense enregistrée, mais l\'envoi Drive a échoué (token expiré ?)',
+          type: 'warning',
+        });
+      } else {
+        setToast({
+          message: result.driveUrl ? 'Ticket envoyé dans Google Drive ✓' : 'Dépense enregistrée',
+          type: 'success',
+        });
+      }
+      setTimeout(() => navigate('/dashboard'), 1800);
     } catch (err) {
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {

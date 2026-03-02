@@ -3,6 +3,10 @@ const { Readable } = require('stream');
 
 let driveClient = null;
 
+function resetDriveClient() {
+  driveClient = null;
+}
+
 function getDriveClient() {
   if (driveClient) return driveClient;
 
@@ -122,4 +126,4 @@ async function downloadDriveFile(fileId) {
   };
 }
 
-module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile };
+module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient };

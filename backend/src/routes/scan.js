@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
-const { uploadToDrive } = require('../services/drive');
+const { uploadToDrive, resetDriveClient } = require('../services/drive');
 
 const router = express.Router();
 
@@ -153,6 +153,11 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         console.error('[drive] Upload error:', driveErr.message);
         if (driveErr.response) {
           console.error('[drive] Error details:', JSON.stringify(driveErr.response.data));
+          // Reset cached client on auth errors so next request uses fresh credentials
+          if (driveErr.response.data?.error === 'invalid_grant') {
+            resetDriveClient();
+            console.warn('[drive] Token expired — client cache cleared. Update GOOGLE_REFRESH_TOKEN and restart.');
+          }
         }
         uploadStatus = 'error';
       }
