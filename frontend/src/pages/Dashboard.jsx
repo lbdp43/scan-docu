@@ -242,6 +242,10 @@ export default function Dashboard() {
           });
           loadData();
         }}
+        onDeleted={() => {
+          setToast({ message: 'D\u00E9pense supprim\u00E9e', type: 'success' });
+          loadData();
+        }}
       />
     </div>
   );

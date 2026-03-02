@@ -252,6 +252,10 @@ export default function History() {
           });
           loadExpenses(pagination.page);
         }}
+        onDeleted={() => {
+          setToast({ message: 'D\u00E9pense supprim\u00E9e', type: 'success' });
+          loadExpenses(pagination.page);
+        }}
       />
     </div>
   );

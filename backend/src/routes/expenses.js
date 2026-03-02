@@ -495,6 +495,17 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Dépense non trouvée' });
     }
 
+    // Delete file from Google Drive if it exists
+    if (existing.drive_file_id) {
+      try {
+        const { deleteDriveFile } = require('../services/drive');
+        await deleteDriveFile(existing.drive_file_id);
+        console.log(`[drive] Deleted file ${existing.drive_file_id} for expense ${expenseId}`);
+      } catch (driveErr) {
+        console.error('[drive] Error deleting file (continuing with DB delete):', driveErr.message);
+      }
+    }
+
     await req.prisma.expense.delete({
       where: { id: expenseId },
     });

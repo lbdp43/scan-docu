@@ -9,7 +9,7 @@ const EXPENSE_TYPES = [
   { value: 'autre', label: 'Autre', icon: '\uD83D\uDCC4' },
 ];
 
-export default function EditExpenseModal({ expense, onClose, onSaved }) {
+export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted }) {
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const [amount, setAmount] = useState('');
@@ -18,7 +18,9 @@ export default function EditExpenseModal({ expense, onClose, onSaved }) {
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved }) {
       setMerchant(expense.merchant || '');
       setDescription(expense.description || '');
       setShowReceipt(false);
+      setShowDeleteConfirm(false);
       setError(null);
     }
   }, [expense]);
@@ -58,6 +61,20 @@ export default function EditExpenseModal({ expense, onClose, onSaved }) {
     } catch (err) {
       setError(err.message || 'Erreur lors de la modification');
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.deleteExpense(expense.id);
+      onDeleted?.();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Erreur lors de la suppression');
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   }
 
@@ -241,6 +258,51 @@ export default function EditExpenseModal({ expense, onClose, onSaved }) {
               </button>
             </div>
           </form>
+
+          {/* Admin delete section */}
+          {isAdmin && (
+            <div className="mt-4 pt-4 border-t border-card-border">
+              {!showDeleteConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium transition-transform active:scale-[0.97]"
+                >
+                  Supprimer cette d{'\u00E9'}pense
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-red-400/80 text-xs text-center">
+                    Cette action est irr{'\u00E9'}versible. Le fichier Drive sera aussi supprim{'\u00E9'}.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1 py-2.5 rounded-2xl bg-card border border-card-border text-text-muted font-medium text-sm transition-transform active:scale-[0.97]"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="flex-1 py-2.5 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-400 font-medium text-sm transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {deleting ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                          Suppression...
+                        </>
+                      ) : (
+                        'Confirmer la suppression'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
