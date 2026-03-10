@@ -108,6 +108,10 @@ export const api = {
     request('/scan', { method: 'POST', body: formData }),
   submitScan: (formData) =>
     request('/scan/submit', { method: 'POST', body: formData }),
+  retryDriveUpload: (id) =>
+    request(`/scan/retry/${id}`, { method: 'POST' }),
+  retryAllDriveUploads: () =>
+    request('/scan/retry-all', { method: 'POST' }),
 
   // Admin
   getUsers: () =>
@@ -128,4 +132,15 @@ export const api = {
     request('/admin/drive-config'),
   updateDriveConfig: (data) =>
     request('/admin/drive-config', { method: 'PUT', body: JSON.stringify(data) }),
+  exportFailedReceipts: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_BASE}/admin/export-failed`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Erreur ${res.status}`);
+    }
+    return res.blob();
+  },
 };

@@ -19,6 +19,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState(null);
@@ -64,6 +65,19 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
     }
   }
 
+  async function handleRetryDrive() {
+    setRetrying(true);
+    setError(null);
+    try {
+      const result = await api.retryDriveUpload(expense.id);
+      onSaved?.(true);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Erreur lors du renvoi vers Drive');
+      setRetrying(false);
+    }
+  }
+
   async function handleDelete() {
     setDeleting(true);
     setError(null);
@@ -104,39 +118,93 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
             </div>
           )}
 
-          {/* Receipt viewer toggle */}
-          {expense.drive_file_id && (
+          {/* Receipt viewer — works with Drive OR stored image in DB */}
+          {expense.has_receipt && (
             <div className="mb-4 space-y-3">
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20">
-                <span className="text-xs text-green-light">
-                  {'\uD83D\uDCC4'} Justificatif sur Drive
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowReceipt(!showReceipt)}
-                    className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
-                  >
-                    {showReceipt ? 'Masquer' : 'Voir'}
-                  </button>
-                  <a
-                    href={api.getReceiptUrl(expense.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
-                  >
-                    {'\u2B07'} PDF
-                  </a>
+              {/* Status bar */}
+              {expense.drive_file_id ? (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20">
+                  <span className="text-xs text-green-light">
+                    {'\uD83D\uDCC4'} Justificatif sur Drive
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceipt(!showReceipt)}
+                      className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
+                    >
+                      {showReceipt ? 'Masquer' : 'Voir'}
+                    </button>
+                    <a
+                      href={api.getReceiptUrl(expense.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
+                    >
+                      {'\u2B07'} T{'\u00E9'}l{'\u00E9'}charger
+                    </a>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <span className="text-xs text-amber-400">
+                    {'\u26A0\uFE0F'} Drive {'\u00E9'}chou{'\u00E9'} — image sauvegard{'\u00E9'}e localement
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceipt(!showReceipt)}
+                      className="px-3 py-1 rounded-lg bg-amber-500/20 text-xs text-amber-400 font-medium"
+                    >
+                      {showReceipt ? 'Masquer' : 'Voir'}
+                    </button>
+                    <a
+                      href={api.getReceiptUrl(expense.id)}
+                      download={`justificatif-${expense.id}.jpg`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-3 py-1 rounded-lg bg-amber-500/20 text-xs text-amber-400 font-medium"
+                    >
+                      {'\u2B07'} T{'\u00E9'}l{'\u00E9'}charger
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Retry Drive upload button */}
+              {!expense.drive_file_id && expense.upload_status === 'error' && (
+                <button
+                  type="button"
+                  onClick={handleRetryDrive}
+                  disabled={retrying}
+                  className="w-full py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {retrying ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                      Renvoi vers Drive...
+                    </>
+                  ) : (
+                    <>{'\uD83D\uDD04'} Renvoyer vers Google Drive</>
+                  )}
+                </button>
+              )}
 
               {showReceipt && (
                 <div className="rounded-2xl overflow-hidden border border-card-border bg-white">
-                  <iframe
+                  <img
                     src={api.getReceiptUrl(expense.id)}
-                    className="w-full h-[250px] sm:h-[300px]"
-                    title="Justificatif"
+                    alt="Justificatif"
+                    className="w-full max-h-[300px] object-contain"
+                    onError={(e) => {
+                      // If image fails, try as iframe (PDF from Drive)
+                      const parent = e.target.parentNode;
+                      const iframe = document.createElement('iframe');
+                      iframe.src = api.getReceiptUrl(expense.id);
+                      iframe.className = 'w-full h-[250px] sm:h-[300px]';
+                      iframe.title = 'Justificatif';
+                      parent.replaceChild(iframe, e.target);
+                    }}
                   />
                 </div>
               )}

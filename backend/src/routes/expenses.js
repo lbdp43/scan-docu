@@ -33,21 +33,37 @@ router.get('/:id/receipt', (req, res, next) => {
       return res.status(403).json({ error: 'Accès non autorisé' });
     }
 
-    if (!expense.drive_file_id) {
-      return res.status(404).json({ error: 'Aucun fichier associé' });
+    // Try Drive first, fall back to stored image in DB
+    if (expense.drive_file_id) {
+      try {
+        const file = await downloadDriveFile(expense.drive_file_id);
+        res.setHeader('Content-Type', file.mimeType || 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${file.name || 'receipt.pdf'}"`);
+        res.setHeader('Content-Length', file.buffer.length);
+        return res.send(file.buffer);
+      } catch (driveErr) {
+        console.error('Receipt Drive download error, falling back to DB:', driveErr.message);
+      }
     }
 
-    const file = await downloadDriveFile(expense.drive_file_id);
+    // Fallback: serve stored receipt_image from database
+    if (expense.has_receipt) {
+      const full = await req.prisma.expense.findUnique({
+        where: { id },
+        select: { receipt_image: true },
+      });
+      if (full?.receipt_image) {
+        const imgBuffer = Buffer.from(full.receipt_image);
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Content-Disposition', `inline; filename="receipt-${id}.jpg"`);
+        res.setHeader('Content-Length', imgBuffer.length);
+        return res.send(imgBuffer);
+      }
+    }
 
-    res.setHeader('Content-Type', file.mimeType || 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${file.name || 'receipt.pdf'}"`);
-    res.setHeader('Content-Length', file.buffer.length);
-    res.send(file.buffer);
+    return res.status(404).json({ error: 'Aucun justificatif disponible' });
   } catch (err) {
     console.error('Receipt download error:', err);
-    if (err.code === 404 || err.message?.includes('not found')) {
-      return res.status(404).json({ error: 'Fichier introuvable sur Drive' });
-    }
     res.status(500).json({ error: 'Erreur lors du téléchargement' });
   }
 });

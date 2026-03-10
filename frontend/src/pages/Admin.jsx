@@ -20,6 +20,8 @@ export default function Admin() {
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [retryingAll, setRetryingAll] = useState(false);
+  const [exportingFailed, setExportingFailed] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -66,6 +68,43 @@ export default function Admin() {
       setStats(statsData);
     } catch (err) {
       setToast({ message: err.message || 'Erreur lors de la suppression', type: 'error' });
+    }
+  }
+
+  async function handleRetryAll() {
+    setRetryingAll(true);
+    try {
+      const result = await api.retryAllDriveUploads();
+      const { uploaded, failed } = result.summary || {};
+      setToast({
+        message: `Retry termin\u00E9 : ${uploaded || 0} envoy\u00E9(s), ${failed || 0} \u00E9chec(s)`,
+        type: uploaded > 0 ? 'success' : 'error',
+      });
+      await loadExpenses();
+      const statsData = await api.getAdminStats();
+      setStats(statsData);
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur lors du retry', type: 'error' });
+    } finally {
+      setRetryingAll(false);
+    }
+  }
+
+  async function handleExportFailed() {
+    setExportingFailed(true);
+    try {
+      const blob = await api.exportFailedReceipts();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `justificatifs-echec-drive-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setToast({ message: 'Export ZIP t\u00E9l\u00E9charg\u00E9', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur export', type: 'error' });
+    } finally {
+      setExportingFailed(false);
     }
   }
 
@@ -183,6 +222,51 @@ export default function Admin() {
           📷 Scanner
         </Link>
       </div>
+
+      {/* Drive error management */}
+      {expenses.some(e => e.upload_status === 'error') && (
+        <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-sm">{'\u26A0\uFE0F'}</span>
+            <p className="text-amber-400 text-sm font-medium">
+              {expenses.filter(e => e.upload_status === 'error').length} justificatif(s) non envoy{'\u00E9'}(s) sur Drive
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRetryAll}
+              disabled={retryingAll}
+              className="flex-1 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium text-xs transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {retryingAll ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  Renvoi en cours...
+                </>
+              ) : (
+                <>{'\uD83D\uDD04'} Renvoyer tout sur Drive</>
+              )}
+            </button>
+            <button
+              onClick={handleExportFailed}
+              disabled={exportingFailed}
+              className="flex-1 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium text-xs transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {exportingFailed ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                  Export...
+                </>
+              ) : (
+                <>{'\uD83D\uDCE5'} T{'\u00E9'}l{'\u00E9'}charger le ZIP</>
+              )}
+            </button>
+          </div>
+          <p className="text-text-dim text-[10px]">
+            Le ZIP contient les photos + PDFs pour les mettre manuellement sur Drive si besoin.
+          </p>
+        </div>
+      )}
 
       {/* Recent expenses (all users) */}
       <div>

@@ -313,4 +313,73 @@ router.put('/drive-config', async (req, res) => {
   }
 });
 
+// GET /api/admin/export-failed — Download all failed receipts as ZIP
+router.get('/export-failed', async (req, res) => {
+  try {
+    const archiver = require('archiver');
+    const { generatePDF } = require('../services/pdf');
+
+    const failedExpenses = await req.prisma.expense.findMany({
+      where: {
+        upload_status: 'error',
+        has_receipt: true,
+      },
+      include: {
+        user: { select: { name: true, card_id: true } },
+      },
+      orderBy: { date_ticket: 'desc' },
+    });
+
+    if (failedExpenses.length === 0) {
+      return res.status(404).json({ error: 'Aucune dépense en erreur avec justificatif' });
+    }
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=justificatifs-echec-drive-${new Date().toISOString().slice(0, 10)}.zip`);
+
+    const archive = archiver('zip', { zlib: { level: 5 } });
+    archive.pipe(res);
+
+    for (const expense of failedExpenses) {
+      const dateStr = new Date(expense.date_ticket).toISOString().slice(0, 10);
+      const userName = expense.user.name.split(' ')[0];
+      const imgBuffer = expense.receipt_image ? Buffer.from(expense.receipt_image) : null;
+
+      // Add the raw image
+      if (imgBuffer && imgBuffer.length > 0) {
+        archive.append(imgBuffer, {
+          name: `${dateStr}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}_photo.jpg`,
+        });
+      }
+
+      // Also generate and add the PDF
+      try {
+        const pdfBuffer = await generatePDF({
+          imageBuffer: imgBuffer,
+          imageMime: imgBuffer ? 'image/jpeg' : null,
+          date: expense.date_ticket,
+          amount: Number(expense.amount),
+          type: expense.type,
+          merchant: expense.merchant || '',
+          description: expense.description || '',
+          userName: expense.user.name,
+          cardId: expense.user.card_id,
+        });
+        archive.append(pdfBuffer, {
+          name: expense.file_name || `${dateStr}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}.pdf`,
+        });
+      } catch (pdfErr) {
+        console.error(`[export-failed] PDF generation error for expense ${expense.id}:`, pdfErr.message);
+      }
+    }
+
+    await archive.finalize();
+  } catch (err) {
+    console.error('Export failed receipts error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  }
+});
+
 module.exports = router;

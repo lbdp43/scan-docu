@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
-const { uploadToDrive, resetDriveClient } = require('../services/drive');
+const { uploadToDrive, resetDriveClient, updateDriveFile } = require('../services/drive');
 
 const router = express.Router();
 
@@ -226,12 +226,130 @@ router.post('/retry/:id', async (req, res) => {
     }
 
     if (expense.upload_status === 'uploaded') {
-      return res.json({ message: 'Déjà uploadé', driveUrl: expense.drive_file_url });
+      return res.json({ success: true, message: 'Déjà uploadé', driveUrl: expense.drive_file_url });
     }
 
-    res.json({ message: 'Réessai en cours — fonctionnalité à compléter avec les credentials Drive' });
+    // Get user for folder and PDF info
+    const user = await req.prisma.user.findUnique({ where: { id: expense.user_id } });
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    const folderId = user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+    if (!folderId) {
+      return res.status(400).json({ error: 'Aucun dossier Drive configuré' });
+    }
+
+    // Regenerate PDF from stored image
+    const { generatePDF } = require('../services/pdf');
+    const pdfBuffer = await generatePDF({
+      imageBuffer: expense.receipt_image,
+      imageMime: expense.receipt_image ? 'image/jpeg' : null,
+      date: expense.date_ticket,
+      amount: Number(expense.amount),
+      type: expense.type,
+      merchant: expense.merchant || '',
+      description: expense.description || '',
+      userName: user.name,
+      cardId: user.card_id,
+    });
+
+    // Upload to Drive
+    const driveResult = await uploadToDrive(pdfBuffer, expense.file_name, folderId);
+
+    // Update expense record
+    await req.prisma.expense.update({
+      where: { id: expenseId },
+      data: {
+        drive_file_id: driveResult.fileId,
+        drive_file_url: driveResult.webViewLink,
+        upload_status: 'uploaded',
+      },
+    });
+
+    console.log(`[retry] Expense ${expenseId} uploaded to Drive: ${driveResult.webViewLink}`);
+    res.json({ success: true, driveUrl: driveResult.webViewLink, uploadStatus: 'uploaded' });
   } catch (err) {
     console.error('Retry error:', err);
+    if (err.response?.data?.error === 'invalid_grant') {
+      resetDriveClient();
+      return res.status(502).json({ error: 'Token Google Drive expiré. Veuillez renouveler le refresh token dans la Google Console.' });
+    }
+    res.status(500).json({ error: 'Erreur lors du renvoi vers Drive: ' + err.message });
+  }
+});
+
+// POST /api/scan/retry-all — Admin: retry all failed Drive uploads
+router.post('/retry-all', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Réservé aux administrateurs' });
+    }
+
+    const failedExpenses = await req.prisma.expense.findMany({
+      where: { upload_status: 'error' },
+      include: { user: { select: { id: true, name: true, card_id: true, drive_folder_id: true } } },
+      orderBy: { created_at: 'asc' },
+    });
+
+    if (failedExpenses.length === 0) {
+      return res.json({ success: true, message: 'Aucune dépense en erreur', results: [] });
+    }
+
+    const { generatePDF } = require('../services/pdf');
+    const results = [];
+
+    for (const expense of failedExpenses) {
+      try {
+        const folderId = expense.user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+        if (!folderId) {
+          results.push({ id: expense.id, status: 'skipped', reason: 'Pas de dossier Drive' });
+          continue;
+        }
+
+        const pdfBuffer = await generatePDF({
+          imageBuffer: expense.receipt_image,
+          imageMime: expense.receipt_image ? 'image/jpeg' : null,
+          date: expense.date_ticket,
+          amount: Number(expense.amount),
+          type: expense.type,
+          merchant: expense.merchant || '',
+          description: expense.description || '',
+          userName: expense.user.name,
+          cardId: expense.user.card_id,
+        });
+
+        const driveResult = await uploadToDrive(pdfBuffer, expense.file_name, folderId);
+
+        await req.prisma.expense.update({
+          where: { id: expense.id },
+          data: {
+            drive_file_id: driveResult.fileId,
+            drive_file_url: driveResult.webViewLink,
+            upload_status: 'uploaded',
+          },
+        });
+
+        results.push({ id: expense.id, status: 'uploaded', driveUrl: driveResult.webViewLink });
+      } catch (uploadErr) {
+        console.error(`[retry-all] Expense ${expense.id} failed:`, uploadErr.message);
+        results.push({ id: expense.id, status: 'error', reason: uploadErr.message });
+        // If token error, stop trying (all subsequent will fail too)
+        if (uploadErr.response?.data?.error === 'invalid_grant') {
+          resetDriveClient();
+          results.push({ status: 'stopped', reason: 'Token expiré — arrêt du retry' });
+          break;
+        }
+      }
+    }
+
+    const uploaded = results.filter(r => r.status === 'uploaded').length;
+    const failed = results.filter(r => r.status === 'error').length;
+    console.log(`[retry-all] Done: ${uploaded} uploaded, ${failed} failed, ${results.length} total`);
+
+    res.json({ success: true, results, summary: { total: failedExpenses.length, uploaded, failed } });
+  } catch (err) {
+    console.error('Retry-all error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
