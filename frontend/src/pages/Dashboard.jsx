@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { getPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 
@@ -38,6 +39,7 @@ const STATUS_ICONS = {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isOnline } = useOutletContext() || {};
   const cached = readCache();
   // Show cached data immediately — no spinner for returning users
   const [stats, setStats] = useState(cached?.stats ?? null);
@@ -46,13 +48,45 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(!!cached); // silent background refresh
   const [editingExpense, setEditingExpense] = useState(null);
   const [toast, setToast] = useState(null);
+  const [pendingExpenses, setPendingExpenses] = useState([]);
   const loadedRef = useRef(false);
 
   useEffect(() => {
     if (loadedRef.current) return;
     loadedRef.current = true;
     loadData();
+    loadPending();
   }, []);
+
+  // Refresh pending list when coming back online
+  useEffect(() => {
+    loadPending();
+  }, [isOnline]);
+
+  async function loadPending() {
+    try {
+      const pending = await getPendingExpenses();
+      setPendingExpenses(pending.filter(p => p.status !== 'failed'));
+    } catch {}
+  }
+
+  function getPendingImageUrl(expense) {
+    if (!expense.imageData?.buffer) return null;
+    try {
+      const blob = new Blob([expense.imageData.buffer], { type: expense.imageData.type || 'image/jpeg' });
+      return URL.createObjectURL(blob);
+    } catch { return null; }
+  }
+
+  async function handleDeletePending(id) {
+    try {
+      await removePendingExpense(id);
+      setPendingExpenses(prev => prev.filter(p => p.id !== id));
+      setToast({ message: 'Dépense en attente supprimée', type: 'success' });
+    } catch {
+      setToast({ message: 'Erreur lors de la suppression', type: 'error' });
+    }
+  }
 
   async function loadData() {
     try {
@@ -174,6 +208,62 @@ export default function Dashboard() {
         </div>
         <span className="text-text-dim text-xl">›</span>
       </Link>
+
+      {/* Pending offline expenses */}
+      {pendingExpenses.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-amber-300/80 text-xs uppercase tracking-widest flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              {pendingExpenses.length} en attente de sync
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {pendingExpenses.map((expense) => {
+              const typeInfo = TYPE_ICONS[expense.type] || TYPE_ICONS.autre;
+              const imgUrl = getPendingImageUrl(expense);
+              return (
+                <div
+                  key={expense.id}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-amber-900/20 border border-amber-500/20"
+                >
+                  {imgUrl ? (
+                    <img
+                      src={imgUrl}
+                      alt="Ticket"
+                      className="w-[46px] h-[46px] rounded-xl object-cover"
+                    />
+                  ) : (
+                    <div className={`w-[46px] h-[46px] rounded-xl flex items-center justify-center text-xl ${typeInfo.color}`}>
+                      {typeInfo.icon}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-text text-sm font-medium truncate">
+                      {expense.merchant || 'Sans commerçant'}
+                    </p>
+                    <p className="text-amber-300/60 text-xs">
+                      {expense.date_ticket} · {expense.type} · {navigator.onLine ? 'Synchronisation...' : 'Hors ligne'}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    <p className="font-serif text-lg font-semibold text-text">
+                      {Number(expense.amount).toFixed(2)}€
+                    </p>
+                    <button
+                      onClick={() => handleDeletePending(expense.id)}
+                      className="text-red-400/60 hover:text-red-400 text-xs p-1"
+                      title="Supprimer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent Tickets */}
       <div>

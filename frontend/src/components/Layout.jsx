@@ -41,23 +41,38 @@ export default function Layout() {
     }
   }, []);
 
-  // Online/offline listeners
+  // Online/offline listeners + SW sync + periodic retry
   useEffect(() => {
     const onOnline = () => {
       setIsOnline(true);
       syncPending();
     };
     const onOffline = () => setIsOnline(false);
+    const onSwSync = () => syncPending();
 
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
+    window.addEventListener('sw-sync-pending', onSwSync);
 
     // Check pending on mount
     refreshPendingCount();
 
+    // Periodic retry every 30s when online and there are pending items
+    const retryInterval = setInterval(() => {
+      if (navigator.onLine) {
+        getPendingExpenses().then((pending) => {
+          if (pending.filter(p => p.status !== 'failed').length > 0) {
+            syncPending();
+          }
+        }).catch(() => {});
+      }
+    }, 30_000);
+
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
+      window.removeEventListener('sw-sync-pending', onSwSync);
+      clearInterval(retryInterval);
     };
   }, []);
 
