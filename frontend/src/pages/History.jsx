@@ -1,15 +1,9 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
-
-const TYPE_ICONS = {
-  carburant: { icon: '\u26FD', color: 'bg-green-mid/20 text-green-light' },
-  repas: { icon: '\uD83C\uDF7D\uFE0F', color: 'bg-orange-500/20 text-orange-300' },
-  peage: { icon: '\uD83D\uDEE3\uFE0F', color: 'bg-blue-500/20 text-blue-300' },
-  autre: { icon: '\uD83D\uDCC4', color: 'bg-gray-500/20 text-gray-300' },
-};
 
 const STATUS_ICONS = {
   uploaded: '\u2705',
@@ -25,6 +19,7 @@ const MONTHS = [
 export default function History() {
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
+  const { types: expenseTypes, typesMap: TYPE_ICONS } = useExpenseTypes();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
@@ -107,15 +102,15 @@ export default function History() {
         >
           Tous
         </button>
-        {Object.entries(TYPE_ICONS).map(([key, val]) => (
+        {expenseTypes.map((t) => (
           <button
-            key={key}
-            onClick={() => setFilterType(key)}
+            key={t.value}
+            onClick={() => setFilterType(t.value)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-              filterType === key ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-card border border-card-border text-text-muted'
+              filterType === t.value ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-card border border-card-border text-text-muted'
             }`}
           >
-            {val.icon} {key}
+            {t.icon} {t.label}
           </button>
         ))}
       </div>

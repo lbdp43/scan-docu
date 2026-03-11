@@ -28,7 +28,7 @@ model Expense {
   card_id        String?  @db.VarChar(50)
   date_ticket    DateTime @db.Date
   amount         Decimal  @db.Decimal(10, 2)
-  type           String   @db.VarChar(20)
+  type           String   @db.VarChar(30)
   merchant       String?  @db.VarChar(255)
   description    String?
   has_receipt    Boolean  @default(true)
@@ -50,6 +50,19 @@ model DriveConfig {
   updated_at            DateTime @default(now()) @updatedAt
 
   @@map("drive_config")
+}
+
+model ExpenseType {
+  id         Int      @id @default(autoincrement())
+  value      String   @unique @db.VarChar(30)
+  label      String   @db.VarChar(50)
+  icon       String   @db.VarChar(10)
+  color      String   @default("#6B7280") @db.VarChar(20)
+  position   Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("expense_types")
 }
 
 model TokenBlacklist {

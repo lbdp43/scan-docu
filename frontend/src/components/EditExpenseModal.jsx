@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-
-const EXPENSE_TYPES = [
-  { value: 'carburant', label: 'Carburant', icon: '\u26FD' },
-  { value: 'repas', label: 'Repas', icon: '\uD83C\uDF7D\uFE0F' },
-  { value: 'peage', label: 'P\u00E9age', icon: '\uD83D\uDEE3\uFE0F' },
-  { value: 'autre', label: 'Autre', icon: '\uD83D\uDCC4' },
-];
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 
 export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted }) {
+  const { types: EXPENSE_TYPES } = useExpenseTypes();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const [amount, setAmount] = useState('');

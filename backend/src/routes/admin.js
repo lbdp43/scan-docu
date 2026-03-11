@@ -240,7 +240,7 @@ router.get('/expenses', async (req, res) => {
       const uid = parseInt(user_id, 10);
       if (!isNaN(uid)) where.user_id = uid;
     }
-    if (type && ['carburant', 'repas', 'peage', 'autre'].includes(type)) where.type = type;
+    if (type) where.type = type;
     if (month && year) {
       where.date_ticket = {
         gte: new Date(parseInt(year), parseInt(month) - 1, 1),

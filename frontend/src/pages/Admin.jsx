@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
 
-const TYPE_ICONS = {
-  carburant: { icon: '⛽', color: 'bg-green-mid/20 text-green-light' },
-  repas: { icon: '🍽️', color: 'bg-orange-500/20 text-orange-300' },
-  peage: { icon: '🛣️', color: 'bg-blue-500/20 text-blue-300' },
-  autre: { icon: '📄', color: 'bg-gray-500/20 text-gray-300' },
-};
-
 export default function Admin() {
   const { user } = useAuth();
+  const { types: expenseTypes, typesMap: TYPE_ICONS } = useExpenseTypes();
   const [stats, setStats] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +211,12 @@ export default function Admin() {
           📥 Export CSV
         </button>
         <Link
+          to="/admin/types"
+          className="flex-1 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-medium text-sm text-center transition-transform active:scale-[0.97]"
+        >
+          🏷️ Types
+        </Link>
+        <Link
           to="/"
           className="flex-1 py-3 rounded-2xl bg-green-mid text-white font-medium text-sm text-center transition-transform active:scale-[0.97]"
         >
@@ -280,13 +281,13 @@ export default function Admin() {
           >
             Tous
           </button>
-          {Object.entries(TYPE_ICONS).map(([key, val]) => (
+          {expenseTypes.map((t) => (
             <button
-              key={key}
-              onClick={() => setFilterType(key === filterType ? '' : key)}
-              className={`px-3 py-1 rounded-full text-xs whitespace-nowrap ${filterType === key ? 'bg-green-mid/20 text-green-light' : 'bg-card text-text-muted'}`}
+              key={t.value}
+              onClick={() => setFilterType(t.value === filterType ? '' : t.value)}
+              className={`px-3 py-1 rounded-full text-xs whitespace-nowrap ${filterType === t.value ? 'bg-green-mid/20 text-green-light' : 'bg-card text-text-muted'}`}
             >
-              {val.icon} {key}
+              {t.icon} {t.label}
             </button>
           ))}
         </div>

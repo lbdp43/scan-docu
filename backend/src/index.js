@@ -13,6 +13,7 @@ const expensesRoutes = require('./routes/expenses');
 const adminRoutes = require('./routes/admin');
 const scanRoutes = require('./routes/scan');
 const driveSetupRoutes = require('./routes/driveSetup');
+const expenseTypesRoutes = require('./routes/expenseTypes');
 const { warmupWorker } = require('./services/ocr');
 
 const prisma = new PrismaClient();
@@ -86,6 +87,7 @@ app.use('/api/expenses', expensesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/drive', driveSetupRoutes);
+app.use('/api/expense-types', expenseTypesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -170,9 +172,31 @@ async function cleanupExpiredTokens() {
   }
 }
 
+async function ensureDefaultExpenseTypes() {
+  try {
+    const count = await prisma.expenseType.count();
+    if (count === 0) {
+      console.log('[startup] No expense types found, seeding defaults...');
+      await prisma.expenseType.createMany({
+        data: [
+          { value: 'carburant', label: 'Carburant', icon: '⛽', color: '#4A9E40', position: 0 },
+          { value: 'repas', label: 'Repas', icon: '🍽️', color: '#F97316', position: 1 },
+          { value: 'peage', label: 'Péage', icon: '🛣️', color: '#3B82F6', position: 2 },
+          { value: 'autre', label: 'Autre', icon: '📄', color: '#6B7280', position: 3 },
+        ],
+        skipDuplicates: true,
+      });
+      console.log('[startup] Default expense types seeded');
+    }
+  } catch (err) {
+    console.error('[startup] Error seeding expense types:', err.message);
+  }
+}
+
 app.listen(PORT, async () => {
   console.log(`LBDP API running on port ${PORT}`);
   await ensureAdminExists();
+  await ensureDefaultExpenseTypes();
   await cleanupExpiredTokens();
   setInterval(cleanupExpiredTokens, 60 * 60 * 1000); // Cleanup every hour
   // Pre-warm Tesseract so the first scan request is instant

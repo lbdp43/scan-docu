@@ -3,6 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { getPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 
@@ -24,13 +25,6 @@ function writeCache(data) {
   } catch {}
 }
 
-const TYPE_ICONS = {
-  carburant: { icon: '⛽', color: 'bg-green-mid/20 text-green-light' },
-  repas: { icon: '🍽️', color: 'bg-orange-500/20 text-orange-300' },
-  peage: { icon: '🛣️', color: 'bg-blue-500/20 text-blue-300' },
-  autre: { icon: '📄', color: 'bg-gray-500/20 text-gray-300' },
-};
-
 const STATUS_ICONS = {
   uploaded: '✅',
   pending: '⏳',
@@ -40,6 +34,7 @@ const STATUS_ICONS = {
 export default function Dashboard() {
   const { user } = useAuth();
   const { isOnline } = useOutletContext() || {};
+  const { typesMap: TYPE_ICONS } = useExpenseTypes();
   const cached = readCache();
   // Show cached data immediately — no spinner for returning users
   const [stats, setStats] = useState(cached?.stats ?? null);

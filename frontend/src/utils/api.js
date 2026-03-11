@@ -113,6 +113,18 @@ export const api = {
   retryAllDriveUploads: () =>
     request('/scan/retry-all', { method: 'POST' }),
 
+  // Expense Types
+  getExpenseTypes: () =>
+    request('/expense-types'),
+  getAllExpenseTypes: () =>
+    request('/expense-types/all'),
+  createExpenseType: (data) =>
+    request('/expense-types', { method: 'POST', body: JSON.stringify(data) }),
+  updateExpenseType: (id, data) =>
+    request(`/expense-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExpenseType: (id) =>
+    request(`/expense-types/${id}`, { method: 'DELETE' }),
+
   // Admin
   getUsers: () =>
     request('/admin/users'),

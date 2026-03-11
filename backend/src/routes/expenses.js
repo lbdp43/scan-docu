@@ -75,7 +75,7 @@ router.use(authenticateToken);
 const createExpenseSchema = z.object({
   date_ticket: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format de date invalide (AAAA-MM-JJ)'),
   amount: z.number().positive('Le montant doit être positif').max(9999.99, 'Montant trop élevé'),
-  type: z.enum(['carburant', 'repas', 'peage', 'autre']),
+  type: z.string().min(1).max(30).trim(),
   merchant: z.string().min(1).max(255).trim().optional(),
   description: z.string().max(500).trim().optional(),
   has_receipt: z.boolean().optional().default(true),
@@ -84,7 +84,7 @@ const createExpenseSchema = z.object({
 const updateExpenseSchema = z.object({
   date_ticket: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format de date invalide (AAAA-MM-JJ)').optional(),
   amount: z.number().positive('Le montant doit être positif').max(9999.99, 'Montant trop élevé').optional(),
-  type: z.enum(['carburant', 'repas', 'peage', 'autre']).optional(),
+  type: z.string().min(1).max(30).trim().optional(),
   merchant: z.string().max(255).trim().optional(),
   description: z.string().max(500).trim().optional(),
 });
@@ -126,7 +126,7 @@ router.get('/', async (req, res) => {
     }
 
     // Filters
-    if (type && ['carburant', 'repas', 'peage', 'autre'].includes(type)) {
+    if (type) {
       where.type = type;
     }
 
@@ -542,7 +542,7 @@ router.get('/export/csv', async (req, res) => {
     }
 
     const { month, year, type } = req.query;
-    if (type && ['carburant', 'repas', 'peage', 'autre'].includes(type)) {
+    if (type) {
       where.type = type;
     }
     if (month && year) {

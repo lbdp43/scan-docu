@@ -2,14 +2,8 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
-
-const EXPENSE_TYPES = [
-  { value: 'carburant', label: 'Carburant', icon: '⛽' },
-  { value: 'repas', label: 'Repas', icon: '🍽️' },
-  { value: 'peage', label: 'Péage', icon: '🛣️' },
-  { value: 'autre', label: 'Autre', icon: '📄' },
-];
 
 // Compress image client-side before uploading
 function compressImage(file, maxWidth = 1400, quality = 0.75) {
@@ -43,6 +37,7 @@ function compressImage(file, maxWidth = 1400, quality = 0.75) {
 export default function Manual() {
   const navigate = useNavigate();
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
+  const { types: EXPENSE_TYPES } = useExpenseTypes();
   const fileInputRef = useRef(null);
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);

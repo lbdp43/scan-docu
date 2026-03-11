@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ExpenseTypesProvider } from './context/ExpenseTypesContext';
 import Layout from './components/Layout';
 
 // Lazy-loaded pages for code splitting
@@ -11,6 +12,7 @@ const Manual = lazy(() => import('./pages/Manual'));
 const History = lazy(() => import('./pages/History'));
 const Admin = lazy(() => import('./pages/Admin'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const AdminTypes = lazy(() => import('./pages/AdminTypes'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Stats = lazy(() => import('./pages/Stats'));
 
@@ -53,6 +55,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <ExpenseTypesProvider>
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-bg"><div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" /></div>}>
           <Routes>
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
@@ -65,10 +68,12 @@ export default function App() {
               <Route path="/profile" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
               <Route path="/admin" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><Admin /></Suspense></PrivateRoute>} />
               <Route path="/admin/users" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><AdminUsers /></Suspense></PrivateRoute>} />
+              <Route path="/admin/types" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><AdminTypes /></Suspense></PrivateRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        </ExpenseTypesProvider>
       </AuthProvider>
     </BrowserRouter>
   );

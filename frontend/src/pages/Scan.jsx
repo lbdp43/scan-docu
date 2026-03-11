@@ -2,14 +2,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
-
-const EXPENSE_TYPES = [
-  { value: 'carburant', label: 'Carburant', icon: '⛽' },
-  { value: 'repas', label: 'Repas', icon: '🍽️' },
-  { value: 'peage', label: 'Péage', icon: '🛣️' },
-  { value: 'autre', label: 'Autre', icon: '📄' },
-];
 
 // Compress image client-side — 1200px is enough for OCR + PDF
 function compressImage(file, maxWidth = 1200, quality = 0.78) {
@@ -42,6 +36,7 @@ function compressImage(file, maxWidth = 1200, quality = 0.78) {
 export default function Scan() {
   const navigate = useNavigate();
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
+  const { types: EXPENSE_TYPES } = useExpenseTypes();
   const fileInputRef = useRef(null);
   const amountRef = useRef(null);
 
@@ -354,13 +349,13 @@ export default function Scan() {
               </span>
             )}
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="flex flex-wrap gap-2">
             {EXPENSE_TYPES.map(t => (
               <button
                 key={t.value}
                 type="button"
                 onClick={() => setType(t.value)}
-                className={`py-3 rounded-2xl text-sm font-medium transition-all flex flex-col items-center gap-1 ${
+                className={`px-4 py-2.5 rounded-2xl text-sm font-medium transition-all flex items-center gap-1.5 ${
                   type === t.value
                     ? 'bg-green-mid/20 border-2 border-green-mid text-green-light'
                     : ocrSuggestedType === t.value && !type
@@ -368,8 +363,8 @@ export default function Scan() {
                     : 'bg-card border border-card-border text-text-muted'
                 }`}
               >
-                <span className="text-xl">{t.icon}</span>
-                <span className="text-[10px]">{t.label}</span>
+                <span className="text-lg">{t.icon}</span>
+                <span className="text-xs">{t.label}</span>
               </button>
             ))}
           </div>

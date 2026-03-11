@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
-
-const TYPE_INFO = {
-  carburant: { icon: '\u26FD', label: 'Carburant', color: '#4A9E40' },
-  repas: { icon: '\uD83C\uDF7D\uFE0F', label: 'Repas', color: '#F97316' },
-  peage: { icon: '\uD83D\uDEE3\uFE0F', label: 'P\u00E9age', color: '#3B82F6' },
-  autre: { icon: '\uD83D\uDCC4', label: 'Autre', color: '#6B7280' },
-};
+import { useExpenseTypes } from '../context/ExpenseTypesContext';
 
 const MONTH_LABELS = {
   '01': 'Jan', '02': 'F\u00E9v', '03': 'Mar', '04': 'Avr',
@@ -18,6 +12,7 @@ const MONTH_LABELS = {
 export default function Stats() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const { typesMap } = useExpenseTypes();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -159,7 +154,7 @@ export default function Stats() {
               {typeTotals
                 .sort((a, b) => b.total - a.total)
                 .map((t) => {
-                  const info = TYPE_INFO[t.type] || TYPE_INFO.autre;
+                  const info = typesMap[t.type] || typesMap.autre || { icon: '📄', label: t.type, hexColor: '#6B7280' };
                   const pct = summary.grandTotal > 0 ? (t.total / summary.grandTotal) * 100 : 0;
                   return (
                     <div key={t.type}>
@@ -177,7 +172,7 @@ export default function Stats() {
                           className="h-full rounded-full transition-all duration-700"
                           style={{
                             width: `${pct}%`,
-                            backgroundColor: info.color,
+                            backgroundColor: info.hexColor,
                           }}
                         />
                       </div>
