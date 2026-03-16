@@ -210,7 +210,9 @@ export default function Admin() {
             {stats?.month?.count || 0} justificatifs · {stats?.totals?.users || 0} collaborateurs
           </p>
         </div>
-        <div className="absolute top-4 right-4 text-[70px] opacity-[0.08] select-none">🌿</div>
+        <div className="absolute top-4 right-4 opacity-[0.06] select-none">
+          <svg width="70" height="70" viewBox="0 0 24 24" fill="currentColor" className="text-green-light"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.71c.75.75 1.6 1.34 2.51 1.76C13.18 23.14 19 22 22 18c.91-1.22 1.38-2.66 1-4-.38-1.34-2.07-2-4-2-1.59 0-3.19.5-4.53 1.4-.52-.98-.84-2.09-.97-3.4z"/></svg>
+        </div>
       </div>
 
       {/* Stats by type */}
@@ -267,19 +269,19 @@ export default function Admin() {
           onClick={handleExportCSV}
           className="flex-1 py-3 rounded-2xl bg-gold/10 border border-gold/30 text-gold font-medium text-sm transition-transform active:scale-[0.97]"
         >
-          📥 Export CSV
+          Export CSV
         </button>
         <Link
           to="/admin/types"
           className="flex-1 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-medium text-sm text-center transition-transform active:scale-[0.97]"
         >
-          🏷️ Types
+          Types
         </Link>
         <Link
           to="/"
           className="flex-1 py-3 rounded-2xl bg-green-mid text-white font-medium text-sm text-center transition-transform active:scale-[0.97]"
         >
-          📷 Scanner
+          Scanner
         </Link>
       </div>
 
@@ -287,7 +289,6 @@ export default function Admin() {
       {expenses.some(e => e.upload_status === 'error') && (
         <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-amber-400 text-sm">{'\u26A0\uFE0F'}</span>
             <p className="text-amber-400 text-sm font-medium">
               {expenses.filter(e => e.upload_status === 'error').length} justificatif(s) non envoy{'\u00E9'}(s) sur Drive
             </p>
@@ -304,7 +305,7 @@ export default function Admin() {
                   Renvoi en cours...
                 </>
               ) : (
-                <>{'\uD83D\uDD04'} Renvoyer tout sur Drive</>
+                <>Renvoyer tout sur Drive</>
               )}
             </button>
             <button
@@ -318,7 +319,7 @@ export default function Admin() {
                   Export...
                 </>
               ) : (
-                <>{'\uD83D\uDCE5'} T{'\u00E9'}l{'\u00E9'}charger le ZIP</>
+                <>T{'\u00E9'}l{'\u00E9'}charger le ZIP</>
               )}
             </button>
           </div>
@@ -334,7 +335,7 @@ export default function Admin() {
                   Validation...
                 </>
               ) : (
-                <>{'\u2705'} J'ai bien t{'\u00E9'}l{'\u00E9'}charg{'\u00E9'} le ZIP — valider</>
+                <>J'ai bien t{'\u00E9'}l{'\u00E9'}charg{'\u00E9'} le ZIP — valider</>
               )}
             </button>
           )}

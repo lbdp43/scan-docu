@@ -6,10 +6,10 @@ import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 
 const STATUS_ICONS = {
-  uploaded: '\u2705',
-  exported: '\uD83D\uDCE6',
-  pending: '\u23F3',
-  error: '\u274C',
+  uploaded: '\u2713',
+  exported: '\u2713',
+  pending: '\u00B7\u00B7\u00B7',
+  error: '\u2717',
 };
 
 const MONTHS = [
@@ -219,15 +219,19 @@ export default function History() {
                         expense.drive_file_url ? (
                           <span
                             onClick={(e) => { e.stopPropagation(); window.open(expense.drive_file_url, '_blank'); }}
-                            className="text-green-light hover:underline cursor-pointer"
+                            className="text-green-light hover:underline cursor-pointer font-medium"
                           >
-                            {'\uD83D\uDCC4'} Drive
+                            Drive
                           </span>
                         ) : (
-                          <span>{STATUS_ICONS[expense.upload_status] || '\u23F3'}</span>
+                          <span className={
+                            expense.upload_status === 'error' ? 'text-red-400' :
+                            expense.upload_status === 'uploaded' || expense.upload_status === 'exported' ? 'text-green-light' :
+                            'text-text-dim'
+                          }>{STATUS_ICONS[expense.upload_status] || '\u00B7\u00B7\u00B7'}</span>
                         )
                       ) : (
-                        <span className="text-amber-400">{'\u26A0\uFE0F'} Sans ticket</span>
+                        <span className="text-amber-400/70 text-[10px]">sans re{'\u00E7'}u</span>
                       )}
                     </div>
                   </div>

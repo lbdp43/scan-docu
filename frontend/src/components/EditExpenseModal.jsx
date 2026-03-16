@@ -125,7 +125,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
               {expense.drive_file_id ? (
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-green-mid/10 border border-green-mid/20">
                   <span className="text-xs text-green-light">
-                    {'\uD83D\uDCC4'} Justificatif sur Drive
+                    Justificatif sur Drive
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -149,7 +149,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
               ) : expense.upload_status === 'exported' ? (
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <span className="text-xs text-blue-400">
-                    {'\uD83D\uDCE6'} Export{'\u00E9'} via ZIP
+                    Export{'\u00E9'} via ZIP
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -172,7 +172,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
               ) : (
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <span className="text-xs text-amber-400">
-                    {'\u26A0\uFE0F'} Drive {'\u00E9'}chou{'\u00E9'} — image sauvegard{'\u00E9'}e localement
+                    Drive {'\u00E9'}chou{'\u00E9'} — image sauvegard{'\u00E9'}e localement
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -208,7 +208,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                       Renvoi vers Drive...
                     </>
                   ) : (
-                    <>{'\uD83D\uDD04'} Renvoyer vers Google Drive</>
+                    <>Renvoyer vers Google Drive</>
                   )}
                 </button>
               )}

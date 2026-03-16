@@ -26,10 +26,10 @@ function writeCache(data) {
 }
 
 const STATUS_ICONS = {
-  uploaded: '✅',
-  exported: '📦',
-  pending: '⏳',
-  error: '❌',
+  uploaded: '\u2713',
+  exported: '\u2713',
+  pending: '\u00B7\u00B7\u00B7',
+  error: '\u2717',
 };
 
 export default function Dashboard() {
@@ -301,10 +301,14 @@ export default function Dashboard() {
                   <p className="font-serif text-lg font-semibold text-text">
                     {Number(expense.amount).toFixed(2)}€
                   </p>
-                  <span className="text-xs">
+                  <span className={`text-xs ${
+                    expense.upload_status === 'error' ? 'text-red-400' :
+                    expense.upload_status === 'uploaded' || expense.upload_status === 'exported' ? 'text-green-light' :
+                    'text-text-dim'
+                  }`}>
                     {expense.has_receipt
-                      ? (STATUS_ICONS[expense.upload_status] || '⏳')
-                      : '✏️'}
+                      ? (STATUS_ICONS[expense.upload_status] || '\u00B7\u00B7\u00B7')
+                      : ''}
                   </span>
                 </div>
               </div>

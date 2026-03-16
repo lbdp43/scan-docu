@@ -4,15 +4,29 @@ import { useAuth } from '../context/AuthContext';
 import { getPendingExpenses, syncPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
 import { api } from '../utils/api';
 
+function NavIcon({ name, active }) {
+  const color = active ? 'currentColor' : 'currentColor';
+  const props = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  switch (name) {
+    case 'scan': return (<svg {...props}><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="12" cy="12" r="3.5" /><path d="M3 9h2M19 9h2M3 15h2M19 15h2" /></svg>);
+    case 'home': return (<svg {...props}><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><path d="M9 21V14h6v7" /></svg>);
+    case 'history': return (<svg {...props}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>);
+    case 'stats': return (<svg {...props}><path d="M4 20h16" /><rect x="4" y="13" width="3" height="7" rx="1" fill={active ? color : 'none'} /><rect x="10.5" y="8" width="3" height="12" rx="1" fill={active ? color : 'none'} /><rect x="17" y="4" width="3" height="16" rx="1" fill={active ? color : 'none'} /></svg>);
+    case 'admin': return (<svg {...props}><circle cx="12" cy="12" r="3" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>);
+    case 'profile': return (<svg {...props}><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0112 0v1" /></svg>);
+    default: return null;
+  }
+}
+
 const navItems = [
-  { path: '/', label: 'Scanner', icon: '📷' },
-  { path: '/dashboard', label: 'Accueil', icon: '🏠' },
-  { path: '/history', label: 'Historique', icon: '📋' },
-  { path: '/stats', label: 'Stats', icon: '📊' },
+  { path: '/', label: 'Scanner', icon: 'scan' },
+  { path: '/dashboard', label: 'Accueil', icon: 'home' },
+  { path: '/history', label: 'Historique', icon: 'history' },
+  { path: '/stats', label: 'Stats', icon: 'stats' },
 ];
 
-const adminNavItem = { path: '/admin', label: 'Admin', icon: '⚙️' };
-const profileNavItem = { path: '/profile', label: 'Profil', icon: '👤' };
+const adminNavItem = { path: '/admin', label: 'Admin', icon: 'admin' };
+const profileNavItem = { path: '/profile', label: 'Profil', icon: 'profile' };
 
 export default function Layout() {
   const { user } = useAuth();
@@ -153,11 +167,11 @@ export default function Layout() {
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center gap-1 py-2 px-3 transition-all duration-200 ${
-                  isActive ? 'text-green-light -translate-y-0.5' : 'text-text-dim'
+                className={`flex flex-col items-center gap-1.5 py-2 px-3 transition-all duration-200 ${
+                  isActive ? 'text-green-light' : 'text-text-dim'
                 }`}
               >
-                <span className="text-xl">{item.icon}</span>
+                <NavIcon name={item.icon} active={isActive} />
                 <span className="text-[10px] font-medium tracking-wide">{item.label}</span>
               </NavLink>
             );

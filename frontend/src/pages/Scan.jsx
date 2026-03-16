@@ -218,11 +218,17 @@ export default function Scan() {
         {/* Big capture button */}
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="w-full border-2 border-dashed border-green-mid/35 rounded-4xl p-14 flex flex-col items-center gap-4 bg-green-mid/[0.04] transition-colors hover:bg-green-mid/[0.08] active:scale-[0.97]"
+          className="w-full border border-green-mid/25 rounded-3xl p-12 flex flex-col items-center gap-5 bg-green-mid/[0.04] transition-all hover:bg-green-mid/[0.08] hover:border-green-mid/40 active:scale-[0.98]"
         >
-          <span className="text-[64px] drop-shadow-[0_0_12px_rgba(77,158,64,0.35)]">📷</span>
+          <div className="w-16 h-16 rounded-2xl bg-green-mid/10 flex items-center justify-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-light">
+              <rect x="2" y="5" width="20" height="15" rx="3" />
+              <circle cx="12" cy="13" r="4" />
+              <path d="M8.5 5L9.5 3h5l1 2" />
+            </svg>
+          </div>
           <div className="text-center">
-            <p className="text-text font-semibold text-lg">Prendre une photo</p>
+            <p className="text-text font-semibold text-base">Prendre une photo</p>
             <p className="text-text-muted text-sm mt-1">ou choisir depuis la galerie</p>
           </div>
         </button>
@@ -238,7 +244,7 @@ export default function Scan() {
 
         <div className="p-4 rounded-2xl bg-card border border-card-border">
           <p className="text-text-muted text-xs leading-relaxed">
-            💡 <strong className="text-text">Conseil péage :</strong> Ticket à plat, bonne lumière. L'OCR s'analyse en arrière-plan — vous pouvez saisir le montant pendant ce temps.
+            <strong className="text-text">Conseil :</strong> Ticket {'\u00E0'} plat, bonne lumi{'\u00E8'}re. L'OCR s'analyse en arri{'\u00E8'}re-plan — vous pouvez saisir le montant pendant ce temps.
           </p>
         </div>
       </div>
@@ -418,7 +424,7 @@ export default function Scan() {
               Envoi en cours…
             </>
           ) : (
-            <>📁 Envoyer dans Google Drive</>
+            <>Enregistrer la d{'\u00E9'}pense</>
           )}
         </button>
       </form>
