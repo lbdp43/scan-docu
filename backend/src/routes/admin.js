@@ -251,6 +251,7 @@ router.get('/expenses', async (req, res) => {
     const [expenses, total] = await Promise.all([
       req.prisma.expense.findMany({
         where,
+        omit: { receipt_image: true },
         include: {
           user: { select: { id: true, name: true, card_id: true } },
         },

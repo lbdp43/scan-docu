@@ -30,11 +30,12 @@ export default function Admin() {
 
   async function loadData() {
     try {
-      const [statsData] = await Promise.all([
+      const [statsData, expensesData] = await Promise.all([
         api.getAdminStats(),
+        api.getAdminExpenses({}),
       ]);
       setStats(statsData);
-      await loadExpenses();
+      setExpenses(expensesData.expenses);
     } catch (err) {
       console.error('Admin load error:', err);
     } finally {
