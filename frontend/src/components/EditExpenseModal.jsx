@@ -93,9 +93,9 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 pb-[100px] pt-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-[#1a2a1c] border border-card-border rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col"
+        className="bg-[#1a2a1c] border border-card-border rounded-3xl w-full max-w-md max-h-full flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Fixed header */}
