@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
+import EditExpenseModal from '../components/EditExpenseModal';
 
 const CACHE_KEY = 'admin_v1';
 const CACHE_TTL = 2 * 60 * 1000;
@@ -39,6 +40,7 @@ export default function Admin() {
   const [exportingFailed, setExportingFailed] = useState(false);
   const [zipDownloaded, setZipDownloaded] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -372,14 +374,18 @@ export default function Admin() {
               day: 'numeric', month: 'short',
             });
             return (
-              <div key={expense.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-card-border">
+              <div
+                key={expense.id}
+                onClick={() => setEditingExpense(expense)}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-card-border cursor-pointer transition-colors hover:border-green-mid/40 active:scale-[0.99]"
+              >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${typeInfo.color}`}>
-                  {expense.has_receipt ? typeInfo.icon : '⚠️'}
+                  {expense.has_receipt ? typeInfo.icon : '\u26A0\uFE0F'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-text text-sm font-medium truncate">
-                      {expense.merchant || 'Sans commerçant'}
+                      {expense.merchant || 'Sans commer\u00E7ant'}
                     </p>
                     {!expense.has_receipt && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 whitespace-nowrap">
@@ -390,11 +396,11 @@ export default function Admin() {
                   <p className="text-text-muted text-xs">{expense.user?.name} · {date}</p>
                 </div>
                 <p className="font-serif text-base font-semibold text-text shrink-0 mr-1">
-                  {Number(expense.amount).toFixed(2)}€
+                  {Number(expense.amount).toFixed(2)}\u20AC
                 </p>
                 <button
                   type="button"
-                  onClick={() => setDeleteConfirm(expense)}
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(expense); }}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
                   title="Supprimer"
                 >
@@ -439,6 +445,24 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      <EditExpenseModal
+        expense={editingExpense}
+        onClose={() => setEditingExpense(null)}
+        onSaved={(driveUpdated) => {
+          setToast({
+            message: driveUpdated ? 'D\u00E9pense modifi\u00E9e et Drive mis \u00E0 jour' : 'D\u00E9pense modifi\u00E9e',
+            type: 'success',
+          });
+          loadExpenses();
+          api.getAdminStats().then(setStats).catch(() => {});
+        }}
+        onDeleted={() => {
+          setToast({ message: 'D\u00E9pense supprim\u00E9e', type: 'success' });
+          loadExpenses();
+          api.getAdminStats().then(setStats).catch(() => {});
+        }}
+      />
     </div>
   );
 }
