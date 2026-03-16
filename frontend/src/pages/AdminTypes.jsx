@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
+import TypeIcon, { IconPicker, ICON_LABELS } from '../components/TypeIcon';
 
 const CACHE_KEY = 'admin_types_v1';
 const CACHE_TTL = 2 * 60 * 1000;
@@ -211,32 +212,32 @@ export default function AdminTypes() {
                 className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
               />
             </div>
-            <div>
-              <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                Emoji
-              </label>
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
+              Ic{'\u00F4'}ne
+            </label>
+            <IconPicker value={newIcon} onChange={setNewIcon} color={newColor} />
+            {newIcon && (
+              <p className="text-text-muted text-[10px] mt-1.5">
+                S{'\u00E9'}lectionn{'\u00E9'} : <span className="text-green-light font-medium">{ICON_LABELS[newIcon] || newIcon}</span>
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
+              Couleur
+            </label>
+            <div className="flex gap-2 items-center">
               <input
-                type="text"
-                value={newIcon}
-                onChange={(e) => setNewIcon(e.target.value)}
-                placeholder="ex: 🏨"
-                maxLength={10}
-                required
-                className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-2xl text-center focus:outline-none focus:border-green-mid"
+                type="color"
+                value={newColor}
+                onChange={(e) => setNewColor(e.target.value)}
+                className="w-10 h-10 rounded-lg border border-card-border cursor-pointer bg-transparent"
               />
-            </div>
-            <div>
-              <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                Couleur
-              </label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="color"
-                  value={newColor}
-                  onChange={(e) => setNewColor(e.target.value)}
-                  className="w-10 h-10 rounded-lg border border-card-border cursor-pointer bg-transparent"
-                />
-                <span className="text-text-muted text-xs font-mono">{newColor}</span>
+              <span className="text-text-muted text-xs font-mono">{newColor}</span>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: newColor + '20', color: newColor }}>
+                <TypeIcon icon={newIcon || 'other'} size={22} />
               </div>
             </div>
           </div>
@@ -280,7 +281,7 @@ export default function AdminTypes() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                      Libell&eacute;
+                      Libell{'\u00E9'}
                     </label>
                     <input
                       type="text"
@@ -288,18 +289,6 @@ export default function AdminTypes() {
                       onChange={(e) => setEditLabel(e.target.value)}
                       maxLength={50}
                       className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
-                    />
-                  </div>
-                  <div className="w-20">
-                    <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                      Emoji
-                    </label>
-                    <input
-                      type="text"
-                      value={editIcon}
-                      onChange={(e) => setEditIcon(e.target.value)}
-                      maxLength={10}
-                      className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-xl text-center focus:outline-none focus:border-green-mid"
                     />
                   </div>
                   <div className="w-14">
@@ -313,6 +302,12 @@ export default function AdminTypes() {
                       className="w-full h-[38px] rounded-lg border border-card-border cursor-pointer bg-transparent"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
+                    Ic{'\u00F4'}ne
+                  </label>
+                  <IconPicker value={editIcon} onChange={setEditIcon} color={editColor} />
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -334,17 +329,17 @@ export default function AdminTypes() {
               /* Display mode */
               <div className="flex items-center gap-3">
                 <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
-                  style={{ backgroundColor: type.color + '20' }}
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                  style={{ backgroundColor: type.color + '20', color: type.color }}
                 >
-                  {type.icon}
+                  <TypeIcon icon={type.icon} color={type.color} size={24} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-text text-sm font-semibold">{type.label}</p>
                     {!type.is_active && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
-                        D&eacute;sactiv&eacute;
+                        D{'\u00E9'}sactiv{'\u00E9'}
                       </span>
                     )}
                   </div>
@@ -357,28 +352,32 @@ export default function AdminTypes() {
                 <div className="flex gap-1">
                   <button
                     onClick={() => startEdit(type)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-card transition-colors text-sm"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-card transition-colors"
                     title="Modifier"
                   >
-                    ✏️
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                   </button>
                   <button
                     onClick={() => handleToggleActive(type)}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-sm ${
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
                       type.is_active
                         ? 'text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/10'
                         : 'text-green-light/60 hover:text-green-light hover:bg-green-mid/10'
                     }`}
                     title={type.is_active ? 'D\u00E9sactiver' : 'R\u00E9activer'}
                   >
-                    {type.is_active ? '⏸️' : '▶️'}
+                    {type.is_active ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8V4z" /></svg>
+                    )}
                   </button>
                   <button
                     onClick={() => handleDelete(type)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors text-sm"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                     title="Supprimer"
                   >
-                    🗑️
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                   </button>
                 </div>
               </div>
@@ -392,7 +391,7 @@ export default function AdminTypes() {
 
       <div className="p-4 rounded-2xl bg-card border border-card-border">
         <p className="text-text-muted text-xs leading-relaxed">
-          💡 <strong className="text-text">Info :</strong> Supprimer un type utilis&eacute; par des d&eacute;penses le d&eacute;sactivera au lieu de le supprimer.
+          <strong className="text-text">Info :</strong> Supprimer un type utilis&eacute; par des d&eacute;penses le d&eacute;sactivera au lieu de le supprimer.
           Les types d&eacute;sactiv&eacute;s ne sont plus propos&eacute;s lors de la saisie mais restent visibles dans l'historique.
         </p>
       </div>

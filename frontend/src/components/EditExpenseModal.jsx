@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
+import TypeIcon from './TypeIcon';
 
 export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted }) {
   const { types: EXPENSE_TYPES } = useExpenseTypes();
@@ -284,7 +285,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                         : 'bg-card border border-card-border text-text-muted'
                     }`}
                   >
-                    {t.icon} {t.label}
+                    <TypeIcon icon={t.icon} color={t.color} size={14} /> {t.label}
                   </button>
                 ))}
               </div>

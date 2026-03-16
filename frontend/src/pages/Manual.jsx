@@ -4,6 +4,7 @@ import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
+import TypeIcon from '../components/TypeIcon';
 
 // Compress image client-side before uploading
 function compressImage(file, maxWidth = 1400, quality = 0.75) {
@@ -182,7 +183,9 @@ export default function Manual() {
               onClick={() => fileInputRef.current?.click()}
               className="w-full border-2 border-dashed border-green-mid/25 rounded-2xl p-6 flex flex-col items-center gap-2 bg-green-mid/[0.03] transition-colors hover:bg-green-mid/[0.06] active:scale-[0.98]"
             >
-              <span className="text-3xl">📸</span>
+              <span className="text-green-light/60">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="15" rx="3" /><circle cx="12" cy="13" r="4" /><path d="M8.5 5L9.5 3h5l1 2" /></svg>
+              </span>
               <span className="text-text-muted text-xs">Ajouter une photo pour justifier</span>
             </button>
           )}
@@ -247,7 +250,7 @@ export default function Manual() {
                     : 'bg-card border border-card-border text-text-muted'
                 }`}
               >
-                {t.icon} {t.label}
+                <TypeIcon icon={t.icon} color={t.color} size={14} /> {t.label}
               </button>
             ))}
           </div>

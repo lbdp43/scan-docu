@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
+import TypeIcon from '../components/TypeIcon';
 
 const STATUS_ICONS = {
   uploaded: '\u2713',
@@ -133,7 +134,7 @@ export default function History() {
               filterType === t.value ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-card border border-card-border text-text-muted'
             }`}
           >
-            {t.icon} {t.label}
+            <TypeIcon icon={t.icon} color={t.color} size={14} /> {t.label}
           </button>
         ))}
       </div>
@@ -195,8 +196,12 @@ export default function History() {
                   onClick={() => setEditingExpense(expense)}
                   className="flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border cursor-pointer transition-colors hover:border-green-mid/40 active:scale-[0.99]"
                 >
-                  <div className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl ${typeInfo.color}`}>
-                    {expense.has_receipt ? typeInfo.icon : '\u270F\uFE0F'}
+                  <div className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center ${typeInfo.color}`}>
+                    {expense.has_receipt ? (
+                      <TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={22} />
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-text text-sm font-medium truncate">

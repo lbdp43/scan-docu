@@ -4,6 +4,7 @@ import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
+import TypeIcon from '../components/TypeIcon';
 
 // Compress image client-side — 1200px is enough for OCR + PDF
 function compressImage(file, maxWidth = 1200, quality = 0.78) {
@@ -210,12 +211,13 @@ export default function Scan() {
   // ── Capture screen ──────────────────────────────────────────
   if (!hasImage) {
     return (
-      <div className="space-y-6 animate-fade-up">
+      <div className="flex flex-col min-h-[calc(100vh-180px)] animate-fade-up">
         {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
         <h1 className="font-serif text-xl font-semibold">Scanner un ticket</h1>
 
-        {/* Big capture button */}
+        {/* Big capture button — centered vertically */}
+        <div className="flex-1 flex items-center justify-center py-8">
         <button
           onClick={() => fileInputRef.current?.click()}
           className="w-full border border-green-mid/25 rounded-3xl p-12 flex flex-col items-center gap-5 bg-green-mid/[0.04] transition-all hover:bg-green-mid/[0.08] hover:border-green-mid/40 active:scale-[0.98]"
@@ -232,6 +234,7 @@ export default function Scan() {
             <p className="text-text-muted text-sm mt-1">ou choisir depuis la galerie</p>
           </div>
         </button>
+        </div>
 
         <input
           ref={fileInputRef}
@@ -349,7 +352,6 @@ export default function Scan() {
                   onClick={() => setType(ocrSuggestedType)}
                   className="underline font-medium text-amber-300"
                 >
-                  {EXPENSE_TYPES.find(t => t.value === ocrSuggestedType)?.icon}{' '}
                   {EXPENSE_TYPES.find(t => t.value === ocrSuggestedType)?.label}
                 </button>
               </span>
@@ -369,7 +371,7 @@ export default function Scan() {
                     : 'bg-card border border-card-border text-text-muted'
                 }`}
               >
-                <span className="text-lg">{t.icon}</span>
+                <span style={{ color: t.color || '#6B7280' }}><TypeIcon icon={t.icon} color={t.color} size={18} /></span>
                 <span className="text-xs">{t.label}</span>
               </button>
             ))}

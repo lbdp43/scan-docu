@@ -46,7 +46,7 @@ export function buildTypesMap(types) {
   });
   // Fallback for unknown types
   if (!map['autre']) {
-    map['autre'] = { icon: '📄', label: 'Autre', color: 'bg-gray-500/20 text-gray-300', hexColor: '#6B7280' };
+    map['autre'] = { icon: null, label: 'Autre', color: 'bg-gray-500/20 text-gray-300', hexColor: '#6B7280' };
   }
   return map;
 }

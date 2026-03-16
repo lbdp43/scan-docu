@@ -6,6 +6,7 @@ import { getPendingExpenses, removePendingExpense, storableToFile } from '../uti
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
+import TypeIcon from '../components/TypeIcon';
 
 const CACHE_KEY = 'dash_v2';
 const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
@@ -131,7 +132,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-[22px] font-semibold">
-            Bonjour {firstName} 👋
+            Bonjour {firstName}
           </h1>
           <p className="text-text-muted text-sm mt-1">Vos notes de frais</p>
         </div>
@@ -156,8 +157,8 @@ export default function Dashboard() {
           {stats?.byType?.map((t, i) => {
             const typeInfo = TYPE_ICONS[t.type] || TYPE_ICONS.autre;
             return (
-              <div key={t.type} className={`flex-1 text-center ${i > 0 ? 'border-l border-white/10' : ''}`}>
-                <span className="text-lg">{typeInfo.icon}</span>
+              <div key={t.type} className={`flex-1 text-center flex flex-col items-center ${i > 0 ? 'border-l border-white/10' : ''}`}>
+                <span className="text-green-light/70"><TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={20} /></span>
                 <p className="text-green-light font-semibold text-lg mt-1">{t.count}</p>
                 <p className="text-text-muted text-[10px] uppercase tracking-wider">{t.type}</p>
               </div>
@@ -169,7 +170,9 @@ export default function Dashboard() {
         </div>
 
         {/* Background decoration */}
-        <div className="absolute top-4 right-4 text-[80px] opacity-[0.08] select-none">🌿</div>
+        <div className="absolute top-4 right-4 opacity-[0.06] select-none">
+          <svg width="70" height="70" viewBox="0 0 24 24" fill="currentColor" className="text-green-light"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.71c.75.75 1.6 1.34 2.51 1.76C13.18 23.14 19 22 22 18c.91-1.22 1.38-2.66 1-4-.38-1.34-2.07-2-4-2-1.59 0-3.19.5-4.53 1.4-.52-.98-.84-2.09-.97-3.4z"/></svg>
+        </div>
       </div>
 
       {/* Action Buttons */}
@@ -181,8 +184,8 @@ export default function Dashboard() {
           boxShadow: '0 4px 20px rgba(77, 158, 64, 0.3)',
         }}
       >
-        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-2xl">
-          📷
+        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white/80">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="15" rx="3" /><circle cx="12" cy="13" r="4" /><path d="M8.5 5L9.5 3h5l1 2" /></svg>
         </div>
         <div className="flex-1">
           <p className="text-white font-semibold text-base">Scanner un ticket</p>
@@ -195,8 +198,8 @@ export default function Dashboard() {
         to="/manual"
         className="flex items-center gap-4 w-full p-4 rounded-3xl border border-green-mid/30 bg-card transition-transform active:scale-[0.97]"
       >
-        <div className="w-12 h-12 rounded-2xl bg-green-mid/10 flex items-center justify-center text-2xl">
-          ✏️
+        <div className="w-12 h-12 rounded-2xl bg-green-mid/10 flex items-center justify-center text-green-light">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
         </div>
         <div className="flex-1">
           <p className="text-text font-semibold text-base">Saisie sans ticket</p>
@@ -230,8 +233,8 @@ export default function Dashboard() {
                       className="w-[46px] h-[46px] rounded-xl object-cover"
                     />
                   ) : (
-                    <div className={`w-[46px] h-[46px] rounded-xl flex items-center justify-center text-xl ${typeInfo.color}`}>
-                      {typeInfo.icon}
+                    <div className={`w-[46px] h-[46px] rounded-xl flex items-center justify-center ${typeInfo.color}`}>
+                      <TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={22} />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
@@ -283,8 +286,12 @@ export default function Dashboard() {
                 onClick={() => setEditingExpense(expense)}
                 className={`flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border cursor-pointer transition-colors hover:border-green-mid/40 active:scale-[0.99] opacity-0 animate-fade-up stagger-${i + 1}`}
               >
-                <div className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center text-xl ${typeInfo.color}`}>
-                  {expense.has_receipt ? typeInfo.icon : '✏️'}
+                <div className={`w-[46px] h-[46px] rounded-2xl flex items-center justify-center ${typeInfo.color}`}>
+                  {expense.has_receipt ? (
+                    <TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={22} />
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-text text-sm font-medium truncate">
