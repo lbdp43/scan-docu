@@ -29,6 +29,11 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
       setShowReceipt(false);
       setShowDeleteConfirm(false);
       setError(null);
+      // Lock body scroll
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    } else {
+      document.body.style.overflow = '';
     }
   }, [expense]);
 
@@ -88,9 +93,9 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-[#1a2a1c] border border-card-border rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[calc(100vh-4rem)] sm:max-h-[85vh] flex flex-col"
+        className="bg-[#1a2a1c] border border-card-border rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Fixed header */}
