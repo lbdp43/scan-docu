@@ -258,24 +258,32 @@ router.get('/recent', async (req, res) => {
 });
 
 // GET /api/expenses/stats/advanced — monthly trends + type breakdown
+// Supports ?from=YYYY-MM-DD&to=YYYY-MM-DD for flexible date ranges
+// Also supports ?compareFrom=YYYY-MM-DD&compareTo=YYYY-MM-DD for N-1 comparison
 router.get('/stats/advanced', async (req, res) => {
   try {
     const where = {};
     if (req.user.role !== 'admin') {
       where.user_id = req.user.userId;
     } else if (req.query.userId) {
-      // Admin can filter by specific user
       const userId = parseInt(req.query.userId, 10);
       if (!isNaN(userId)) where.user_id = userId;
     }
 
     const now = new Date();
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    let fromDate, toDate;
+    if (req.query.from && req.query.to) {
+      fromDate = new Date(req.query.from);
+      toDate = new Date(req.query.to);
+    } else {
+      fromDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
 
     const expenses = await req.prisma.expense.findMany({
       where: {
         ...where,
-        date_ticket: { gte: sixMonthsAgo },
+        date_ticket: { gte: fromDate, lte: toDate },
       },
       select: {
         amount: true,
@@ -287,10 +295,11 @@ router.get('/stats/advanced', async (req, res) => {
       orderBy: { date_ticket: 'asc' },
     });
 
-    // Build monthly breakdown
+    // Build monthly breakdown for every month in the range
     const monthlyMap = {};
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const startMonth = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1);
+    const endMonth = new Date(toDate.getFullYear(), toDate.getMonth(), 1);
+    for (let d = new Date(startMonth); d <= endMonth; d.setMonth(d.getMonth() + 1)) {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       monthlyMap[key] = { month: key, total: 0, count: 0, byType: {} };
     }
@@ -324,6 +333,50 @@ router.get('/stats/advanced', async (req, res) => {
       ? monthly.reduce((s, m) => s + m.total, 0) / activeMonths.length
       : 0;
 
+    // Optional: comparison period (N-1)
+    let comparison = null;
+    if (req.query.compareFrom && req.query.compareTo) {
+      const cFrom = new Date(req.query.compareFrom);
+      const cTo = new Date(req.query.compareTo);
+      const compExpenses = await req.prisma.expense.findMany({
+        where: {
+          ...where,
+          date_ticket: { gte: cFrom, lte: cTo },
+        },
+        select: { amount: true, type: true, date_ticket: true },
+        orderBy: { date_ticket: 'asc' },
+      });
+
+      let compTotal = 0;
+      const compTypeTotals = {};
+      const compMonthlyMap = {};
+      const cStartMonth = new Date(cFrom.getFullYear(), cFrom.getMonth(), 1);
+      const cEndMonth = new Date(cTo.getFullYear(), cTo.getMonth(), 1);
+      for (let d = new Date(cStartMonth); d <= cEndMonth; d.setMonth(d.getMonth() + 1)) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        compMonthlyMap[key] = { month: key, total: 0, count: 0 };
+      }
+
+      for (const exp of compExpenses) {
+        const d = new Date(exp.date_ticket);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const amt = Number(exp.amount);
+        compTotal += amt;
+        compTypeTotals[exp.type] = (compTypeTotals[exp.type] || 0) + amt;
+        if (compMonthlyMap[key]) {
+          compMonthlyMap[key].total += amt;
+          compMonthlyMap[key].count++;
+        }
+      }
+
+      comparison = {
+        grandTotal: compTotal,
+        totalExpenses: compExpenses.length,
+        typeTotals: Object.entries(compTypeTotals).map(([type, total]) => ({ type, total })),
+        monthly: Object.values(compMonthlyMap),
+      };
+    }
+
     res.json({
       monthly,
       typeTotals: Object.entries(typeTotals).map(([type, total]) => ({ type, total })),
@@ -334,6 +387,8 @@ router.get('/stats/advanced', async (req, res) => {
         withReceipt,
         withoutReceipt,
       },
+      comparison,
+      range: { from: fromDate.toISOString().slice(0, 10), to: toDate.toISOString().slice(0, 10) },
     });
   } catch (err) {
     console.error('Advanced stats error:', err);

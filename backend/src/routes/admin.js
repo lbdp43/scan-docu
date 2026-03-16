@@ -382,4 +382,28 @@ router.get('/export-failed', async (req, res) => {
   }
 });
 
+// POST /api/admin/acknowledge-zip — Mark all failed receipts as exported (ZIP downloaded)
+router.post('/acknowledge-zip', async (req, res) => {
+  try {
+    const result = await req.prisma.expense.updateMany({
+      where: {
+        upload_status: 'error',
+        has_receipt: true,
+      },
+      data: {
+        upload_status: 'exported',
+      },
+    });
+
+    res.json({
+      success: true,
+      count: result.count,
+      message: `${result.count} justificatif(s) marqué(s) comme exporté(s)`,
+    });
+  } catch (err) {
+    console.error('Acknowledge ZIP error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;

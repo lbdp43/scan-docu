@@ -144,6 +144,8 @@ export const api = {
     request('/admin/drive-config'),
   updateDriveConfig: (data) =>
     request('/admin/drive-config', { method: 'PUT', body: JSON.stringify(data) }),
+  acknowledgeZipDownload: () =>
+    request('/admin/acknowledge-zip', { method: 'POST' }),
   exportFailedReceipts: async () => {
     const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/admin/export-failed`, {

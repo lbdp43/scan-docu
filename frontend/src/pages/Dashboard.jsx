@@ -27,6 +27,7 @@ function writeCache(data) {
 
 const STATUS_ICONS = {
   uploaded: '✅',
+  exported: '📦',
   pending: '⏳',
   error: '❌',
 };

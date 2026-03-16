@@ -17,6 +17,8 @@ export default function Admin() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [retryingAll, setRetryingAll] = useState(false);
   const [exportingFailed, setExportingFailed] = useState(false);
+  const [zipDownloaded, setZipDownloaded] = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -95,11 +97,31 @@ export default function Admin() {
       a.download = `justificatifs-echec-drive-${new Date().toISOString().slice(0, 10)}.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ message: 'Export ZIP t\u00E9l\u00E9charg\u00E9', type: 'success' });
+      setZipDownloaded(true);
+      setToast({ message: 'Export ZIP t\u00E9l\u00E9charg\u00E9 — confirmez la r\u00E9ception ci-dessous', type: 'success' });
     } catch (err) {
       setToast({ message: err.message || 'Erreur export', type: 'error' });
     } finally {
       setExportingFailed(false);
+    }
+  }
+
+  async function handleAcknowledgeZip() {
+    setAcknowledging(true);
+    try {
+      const result = await api.acknowledgeZipDownload();
+      setZipDownloaded(false);
+      setToast({
+        message: `${result.count} justificatif(s) valid\u00E9(s) — alerte effac\u00E9e`,
+        type: 'success',
+      });
+      await loadExpenses();
+      const statsData = await api.getAdminStats();
+      setStats(statsData);
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur lors de la validation', type: 'error' });
+    } finally {
+      setAcknowledging(false);
     }
   }
 
@@ -263,6 +285,22 @@ export default function Admin() {
               )}
             </button>
           </div>
+          {zipDownloaded && (
+            <button
+              onClick={handleAcknowledgeZip}
+              disabled={acknowledging}
+              className="w-full py-2.5 rounded-xl bg-green-mid/20 border border-green-mid/30 text-green-light font-medium text-xs transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {acknowledging ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin" />
+                  Validation...
+                </>
+              ) : (
+                <>{'\u2705'} J'ai bien t{'\u00E9'}l{'\u00E9'}charg{'\u00E9'} le ZIP — valider</>
+              )}
+            </button>
+          )}
           <p className="text-text-dim text-[10px]">
             Le ZIP contient les photos + PDFs pour les mettre manuellement sur Drive si besoin.
           </p>

@@ -141,6 +141,29 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                     </a>
                   </div>
                 </div>
+              ) : expense.upload_status === 'exported' ? (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <span className="text-xs text-blue-400">
+                    {'\uD83D\uDCE6'} Export{'\u00E9'} via ZIP
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceipt(!showReceipt)}
+                      className="px-3 py-1 rounded-lg bg-blue-500/20 text-xs text-blue-400 font-medium"
+                    >
+                      {showReceipt ? 'Masquer' : 'Voir'}
+                    </button>
+                    <a
+                      href={api.getReceiptUrl(expense.id)}
+                      download={`justificatif-${expense.id}.jpg`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-3 py-1 rounded-lg bg-blue-500/20 text-xs text-blue-400 font-medium"
+                    >
+                      {'\u2B07'} T{'\u00E9'}l{'\u00E9'}charger
+                    </a>
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <span className="text-xs text-amber-400">

@@ -7,6 +7,7 @@ import EditExpenseModal from '../components/EditExpenseModal';
 
 const STATUS_ICONS = {
   uploaded: '\u2705',
+  exported: '\uD83D\uDCE6',
   pending: '\u23F3',
   error: '\u274C',
 };
