@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
@@ -9,26 +9,63 @@ const MONTH_LABELS = {
   '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'D\u00E9c',
 };
 
+const CACHE_KEY = 'stats_v1';
+const CACHE_TTL = 2 * 60 * 1000;
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts < CACHE_TTL ? data : null;
+  } catch { return null; }
+}
+
+function writeCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export default function Stats() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const { typesMap } = useExpenseTypes();
+  const cached = readCache();
+  const loadedRef = useRef(false);
 
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState([]);
+  const [data, setData] = useState(cached?.stats ?? null);
+  const [loading, setLoading] = useState(!cached);
+  const [users, setUsers] = useState(cached?.users ?? []);
   const [selectedUserId, setSelectedUserId] = useState('');
 
   useEffect(() => {
-    loadStats();
-    if (isAdmin) {
-      api.getUsers().then(res => setUsers(res.users || res || [])).catch(() => {});
-    }
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    loadInitial();
   }, []);
 
   useEffect(() => {
+    if (!loadedRef.current) return;
     loadStats();
   }, [selectedUserId]);
+
+  async function loadInitial() {
+    try {
+      const promises = [api.getAdvancedStats({})];
+      if (isAdmin) promises.push(api.getUsers());
+
+      const results = await Promise.all(promises);
+      setData(results[0]);
+      const usersList = results[1]?.users || results[1] || [];
+      if (isAdmin) setUsers(usersList);
+      writeCache({ stats: results[0], users: usersList });
+    } catch (err) {
+      console.error('Stats error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function loadStats() {
     setLoading(true);

@@ -17,17 +17,36 @@ const MONTHS = [
   'Juillet', 'Ao\u00FBt', 'Septembre', 'Octobre', 'Novembre', 'D\u00E9cembre',
 ];
 
+const CACHE_KEY = 'history_v1';
+const CACHE_TTL = 2 * 60 * 1000;
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts < CACHE_TTL ? data : null;
+  } catch { return null; }
+}
+
+function writeCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export default function History() {
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { types: expenseTypes, typesMap: TYPE_ICONS } = useExpenseTypes();
-  const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readCache();
+  const [expenses, setExpenses] = useState(cached?.expenses ?? []);
+  const [loading, setLoading] = useState(!cached);
   const [filterType, setFilterType] = useState('');
   const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth() + 1));
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
   const [searchQuery, setSearchQuery] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+  const [pagination, setPagination] = useState(cached?.pagination ?? { page: 1, totalPages: 1 });
   const [toast, setToast] = useState(null);
   const searchTimeout = useRef(null);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -56,6 +75,9 @@ export default function History() {
       const data = await api.getExpenses(params);
       setExpenses(data.expenses);
       setPagination(data.pagination);
+      if (page === 1 && !q && !filterType) {
+        writeCache({ expenses: data.expenses, pagination: data.pagination });
+      }
     } catch (err) {
       console.error('Load expenses error:', err);
     } finally {

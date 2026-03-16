@@ -1,13 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 
+const CACHE_KEY = 'admin_types_v1';
+const CACHE_TTL = 2 * 60 * 1000;
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts < CACHE_TTL ? data : null;
+  } catch { return null; }
+}
+
+function writeCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export default function AdminTypes() {
   const { refresh: refreshGlobalTypes } = useExpenseTypes();
-  const [types, setTypes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readCache();
+  const [types, setTypes] = useState(cached?.types ?? []);
+  const [loading, setLoading] = useState(!cached);
+  const loadedRef = useRef(false);
   const [toast, setToast] = useState(null);
 
   // Create form
@@ -26,6 +46,8 @@ export default function AdminTypes() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     loadTypes();
   }, []);
 
@@ -33,6 +55,7 @@ export default function AdminTypes() {
     try {
       const result = await api.getAllExpenseTypes();
       setTypes(result.types);
+      writeCache({ types: result.types });
     } catch (err) {
       console.error(err);
     } finally {
@@ -127,8 +150,12 @@ export default function AdminTypes() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="h-7 bg-card rounded-xl w-44" />
+          <div className="h-9 bg-card rounded-2xl w-32" />
+        </div>
+        {[1,2,3,4].map(i => <div key={i} className="h-16 bg-card rounded-2xl" />)}
       </div>
     );
   }

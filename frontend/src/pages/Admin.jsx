@@ -1,16 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
 
+const CACHE_KEY = 'admin_v1';
+const CACHE_TTL = 2 * 60 * 1000;
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts < CACHE_TTL ? data : null;
+  } catch { return null; }
+}
+
+function writeCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const { types: expenseTypes, typesMap: TYPE_ICONS } = useExpenseTypes();
-  const [stats, setStats] = useState(null);
-  const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readCache();
+  const [stats, setStats] = useState(cached?.stats ?? null);
+  const [expenses, setExpenses] = useState(cached?.expenses ?? []);
+  const [loading, setLoading] = useState(!cached);
+  const loadedRef = useRef(false);
   const [toast, setToast] = useState(null);
   const [filterUser, setFilterUser] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -21,10 +41,13 @@ export default function Admin() {
   const [acknowledging, setAcknowledging] = useState(false);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     loadData();
   }, []);
 
   useEffect(() => {
+    if (!loadedRef.current) return;
     loadExpenses();
   }, [filterUser, filterType]);
 
@@ -36,6 +59,7 @@ export default function Admin() {
       ]);
       setStats(statsData);
       setExpenses(expensesData.expenses);
+      writeCache({ stats: statsData, expenses: expensesData.expenses });
     } catch (err) {
       console.error('Admin load error:', err);
     } finally {
@@ -143,8 +167,18 @@ export default function Admin() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="h-7 bg-card rounded-xl w-40" />
+          <div className="h-7 bg-card rounded-full w-24" />
+        </div>
+        <div className="rounded-4xl p-7 bg-card h-40" />
+        <div className="grid grid-cols-2 gap-3">
+          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-card rounded-2xl" />)}
+        </div>
+        <div className="space-y-2">
+          {[1,2,3].map(i => <div key={i} className="h-16 bg-card rounded-2xl" />)}
+        </div>
       </div>
     );
   }
