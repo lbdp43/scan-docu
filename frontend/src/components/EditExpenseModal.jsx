@@ -3,6 +3,7 @@ import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import TypeIcon from './TypeIcon';
+import CreateTypeInline from './CreateTypeInline';
 
 export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted }) {
   const { types: EXPENSE_TYPES } = useExpenseTypes();
@@ -19,6 +20,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
   const [showReceipt, setShowReceipt] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState(null);
+  const [showCreateType, setShowCreateType] = useState(false);
 
   useEffect(() => {
     if (expense) {
@@ -278,8 +280,8 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                   <button
                     key={t.value}
                     type="button"
-                    onClick={() => setType(t.value)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    onClick={() => { setType(t.value); setShowCreateType(false); }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
                       type === t.value
                         ? 'bg-green-mid/20 border border-green-mid text-green-light'
                         : 'bg-card border border-card-border text-text-muted'
@@ -288,7 +290,24 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                     <TypeIcon icon={t.icon} color={t.color} size={14} /> {t.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setShowCreateType(true)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 bg-card border border-dashed border-card-border text-text-muted hover:border-green-mid/40 hover:text-green-light"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                  Nouveau
+                </button>
               </div>
+              {showCreateType && (
+                <CreateTypeInline
+                  onCreated={(newValue) => {
+                    setType(newValue);
+                    setShowCreateType(false);
+                  }}
+                  onCancel={() => setShowCreateType(false)}
+                />
+              )}
             </div>
 
             {/* Merchant */}

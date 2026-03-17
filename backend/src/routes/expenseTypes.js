@@ -50,8 +50,8 @@ const updateTypeSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-// POST /api/expense-types — Create type (admin only)
-router.post('/', authenticateToken, checkAdmin, validate(createTypeSchema), async (req, res) => {
+// POST /api/expense-types — Create type (any authenticated user)
+router.post('/', authenticateToken, validate(createTypeSchema), async (req, res) => {
   try {
     const data = req.validatedBody;
 

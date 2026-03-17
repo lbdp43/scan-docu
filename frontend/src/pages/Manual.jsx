@@ -5,6 +5,7 @@ import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
+import CreateTypeInline from '../components/CreateTypeInline';
 
 // Compress image client-side before uploading
 function compressImage(file, maxWidth = 1400, quality = 0.75) {
@@ -48,6 +49,7 @@ export default function Manual() {
   const [type, setType] = useState('autre');
   const [merchant, setMerchant] = useState('');
   const [description, setDescription] = useState('');
+  const [showCreateType, setShowCreateType] = useState(false);
 
   // Optional photo
   const [photoFile, setPhotoFile] = useState(null);
@@ -243,8 +245,8 @@ export default function Manual() {
               <button
                 key={t.value}
                 type="button"
-                onClick={() => setType(t.value)}
-                className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
+                onClick={() => { setType(t.value); setShowCreateType(false); }}
+                className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
                   type === t.value
                     ? 'bg-green-mid/20 border border-green-mid text-green-light'
                     : 'bg-card border border-card-border text-text-muted'
@@ -253,7 +255,25 @@ export default function Manual() {
                 <TypeIcon icon={t.icon} color={t.color} size={14} /> {t.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setShowCreateType(true)}
+              className="px-4 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 bg-card border border-dashed border-card-border text-text-muted hover:border-green-mid/40 hover:text-green-light"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+              Nouveau
+            </button>
           </div>
+          {showCreateType && (
+            <CreateTypeInline
+              onCreated={(newValue) => {
+                setType(newValue);
+                setShowCreateType(false);
+                setToast({ message: 'Type cr\u00E9\u00E9', type: 'success' });
+              }}
+              onCancel={() => setShowCreateType(false)}
+            />
+          )}
         </div>
 
         {/* Merchant */}
