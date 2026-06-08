@@ -109,6 +109,27 @@ async function getTransactions({ filter, limit = 100, cursor } = {}) {
   };
 }
 
+async function getBankAccounts() {
+  const raw = await request('GET', '/bank_accounts', { params: { limit: '100' } });
+  return raw.items || raw.bank_accounts || raw.data || [];
+}
+
+async function getSavedBankAccountId() {
+  try {
+    const setting = await settingsPrisma.setting.findUnique({ where: { key: 'PENNYLANE_BANK_ACCOUNT_ID' } });
+    return setting?.value?.trim() || null;
+  } catch {}
+  return null;
+}
+
+async function saveBankAccountId(id) {
+  await settingsPrisma.setting.upsert({
+    where: { key: 'PENNYLANE_BANK_ACCOUNT_ID' },
+    update: { value: String(id) },
+    create: { key: 'PENNYLANE_BANK_ACCOUNT_ID', value: String(id) },
+  });
+}
+
 async function getMatchedTransactions(invoiceId) {
   return request('GET', `/supplier_invoices/${invoiceId}/matched_transactions`);
 }
@@ -230,6 +251,9 @@ module.exports = {
   getSupplierInvoices,
   getSupplierInvoice,
   getTransactions,
+  getBankAccounts,
+  getSavedBankAccountId,
+  saveBankAccountId,
   getMatchedTransactions,
   matchTransaction,
   unmatchTransaction,

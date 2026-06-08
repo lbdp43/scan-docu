@@ -18,6 +18,9 @@ export default function AdminPennylane() {
   const [activeTab, setActiveTab] = useState('overview');
   const [debugData, setDebugData] = useState(null);
   const [loadingDebug, setLoadingDebug] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedBank, setSelectedBank] = useState(null);
+  const [loadingBanks, setLoadingBanks] = useState(false);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -34,6 +37,12 @@ export default function AdminPennylane() {
       ]);
       setStatus(s);
       setUnmatched(u.expenses || []);
+      if (s.connected) {
+        api.getPennylaneBankAccounts().then(data => {
+          setBankAccounts(data.accounts || []);
+          setSelectedBank(data.selectedId || null);
+        }).catch(() => {});
+      }
     } catch (err) {
       setStatus({ connected: false, error: err.message });
     } finally {
@@ -111,6 +120,17 @@ export default function AdminPennylane() {
       setTransactions(data);
     } catch (err) {
       setToast({ message: 'Erreur chargement transactions: ' + err.message, type: 'error' });
+    }
+  }
+
+  async function handleSelectBank(accountId) {
+    try {
+      await api.savePennylaneBankAccount(accountId);
+      setSelectedBank(String(accountId));
+      setTransactions(null);
+      setToast({ message: 'Compte bancaire sélectionné', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
     }
   }
 
@@ -218,6 +238,39 @@ export default function AdminPennylane() {
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Bank account selector */}
+      {status?.connected && bankAccounts.length > 0 && (
+        <div className="p-4 rounded-2xl bg-card border border-card-border space-y-3">
+          <p className="text-text-muted text-xs uppercase tracking-widest">Compte bancaire</p>
+          <div className="space-y-2">
+            {bankAccounts.map(acc => (
+              <button
+                key={acc.id}
+                onClick={() => handleSelectBank(acc.id)}
+                className={`w-full p-3 rounded-xl text-left transition-colors ${
+                  String(acc.id) === selectedBank
+                    ? 'bg-green-mid/20 border border-green-mid/40'
+                    : 'bg-bg border border-card-border'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-text text-sm font-medium">{acc.name || acc.label || `Compte #${acc.id}`}</p>
+                    <p className="text-text-muted text-[10px]">{acc.iban || acc.account_number || ''} {acc.bank_name || ''}</p>
+                  </div>
+                  {String(acc.id) === selectedBank && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-400 shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+          {!selectedBank && (
+            <p className="text-amber-400 text-[10px]">S{'é'}lectionnez le compte pro pour filtrer les transactions carte</p>
+          )}
         </div>
       )}
 

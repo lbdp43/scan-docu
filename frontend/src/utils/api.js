@@ -187,6 +187,10 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/pennylane/transactions?${qs}`);
   },
+  getPennylaneBankAccounts: () =>
+    request('/pennylane/bank-accounts'),
+  savePennylaneBankAccount: (accountId) =>
+    request('/pennylane/bank-accounts', { method: 'POST', body: JSON.stringify({ accountId }) }),
   getPennylaneUnmatched: () =>
     request('/pennylane/unmatched'),
   pennylaneReconcile: () =>

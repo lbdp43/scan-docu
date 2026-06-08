@@ -30,6 +30,30 @@ router.post('/config', async (req, res) => {
   }
 });
 
+// GET /api/pennylane/bank-accounts — List bank accounts from Pennylane
+router.get('/bank-accounts', async (req, res) => {
+  try {
+    const accounts = await pennylane.getBankAccounts();
+    const savedId = await pennylane.getSavedBankAccountId();
+    res.json({ accounts, selectedId: savedId });
+  } catch (err) {
+    console.error('[pennylane] bank-accounts error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// POST /api/pennylane/bank-accounts — Save selected bank account
+router.post('/bank-accounts', async (req, res) => {
+  try {
+    const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requis' });
+    await pennylane.saveBankAccountId(accountId);
+    res.json({ success: true, selectedId: String(accountId) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/pennylane/invoices — List supplier invoices from Pennylane
 router.get('/invoices', async (req, res) => {
   try {
@@ -53,10 +77,14 @@ router.get('/invoices', async (req, res) => {
 // GET /api/pennylane/transactions — List bank transactions from Pennylane
 router.get('/transactions', async (req, res) => {
   try {
-    const { date_from, date_to, expenses_only, limit, cursor } = req.query;
+    const { date_from, date_to, expenses_only, bank_account_id, limit, cursor } = req.query;
     const filter = [];
     if (date_from) filter.push({ field: 'date', operator: 'gteq', value: date_from });
     if (date_to) filter.push({ field: 'date', operator: 'lteq', value: date_to });
+
+    // Use saved bank account if none specified
+    const bankId = bank_account_id || await pennylane.getSavedBankAccountId();
+    if (bankId) filter.push({ field: 'bank_account_id', operator: 'eq', value: bankId });
 
     let allItems = [];
     let nextCursor = cursor || undefined;
@@ -152,6 +180,8 @@ router.post('/reconcile', async (req, res) => {
       { field: 'date', operator: 'gteq', value: fyStart },
       { field: 'date', operator: 'lteq', value: fyEnd },
     ];
+    const savedBankId = await pennylane.getSavedBankAccountId();
+    if (savedBankId) txFilter.push({ field: 'bank_account_id', operator: 'eq', value: savedBankId });
 
     let allInvoices = [];
     let invoiceCursor;
