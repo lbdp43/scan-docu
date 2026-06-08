@@ -506,6 +506,27 @@ export default function Admin() {
         </Link>
       </div>
 
+      {/* Pennylane */}
+      <Link viewTransition
+        to="/admin/pennylane"
+        className="block p-4 rounded-2xl bg-purple-500/5 border border-purple-500/20 transition-transform active:scale-[0.98]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-400">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="text-text text-sm font-medium">Rapprochement Pennylane</p>
+            <p className="text-text-muted text-xs">Lier justificatifs et transactions bancaires</p>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted"><path d="M9 18l6-6-6-6" /></svg>
+        </div>
+      </Link>
+
       {/* Drive error management */}
       {expenses.some(e => e.upload_status === 'error') && (
         <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-3">

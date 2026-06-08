@@ -14,6 +14,7 @@ const adminRoutes = require('./routes/admin');
 const scanRoutes = require('./routes/scan');
 const driveSetupRoutes = require('./routes/driveSetup');
 const expenseTypesRoutes = require('./routes/expenseTypes');
+const pennylaneRoutes = require('./routes/pennylane');
 const { warmupWorker } = require('./services/ocr');
 
 const prisma = new PrismaClient();
@@ -88,6 +89,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/drive', driveSetupRoutes);
 app.use('/api/expense-types', expenseTypesRoutes);
+app.use('/api/pennylane', pennylaneRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

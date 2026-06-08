@@ -36,9 +36,11 @@ model Expense {
   drive_file_id  String?
   drive_file_url String?
   file_name      String?  @db.VarChar(255)
-  upload_status  String   @default("pending") @db.VarChar(20)
-  created_at     DateTime @default(now())
-  user           User     @relation(fields: [user_id], references: [id])
+  upload_status       String   @default("pending") @db.VarChar(20)
+  pennylane_invoice_id String?  @db.VarChar(100)
+  pennylane_matched    Boolean  @default(false)
+  created_at           DateTime @default(now())
+  user                 User     @relation(fields: [user_id], references: [id])
 
   @@map("expenses")
 }

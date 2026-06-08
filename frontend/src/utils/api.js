@@ -171,4 +171,26 @@ export const api = {
     }
     return res.blob();
   },
+
+  // Pennylane
+  getPennylaneStatus: () =>
+    request('/pennylane/status'),
+  savePennylaneToken: (token) =>
+    request('/pennylane/config', { method: 'POST', body: JSON.stringify({ token }) }),
+  getPennylaneInvoices: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/pennylane/invoices?${qs}`);
+  },
+  getPennylaneTransactions: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/pennylane/transactions?${qs}`);
+  },
+  getPennylaneUnmatched: () =>
+    request('/pennylane/unmatched'),
+  pennylaneReconcile: () =>
+    request('/pennylane/reconcile', { method: 'POST' }),
+  pennylaneMatch: (expenseId, invoiceId, transactionId) =>
+    request('/pennylane/match', { method: 'POST', body: JSON.stringify({ expenseId, invoiceId, transactionId }) }),
+  pennylaneUnmatch: (id, transactionId) =>
+    request(`/pennylane/unmatch/${id}`, { method: 'POST', body: JSON.stringify({ transactionId }) }),
 };
