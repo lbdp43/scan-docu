@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
+import React, { useState, useRef, useCallback } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
@@ -38,12 +38,10 @@ function compressImage(file, maxWidth = 1200, quality = 0.78) {
 
 export default function Scan() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
   const { types: EXPENSE_TYPES } = useExpenseTypes();
   const fileInputRef = useRef(null);
   const amountRef = useRef(null);
-  const autoScanTriggered = useRef(false);
 
   const [hasImage, setHasImage] = useState(false);
   const [imageFile, setImageFile] = useState(null);
@@ -66,14 +64,6 @@ export default function Scan() {
   const [lastResult, setLastResult] = useState(null);
 
   const userEdited = useRef({ amount: false, merchant: false });
-
-  useEffect(() => {
-    if (searchParams.get('action') === 'scan' && !autoScanTriggered.current && !hasImage) {
-      autoScanTriggered.current = true;
-      setSearchParams({}, { replace: true });
-      setTimeout(() => fileInputRef.current?.click(), 300);
-    }
-  }, [searchParams]);
 
   const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];

@@ -21,18 +21,6 @@
   ],
   "shortcuts": [
     {
-      "name": "Scanner un ticket",
-      "short_name": "Scanner",
-      "url": "/?action=scan",
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
       "name": "Saisie manuelle",
       "short_name": "Saisie",
       "url": "/manual",
