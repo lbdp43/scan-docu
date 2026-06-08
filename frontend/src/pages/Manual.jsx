@@ -6,6 +6,7 @@ import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
 import CreateTypeInline from '../components/CreateTypeInline';
+import DuplicateWarning from '../components/DuplicateWarning';
 import { haptic } from '../utils/haptic';
 
 // Compress image client-side before uploading
@@ -52,6 +53,9 @@ export default function Manual() {
   const [description, setDescription] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
 
+  const [duplicateFound, setDuplicateFound] = useState(null);
+  const [skipDuplicateCheck, setSkipDuplicateCheck] = useState(false);
+
   // Optional photo
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -73,25 +77,7 @@ export default function Manual() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!amount || parseFloat(amount) <= 0) {
-      haptic('error');
-      setToast({ message: 'Montant requis', type: 'error' });
-      return;
-    }
-    if (!merchant.trim()) {
-      haptic('error');
-      setToast({ message: 'Commerçant requis', type: 'error' });
-      return;
-    }
-    if (!description.trim()) {
-      haptic('error');
-      setToast({ message: 'Motif / description requis', type: 'error' });
-      return;
-    }
-
+  const doSubmit = async () => {
     setLoading(true);
 
     const expenseData = {
@@ -102,7 +88,6 @@ export default function Manual() {
       description: description.trim(),
     };
 
-    // If offline, save to IndexedDB queue (with optional photo)
     if (!navigator.onLine) {
       try {
         await savePendingExpense(expenseData, photoFile);
@@ -135,7 +120,6 @@ export default function Manual() {
       }
       setTimeout(() => navigate('/dashboard', { viewTransition: true }), 2000);
     } catch (err) {
-      // If network error, try offline save (with optional photo)
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
           await savePendingExpense(expenseData, photoFile);
@@ -148,6 +132,40 @@ export default function Manual() {
       setToast({ message: err.message || 'Erreur', type: 'error' });
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!amount || parseFloat(amount) <= 0) {
+      haptic('error');
+      setToast({ message: 'Montant requis', type: 'error' });
+      return;
+    }
+    if (!merchant.trim()) {
+      haptic('error');
+      setToast({ message: 'Commerçant requis', type: 'error' });
+      return;
+    }
+    if (!description.trim()) {
+      haptic('error');
+      setToast({ message: 'Motif / description requis', type: 'error' });
+      return;
+    }
+
+    if (!skipDuplicateCheck && navigator.onLine) {
+      try {
+        const { duplicate } = await api.checkDuplicate({ amount, date_ticket: dateTicket, merchant: merchant.trim() });
+        if (duplicate) {
+          haptic('medium');
+          setDuplicateFound(duplicate);
+          return;
+        }
+      } catch {}
+    }
+
+    setSkipDuplicateCheck(false);
+    await doSubmit();
   };
 
   const today = new Date().toISOString().slice(0, 10);
@@ -335,6 +353,17 @@ export default function Manual() {
           )}
         </button>
       </form>
+
+      <DuplicateWarning
+        duplicate={duplicateFound}
+        loading={loading}
+        onCancel={() => setDuplicateFound(null)}
+        onConfirm={() => {
+          setDuplicateFound(null);
+          setSkipDuplicateCheck(true);
+          doSubmit();
+        }}
+      />
     </div>
   );
 }

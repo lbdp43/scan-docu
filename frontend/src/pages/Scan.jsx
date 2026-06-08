@@ -1,11 +1,12 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
 import CreateTypeInline from '../components/CreateTypeInline';
+import DuplicateWarning from '../components/DuplicateWarning';
 import { haptic } from '../utils/haptic';
 
 // Compress image client-side — 1200px is enough for OCR + PDF
@@ -38,10 +39,12 @@ function compressImage(file, maxWidth = 1200, quality = 0.78) {
 
 export default function Scan() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
   const { types: EXPENSE_TYPES } = useExpenseTypes();
   const fileInputRef = useRef(null);
   const amountRef = useRef(null);
+  const autoScanTriggered = useRef(false);
 
   const [hasImage, setHasImage] = useState(false);
   const [imageFile, setImageFile] = useState(null);
@@ -60,10 +63,21 @@ export default function Scan() {
   const [description, setDescription] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
   const [ocrSuggestedType, setOcrSuggestedType] = useState(null);
+  const [duplicateFound, setDuplicateFound] = useState(null);
+  const [skipDuplicateCheck, setSkipDuplicateCheck] = useState(false);
 
   // Track which fields the user has already manually edited
   // so OCR result doesn't overwrite user input
   const userEdited = useRef({ amount: false, merchant: false });
+
+  // Auto-open camera when launched via PWA shortcut (?action=scan)
+  useEffect(() => {
+    if (searchParams.get('action') === 'scan' && !autoScanTriggered.current && !hasImage) {
+      autoScanTriggered.current = true;
+      setSearchParams({}, { replace: true });
+      setTimeout(() => fileInputRef.current?.click(), 300);
+    }
+  }, [searchParams]);
 
   const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -129,25 +143,10 @@ export default function Scan() {
     }
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!amount || parseFloat(amount) <= 0) {
-      haptic('error');
-      setToast({ message: 'Montant requis', type: 'error' });
-      return;
-    }
-    if (!type) {
-      haptic('error');
-      setToast({ message: 'Veuillez sélectionner un type de dépense', type: 'error' });
-      return;
-    }
-
+  const doSubmit = async () => {
     setSubmitting(true);
-
     const date = dateTicket || new Date().toISOString().slice(0, 10);
 
-    // Offline: save to IndexedDB
     if (!navigator.onLine) {
       try {
         await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
@@ -198,6 +197,36 @@ export default function Scan() {
       setToast({ message: err.message || 'Erreur lors de l\'envoi', type: 'error' });
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!amount || parseFloat(amount) <= 0) {
+      haptic('error');
+      setToast({ message: 'Montant requis', type: 'error' });
+      return;
+    }
+    if (!type) {
+      haptic('error');
+      setToast({ message: 'Veuillez sélectionner un type de dépense', type: 'error' });
+      return;
+    }
+
+    if (!skipDuplicateCheck && navigator.onLine) {
+      try {
+        const date = dateTicket || new Date().toISOString().slice(0, 10);
+        const { duplicate } = await api.checkDuplicate({ amount, date_ticket: date, merchant });
+        if (duplicate) {
+          haptic('medium');
+          setDuplicateFound(duplicate);
+          return;
+        }
+      } catch {}
+    }
+
+    setSkipDuplicateCheck(false);
+    await doSubmit();
   };
 
   const reset = () => {
@@ -456,6 +485,17 @@ export default function Scan() {
           )}
         </button>
       </form>
+
+      <DuplicateWarning
+        duplicate={duplicateFound}
+        loading={submitting}
+        onCancel={() => setDuplicateFound(null)}
+        onConfirm={() => {
+          setDuplicateFound(null);
+          setSkipDuplicateCheck(true);
+          doSubmit();
+        }}
+      />
     </div>
   );
 }

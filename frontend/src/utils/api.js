@@ -98,6 +98,10 @@ export const api = {
     const token = localStorage.getItem('token');
     return `${API_BASE}/expenses/${id}/receipt?token=${encodeURIComponent(token)}`;
   },
+  checkDuplicate: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/expenses/check-duplicate?${qs}`);
+  },
   exportCSV: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/expenses/export/csv?${qs}`);

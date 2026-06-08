@@ -184,6 +184,48 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/expenses/check-duplicate — detect potential duplicate before submission
+router.get('/check-duplicate', async (req, res) => {
+  try {
+    const { amount, date_ticket, merchant } = req.query;
+    if (!amount || !date_ticket) {
+      return res.json({ duplicate: null });
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount)) {
+      return res.json({ duplicate: null });
+    }
+
+    const targetDate = new Date(date_ticket);
+    const dayBefore = new Date(targetDate);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    const dayAfter = new Date(targetDate);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+
+    const where = {
+      user_id: req.user.userId,
+      amount: { gte: parsedAmount - 0.01, lte: parsedAmount + 0.01 },
+      date_ticket: { gte: dayBefore, lte: dayAfter },
+    };
+
+    if (merchant && merchant.trim()) {
+      where.merchant = { contains: merchant.trim(), mode: 'insensitive' };
+    }
+
+    const match = await req.prisma.expense.findFirst({
+      where,
+      omit: { receipt_image: true },
+      orderBy: { created_at: 'desc' },
+    });
+
+    res.json({ duplicate: match || null });
+  } catch (err) {
+    console.error('Check duplicate error:', err);
+    res.json({ duplicate: null });
+  }
+});
+
 // GET /api/expenses/stats — monthly stats
 router.get('/stats', async (req, res) => {
   try {
