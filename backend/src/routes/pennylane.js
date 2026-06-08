@@ -411,6 +411,109 @@ router.post('/reconcile', async (req, res) => {
   }
 });
 
+// GET /api/pennylane/missing — Bank transactions without matching expense in our DB
+router.get('/missing', async (req, res) => {
+  try {
+    const year = new Date().getFullYear();
+    const fyStart = `${year}-01-01`;
+    const fyEnd = `${year}-12-31`;
+
+    const filter = [
+      { field: 'date', operator: 'gteq', value: fyStart },
+      { field: 'date', operator: 'lteq', value: fyEnd },
+    ];
+    const savedBankId = await pennylane.getSavedBankAccountId();
+    if (savedBankId) filter.push({ field: 'bank_account_id', operator: 'eq', value: savedBankId });
+
+    let allTransactions = [];
+    let txCursor;
+    do {
+      const batch = await pennylane.getTransactions({ filter, limit: 100, cursor: txCursor });
+      allTransactions = allTransactions.concat(batch.items);
+      txCursor = batch.has_more ? batch.next_cursor : null;
+      if (txCursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
+    } while (txCursor);
+
+    const expenseTransactions = allTransactions.filter(t => Number(t.amount || t.currency_amount) < 0);
+
+    const expenses = await req.prisma.expense.findMany({
+      where: {
+        upload_status: 'uploaded',
+        date_ticket: { gte: new Date(fyStart) },
+      },
+      omit: { receipt_image: true },
+      include: { user: { select: { name: true, card_id: true } } },
+    });
+
+    const results = [];
+    for (const tx of expenseTransactions) {
+      const txAmount = Math.abs(Number(tx.amount || tx.currency_amount || 0));
+      const txDate = new Date(tx.date).getTime();
+
+      let bestExpense = null;
+      let bestScore = 0;
+      for (const exp of expenses) {
+        const expAmount = Number(exp.amount);
+        if (Math.abs(expAmount - txAmount) > 1) continue;
+
+        let score = 0;
+        if (Math.abs(expAmount - txAmount) < 0.02) score += 30;
+        else if (Math.abs(expAmount - txAmount) < 0.10) score += 15;
+        else score += 5;
+
+        const expDate = new Date(exp.date_ticket).getTime();
+        const daysDiff = (txDate - expDate) / (1000 * 60 * 60 * 24);
+        if (daysDiff >= -1 && daysDiff <= 20) {
+          if (daysDiff < 2) score += 10;
+          else if (daysDiff < 7) score += 7;
+          else if (daysDiff < 15) score += 4;
+          else score += 2;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestExpense = exp;
+        }
+      }
+
+      const matched = bestScore >= 25;
+      results.push({
+        transactionId: tx.id,
+        label: tx.label,
+        amount: txAmount,
+        date: tx.date,
+        matched,
+        matchScore: matched ? bestScore : null,
+        expense: matched ? {
+          id: bestExpense.id,
+          merchant: bestExpense.merchant,
+          amount: Number(bestExpense.amount),
+          date: bestExpense.date_ticket,
+          type: bestExpense.type,
+          userName: bestExpense.user?.name,
+          cardId: bestExpense.card_id || bestExpense.user?.card_id,
+        } : null,
+      });
+    }
+
+    const unmatched = results.filter(r => !r.matched);
+    const matchedCount = results.filter(r => r.matched).length;
+
+    res.json({
+      transactions: unmatched,
+      summary: {
+        totalBankTransactions: expenseTransactions.length,
+        matched: matchedCount,
+        unmatched: unmatched.length,
+        totalExpenses: expenses.length,
+      },
+    });
+  } catch (err) {
+    console.error('[pennylane] missing error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // POST /api/pennylane/match — Manual match: link a specific expense to invoice + transaction
 router.post('/match', async (req, res) => {
   try {

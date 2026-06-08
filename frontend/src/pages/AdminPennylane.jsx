@@ -21,6 +21,8 @@ export default function AdminPennylane() {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBank, setSelectedBank] = useState(null);
   const [loadingBanks, setLoadingBanks] = useState(false);
+  const [missing, setMissing] = useState(null);
+  const [loadingMissing, setLoadingMissing] = useState(false);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -147,6 +149,18 @@ export default function AdminPennylane() {
     }
   }
 
+  async function loadMissing() {
+    setLoadingMissing(true);
+    try {
+      const data = await api.getPennylaneMissing();
+      setMissing(data);
+    } catch (err) {
+      setToast({ message: 'Erreur: ' + err.message, type: 'error' });
+    } finally {
+      setLoadingMissing(false);
+    }
+  }
+
   async function handleViewInvoice(invoiceId) {
     try {
       const detail = await api.getPennylaneInvoice(invoiceId);
@@ -165,6 +179,7 @@ export default function AdminPennylane() {
     setActiveTab(tab);
     if (tab === 'invoices' && !invoices) loadInvoices();
     if (tab === 'transactions' && !transactions) loadTransactions();
+    if (tab === 'missing' && !missing) loadMissing();
   }
 
   if (loading) {
@@ -317,6 +332,7 @@ export default function AdminPennylane() {
           <div className="flex gap-1 bg-card rounded-2xl p-1">
             {[
               { id: 'overview', label: 'Rapprochement' },
+              { id: 'missing', label: 'Manquants' },
               { id: 'invoices', label: 'Factures' },
               { id: 'transactions', label: 'Transactions' },
             ].map(tab => (
@@ -510,6 +526,54 @@ export default function AdminPennylane() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Missing tab — bank transactions without matching expense */}
+          {activeTab === 'missing' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-text-muted text-xs uppercase tracking-widest">Paiements sans ticket — exercice {new Date().getFullYear()}</h3>
+                <button onClick={loadMissing} className="text-green-light text-xs">Rafra{'î'}chir</button>
+              </div>
+              {loadingMissing || !missing ? (
+                <div className="flex justify-center py-8">
+                  <span className="w-6 h-6 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" />
+                </div>
+              ) : (
+                <>
+                <div className="p-3 rounded-xl bg-card border border-card-border space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-muted text-xs">{missing.summary.totalBankTransactions} paiements carte</span>
+                    <span className="text-text-muted text-xs">{missing.summary.totalExpenses} tickets dans l'app</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-green-400 text-xs">{missing.summary.matched} retrouv{'é'}s</span>
+                    <span className="text-amber-400 text-xs font-medium">{missing.summary.unmatched} sans ticket</span>
+                  </div>
+                </div>
+                {missing.transactions.length === 0 ? (
+                  <p className="text-green-400 text-center py-8 text-sm">Tous les paiements ont un ticket correspondant</p>
+                ) : (
+                  <div className="space-y-2">
+                    {missing.transactions.map(tx => (
+                      <div key={tx.transactionId} className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0 mr-2">
+                            <p className="text-text text-sm font-medium truncate">{tx.label || 'Transaction inconnue'}</p>
+                            <p className="text-text-muted text-xs">{tx.date}</p>
+                          </div>
+                          <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">
+                            -{Number(tx.amount).toFixed(2)} {'€'}
+                          </p>
+                        </div>
+                        <p className="text-amber-400/70 text-[10px] mt-1">Aucun ticket correspondant dans l'application</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                </>
               )}
             </div>
           )}
