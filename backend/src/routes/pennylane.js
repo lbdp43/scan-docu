@@ -156,12 +156,19 @@ router.post('/reconcile', async (req, res) => {
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } while (txCursor);
 
+    // Filter out already reconciled invoices
+    const unreconciledInvoices = allInvoices.filter(i => !i.reconciled);
+    // Only negative transactions (outgoing payments = card expenses)
+    const expenseTransactions = allTransactions.filter(t => Number(t.amount || t.currency_amount) < 0);
+
+    console.log(`[pennylane] reconcile: ${allInvoices.length} invoices (${unreconciledInvoices.length} unreconciled), ${allTransactions.length} transactions (${expenseTransactions.length} expense-type)`);
+
     const results = [];
     const usedInvoiceIds = new Set();
     const usedTransactionIds = new Set();
 
     for (const expense of expenses) {
-      const availableInvoices = allInvoices.filter(i => !usedInvoiceIds.has(i.id));
+      const availableInvoices = unreconciledInvoices.filter(i => !usedInvoiceIds.has(i.id));
       const invoiceMatch = await pennylane.findMatchingInvoice(expense, availableInvoices);
 
       if (!invoiceMatch) {
@@ -176,7 +183,7 @@ router.post('/reconcile', async (req, res) => {
         continue;
       }
 
-      const availableTx = allTransactions.filter(t => !usedTransactionIds.has(t.id));
+      const availableTx = expenseTransactions.filter(t => !usedTransactionIds.has(t.id));
       const txMatch = await pennylane.findMatchingTransaction(expense, availableTx);
 
       if (!txMatch) {

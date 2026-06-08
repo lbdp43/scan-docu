@@ -126,7 +126,19 @@ async function unmatchTransaction(invoiceId, transactionId) {
 }
 
 function scoreMatch(expense, invoice) {
+  if (invoice.reconciled) return 0;
+
   let score = 0;
+
+  // Filename match is the strongest signal — our app uploaded this exact file
+  if (expense.file_name && invoice.filename) {
+    if (invoice.filename === expense.file_name) return 100;
+    const expBase = expense.file_name.replace('.pdf', '').toLowerCase();
+    const invBase = invoice.filename.replace('.pdf', '').toLowerCase();
+    if (expBase === invBase) return 100;
+    if (invBase.includes(expBase) || expBase.includes(invBase)) score += 30;
+  }
+
   const expenseAmount = Number(expense.amount);
   const invoiceAmount = Number(invoice.currency_amount || invoice.amount || 0);
 
@@ -140,20 +152,15 @@ function scoreMatch(expense, invoice) {
   else if (daysDiff < 3) score += 5;
   else if (daysDiff < 5) score += 2;
 
-  if (expense.merchant && invoice.supplier?.name) {
+  // Supplier name is in `label` field (e.g. "Facture LECLERC - ...")
+  if (expense.merchant && invoice.label) {
     const expMerch = expense.merchant.toLowerCase();
-    const invSupp = invoice.supplier.name.toLowerCase();
-    if (expMerch.includes(invSupp) || invSupp.includes(expMerch)) score += 15;
+    const invLabel = invoice.label.toLowerCase();
+    if (invLabel.includes(expMerch) || expMerch.includes(invLabel)) score += 15;
     else {
-      const expWords = expMerch.split(/\s+/);
-      const invWords = invSupp.split(/\s+/);
-      if (expWords.some(w => w.length > 3 && invWords.some(iw => iw.includes(w)))) score += 8;
+      const expWords = expMerch.split(/\s+/).filter(w => w.length > 2);
+      if (expWords.some(w => invLabel.includes(w))) score += 8;
     }
-  }
-
-  if (expense.file_name && invoice.file_url) {
-    const invFileName = decodeURIComponent(invoice.file_url.split('/').pop() || '');
-    if (expense.file_name && invFileName.includes(expense.file_name.replace('.pdf', ''))) score += 25;
   }
 
   return score;
@@ -162,7 +169,7 @@ function scoreMatch(expense, invoice) {
 function scoreTransactionMatch(expense, transaction) {
   let score = 0;
   const expenseAmount = Number(expense.amount);
-  const txAmount = Math.abs(Number(transaction.amount));
+  const txAmount = Math.abs(Number(transaction.amount || transaction.currency_amount || 0));
 
   if (Math.abs(expenseAmount - txAmount) < 0.02) score += 20;
   else if (Math.abs(expenseAmount - txAmount) < 0.10) score += 10;
@@ -174,11 +181,11 @@ function scoreTransactionMatch(expense, transaction) {
   else if (daysDiff < 3) score += 5;
 
   if (expense.merchant && transaction.label) {
-    const merchant = expense.merchant.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const label = transaction.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const merchant = expense.merchant.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    const label = transaction.label.toLowerCase().replace(/[^a-z0-9\s]/g, '');
     if (label.includes(merchant) || merchant.includes(label)) score += 15;
     else {
-      const words = merchant.split(/\s+/).filter(w => w.length > 3);
+      const words = merchant.split(/\s+/).filter(w => w.length > 2);
       if (words.some(w => label.includes(w))) score += 8;
     }
   }

@@ -393,22 +393,22 @@ export default function AdminPennylane() {
                   {(invoices.items || []).map(inv => (
                     <div key={inv.id} className="p-3 rounded-xl bg-card border border-card-border">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-text text-sm font-medium">{inv.supplier?.name || `Facture #${inv.id}`}</p>
+                        <div className="flex-1 min-w-0 mr-3">
+                          <p className="text-text text-sm font-medium truncate">{inv.filename || inv.label || `Facture #${inv.id}`}</p>
                           <p className="text-text-muted text-xs">
-                            {inv.date} · {inv.invoice_number || 'N/A'}
+                            {inv.date} · {inv.payment_status || 'N/A'}
                           </p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
                           <p className="font-serif text-sm font-semibold text-text">
                             {Number(inv.currency_amount || inv.amount || 0).toFixed(2)} {'€'}
                           </p>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                            inv.status === 'draft' ? 'bg-amber-500/20 text-amber-400' :
-                            inv.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                            inv.reconciled ? 'bg-green-500/20 text-green-400' :
+                            inv.accounting_status === 'validation_needed' ? 'bg-amber-500/20 text-amber-400' :
                             'bg-blue-500/20 text-blue-400'
                           }`}>
-                            {inv.status}
+                            {inv.reconciled ? 'Rapproché' : inv.accounting_status || '?'}
                           </span>
                         </div>
                       </div>
