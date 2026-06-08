@@ -77,9 +77,22 @@ export default function AdminPennylane() {
     }
   }
 
+  function fiscalYear() {
+    const now = new Date();
+    return {
+      from: `${now.getFullYear()}-01-01`,
+      to: `${now.getFullYear()}-12-31`,
+    };
+  }
+
   async function loadInvoices() {
     try {
-      const data = await api.getPennylaneInvoices({ limit: 20 });
+      const fy = fiscalYear();
+      const data = await api.getPennylaneInvoices({
+        date_from: fy.from,
+        date_to: fy.to,
+        limit: 100,
+      });
       setInvoices(data);
     } catch (err) {
       setToast({ message: 'Erreur chargement factures: ' + err.message, type: 'error' });
@@ -88,13 +101,12 @@ export default function AdminPennylane() {
 
   async function loadTransactions() {
     try {
-      const now = new Date();
-      const from = new Date(now);
-      from.setDate(from.getDate() - 30);
+      const fy = fiscalYear();
       const data = await api.getPennylaneTransactions({
-        date_from: from.toISOString().slice(0, 10),
-        date_to: now.toISOString().slice(0, 10),
-        limit: 20,
+        date_from: fy.from,
+        date_to: fy.to,
+        expenses_only: 'true',
+        limit: 100,
       });
       setTransactions(data);
     } catch (err) {
@@ -381,7 +393,7 @@ export default function AdminPennylane() {
           {activeTab === 'invoices' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-text-muted text-xs uppercase tracking-widest">Factures fournisseur Pennylane</h3>
+                <h3 className="text-text-muted text-xs uppercase tracking-widest">Factures fournisseur — exercice {new Date().getFullYear()}</h3>
                 <button onClick={loadInvoices} className="text-green-light text-xs">Rafra{'î'}chir</button>
               </div>
               {!invoices ? (
@@ -426,7 +438,7 @@ export default function AdminPennylane() {
           {activeTab === 'transactions' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-text-muted text-xs uppercase tracking-widest">Transactions bancaires (30j)</h3>
+                <h3 className="text-text-muted text-xs uppercase tracking-widest">D{'é'}penses carte — exercice {new Date().getFullYear()}</h3>
                 <button onClick={loadTransactions} className="text-green-light text-xs">Rafra{'î'}chir</button>
               </div>
               {!transactions ? (
@@ -434,22 +446,28 @@ export default function AdminPennylane() {
                   <span className="w-6 h-6 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-card border border-card-border flex justify-between items-center">
+                    <span className="text-text-muted text-xs">{(transactions.items || []).length} d{'é'}penses carte</span>
+                    <span className="font-serif text-sm font-semibold text-red-400">
+                      {(transactions.items || []).reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)} {'€'}
+                    </span>
+                  </div>
                   {(transactions.items || []).map(tx => (
                     <div key={tx.id} className="p-3 rounded-xl bg-card border border-card-border">
                       <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 mr-3">
                           <p className="text-text text-sm font-medium truncate">{tx.label || `Transaction #${tx.id}`}</p>
                           <p className="text-text-muted text-xs">{tx.date}</p>
                         </div>
-                        <p className={`font-serif text-sm font-semibold ${Number(tx.amount) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        <p className="font-serif text-sm font-semibold text-red-400 shrink-0">
                           {Number(tx.amount).toFixed(2)} {'€'}
                         </p>
                       </div>
                     </div>
                   ))}
                   {(transactions.items || []).length === 0 && (
-                    <p className="text-text-dim text-center py-8 text-sm">Aucune transaction</p>
+                    <p className="text-text-dim text-center py-8 text-sm">Aucune d{'é'}pense carte</p>
                   )}
                 </div>
               )}

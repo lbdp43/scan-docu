@@ -33,16 +33,16 @@ router.post('/config', async (req, res) => {
 // GET /api/pennylane/invoices — List supplier invoices from Pennylane
 router.get('/invoices', async (req, res) => {
   try {
-    const { status: invStatus, limit, cursor } = req.query;
+    const { status: invStatus, date_from, date_to, limit, cursor } = req.query;
     const filter = [];
     if (invStatus) filter.push({ field: 'status', operator: 'eq', value: invStatus });
+    if (date_from) filter.push({ field: 'date', operator: 'gteq', value: date_from });
+    if (date_to) filter.push({ field: 'date', operator: 'lteq', value: date_to });
     const data = await pennylane.getSupplierInvoices({
       filter: filter.length ? filter : undefined,
-      limit: parseInt(limit) || 50,
+      limit: parseInt(limit) || 100,
       cursor: cursor || undefined,
     });
-    console.log('[pennylane] invoices raw keys:', Object.keys(data || {}));
-    console.log('[pennylane] invoices raw sample:', JSON.stringify(data).slice(0, 500));
     res.json(data);
   } catch (err) {
     console.error('[pennylane] invoices error:', err.message);
@@ -53,18 +53,33 @@ router.get('/invoices', async (req, res) => {
 // GET /api/pennylane/transactions — List bank transactions from Pennylane
 router.get('/transactions', async (req, res) => {
   try {
-    const { date_from, date_to, limit, cursor } = req.query;
+    const { date_from, date_to, expenses_only, limit, cursor } = req.query;
     const filter = [];
     if (date_from) filter.push({ field: 'date', operator: 'gteq', value: date_from });
     if (date_to) filter.push({ field: 'date', operator: 'lteq', value: date_to });
-    const data = await pennylane.getTransactions({
-      filter: filter.length ? filter : undefined,
-      limit: parseInt(limit) || 50,
-      cursor: cursor || undefined,
-    });
-    console.log('[pennylane] transactions raw keys:', Object.keys(data || {}));
-    console.log('[pennylane] transactions raw sample:', JSON.stringify(data).slice(0, 500));
-    res.json(data);
+
+    let allItems = [];
+    let nextCursor = cursor || undefined;
+    const pageLimit = parseInt(limit) || 100;
+
+    // Paginate to get all transactions in the date range
+    do {
+      const batch = await pennylane.getTransactions({
+        filter: filter.length ? filter : undefined,
+        limit: pageLimit,
+        cursor: nextCursor,
+      });
+      allItems = allItems.concat(batch.items);
+      nextCursor = batch.has_more ? batch.next_cursor : null;
+      if (nextCursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
+    } while (nextCursor);
+
+    // Filter to only expenses (negative amounts) if requested
+    if (expenses_only === 'true') {
+      allItems = allItems.filter(t => Number(t.amount || t.currency_amount) < 0);
+    }
+
+    res.json({ items: allItems, has_more: false, total: allItems.length });
   } catch (err) {
     console.error('[pennylane] transactions error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -121,21 +136,21 @@ router.post('/reconcile', async (req, res) => {
     });
 
     if (expenses.length === 0) {
-      return res.json({ message: 'Aucune dépense à rapprocher', results: [] });
+      return res.json({ message: 'Aucune dépense à rapprocher', results: [], summary: { total: 0, matched: 0, noInvoice: 0, noTransaction: 0, errors: 0 } });
     }
 
-    const dateMin = new Date(Math.min(...expenses.map(e => new Date(e.date_ticket).getTime())));
-    const dateMax = new Date(Math.max(...expenses.map(e => new Date(e.date_ticket).getTime())));
-    dateMin.setDate(dateMin.getDate() - 5);
-    dateMax.setDate(dateMax.getDate() + 5);
+    // Use full fiscal year to find all invoices and transactions
+    const year = new Date().getFullYear();
+    const fyStart = `${year}-01-01`;
+    const fyEnd = `${year}-12-31`;
 
     const invoiceFilter = [
-      { field: 'date', operator: 'gteq', value: dateMin.toISOString().slice(0, 10) },
-      { field: 'date', operator: 'lteq', value: dateMax.toISOString().slice(0, 10) },
+      { field: 'date', operator: 'gteq', value: fyStart },
+      { field: 'date', operator: 'lteq', value: fyEnd },
     ];
     const txFilter = [
-      { field: 'date', operator: 'gteq', value: dateMin.toISOString().slice(0, 10) },
-      { field: 'date', operator: 'lteq', value: dateMax.toISOString().slice(0, 10) },
+      { field: 'date', operator: 'gteq', value: fyStart },
+      { field: 'date', operator: 'lteq', value: fyEnd },
     ];
 
     let allInvoices = [];
@@ -225,6 +240,7 @@ router.post('/reconcile', async (req, res) => {
           transactionScore: txMatch.score,
         });
       } catch (matchErr) {
+        console.error(`[pennylane] match error expense ${expense.id}:`, matchErr.message);
         results.push({
           expenseId: expense.id,
           merchant: expense.merchant,
@@ -233,7 +249,11 @@ router.post('/reconcile', async (req, res) => {
           status: 'error',
           message: matchErr.message,
           invoiceId: invoiceMatch.invoice.id,
+          invoiceFilename: invoiceMatch.invoice.filename,
+          invoiceStatus: invoiceMatch.invoice.accounting_status,
+          invoiceReconciled: invoiceMatch.invoice.reconciled,
           transactionId: txMatch.transaction.id,
+          transactionLabel: txMatch.transaction.label,
         });
       }
 
