@@ -142,9 +142,8 @@ router.post('/reconcile', async (req, res) => {
     let invoiceCursor;
     do {
       const batch = await pennylane.getSupplierInvoices({ filter: invoiceFilter, limit: 100, cursor: invoiceCursor });
-      const items = batch.supplier_invoices || batch.invoices || batch.data || [];
-      allInvoices = allInvoices.concat(items);
-      invoiceCursor = batch.pagination?.cursor || batch.cursor;
+      allInvoices = allInvoices.concat(batch.items);
+      invoiceCursor = batch.has_more ? batch.next_cursor : null;
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } while (invoiceCursor);
 
@@ -152,9 +151,8 @@ router.post('/reconcile', async (req, res) => {
     let txCursor;
     do {
       const batch = await pennylane.getTransactions({ filter: txFilter, limit: 100, cursor: txCursor });
-      const items = batch.transactions || batch.data || [];
-      allTransactions = allTransactions.concat(items);
-      txCursor = batch.pagination?.cursor || batch.cursor;
+      allTransactions = allTransactions.concat(batch.items);
+      txCursor = batch.has_more ? batch.next_cursor : null;
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } while (txCursor);
 

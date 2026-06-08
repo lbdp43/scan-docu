@@ -390,7 +390,7 @@ export default function AdminPennylane() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {(invoices.supplier_invoices || invoices.invoices || invoices.data || []).map(inv => (
+                  {(invoices.items || []).map(inv => (
                     <div key={inv.id} className="p-3 rounded-xl bg-card border border-card-border">
                       <div className="flex items-center justify-between">
                         <div>
@@ -414,7 +414,7 @@ export default function AdminPennylane() {
                       </div>
                     </div>
                   ))}
-                  {(invoices.supplier_invoices || invoices.invoices || invoices.data || []).length === 0 && (
+                  {(invoices.items || []).length === 0 && (
                     <p className="text-text-dim text-center py-8 text-sm">Aucune facture</p>
                   )}
                 </div>
@@ -435,7 +435,7 @@ export default function AdminPennylane() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {(transactions.transactions || transactions.data || []).map(tx => (
+                  {(transactions.items || []).map(tx => (
                     <div key={tx.id} className="p-3 rounded-xl bg-card border border-card-border">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
@@ -448,7 +448,7 @@ export default function AdminPennylane() {
                       </div>
                     </div>
                   ))}
-                  {(transactions.transactions || transactions.data || []).length === 0 && (
+                  {(transactions.items || []).length === 0 && (
                     <p className="text-text-dim text-center py-8 text-sm">Aucune transaction</p>
                   )}
                 </div>

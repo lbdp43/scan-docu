@@ -83,7 +83,13 @@ async function getSupplierInvoices({ filter, limit = 100, cursor } = {}) {
   const params = { limit: String(limit) };
   if (filter) params.filter = JSON.stringify(filter);
   if (cursor) params.cursor = cursor;
-  return request('GET', '/supplier_invoices', { params });
+  const raw = await request('GET', '/supplier_invoices', { params });
+  return {
+    items: raw.items || raw.supplier_invoices || raw.data || [],
+    has_more: raw.has_more ?? false,
+    next_cursor: raw.next_cursor || null,
+    _raw_keys: Object.keys(raw || {}),
+  };
 }
 
 async function getSupplierInvoice(id) {
@@ -94,7 +100,13 @@ async function getTransactions({ filter, limit = 100, cursor } = {}) {
   const params = { limit: String(limit) };
   if (filter) params.filter = JSON.stringify(filter);
   if (cursor) params.cursor = cursor;
-  return request('GET', '/transactions', { params });
+  const raw = await request('GET', '/transactions', { params });
+  return {
+    items: raw.items || raw.transactions || raw.data || [],
+    has_more: raw.has_more ?? false,
+    next_cursor: raw.next_cursor || null,
+    _raw_keys: Object.keys(raw || {}),
+  };
 }
 
 async function getMatchedTransactions(invoiceId) {
