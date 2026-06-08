@@ -175,6 +175,8 @@ export const api = {
   // Pennylane
   getPennylaneStatus: () =>
     request('/pennylane/status'),
+  getPennylaneDebug: () =>
+    request('/pennylane/debug'),
   savePennylaneToken: (token) =>
     request('/pennylane/config', { method: 'POST', body: JSON.stringify({ token }) }),
   getPennylaneInvoices: (params = {}) => {

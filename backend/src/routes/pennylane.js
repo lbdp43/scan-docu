@@ -41,6 +41,8 @@ router.get('/invoices', async (req, res) => {
       limit: parseInt(limit) || 50,
       cursor: cursor || undefined,
     });
+    console.log('[pennylane] invoices raw keys:', Object.keys(data || {}));
+    console.log('[pennylane] invoices raw sample:', JSON.stringify(data).slice(0, 500));
     res.json(data);
   } catch (err) {
     console.error('[pennylane] invoices error:', err.message);
@@ -60,10 +62,27 @@ router.get('/transactions', async (req, res) => {
       limit: parseInt(limit) || 50,
       cursor: cursor || undefined,
     });
+    console.log('[pennylane] transactions raw keys:', Object.keys(data || {}));
+    console.log('[pennylane] transactions raw sample:', JSON.stringify(data).slice(0, 500));
     res.json(data);
   } catch (err) {
     console.error('[pennylane] transactions error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/pennylane/debug — Raw API responses for debugging
+router.get('/debug', async (req, res) => {
+  try {
+    const invoicesRaw = await pennylane.getSupplierInvoices({ limit: 2 });
+    await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
+    const txRaw = await pennylane.getTransactions({ limit: 2 });
+    res.json({
+      invoices: { keys: Object.keys(invoicesRaw || {}), raw: invoicesRaw },
+      transactions: { keys: Object.keys(txRaw || {}), raw: txRaw },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack?.split('\n').slice(0, 3) });
   }
 });
 

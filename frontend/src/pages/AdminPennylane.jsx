@@ -16,6 +16,8 @@ export default function AdminPennylane() {
   const [invoices, setInvoices] = useState(null);
   const [transactions, setTransactions] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [debugData, setDebugData] = useState(null);
+  const [loadingDebug, setLoadingDebug] = useState(false);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -97,6 +99,18 @@ export default function AdminPennylane() {
       setTransactions(data);
     } catch (err) {
       setToast({ message: 'Erreur chargement transactions: ' + err.message, type: 'error' });
+    }
+  }
+
+  async function handleDebug() {
+    setLoadingDebug(true);
+    try {
+      const data = await api.getPennylaneDebug();
+      setDebugData(data);
+    } catch (err) {
+      setToast({ message: 'Debug error: ' + err.message, type: 'error' });
+    } finally {
+      setLoadingDebug(false);
     }
   }
 
@@ -192,6 +206,27 @@ export default function AdminPennylane() {
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Debug section */}
+      {status?.connected && (
+        <div className="space-y-2">
+          {status.responseKeys && (
+            <p className="text-text-dim text-[10px] font-mono">API response keys: {JSON.stringify(status.responseKeys)}</p>
+          )}
+          <button
+            onClick={handleDebug}
+            disabled={loadingDebug}
+            className="text-text-muted text-[11px] underline underline-offset-2"
+          >
+            {loadingDebug ? 'Chargement...' : 'Debug: voir la réponse brute API'}
+          </button>
+          {debugData && (
+            <pre className="p-3 rounded-xl bg-card border border-card-border text-[9px] text-text-muted font-mono overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+              {JSON.stringify(debugData, null, 2)}
+            </pre>
+          )}
         </div>
       )}
 

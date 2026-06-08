@@ -67,7 +67,13 @@ async function testConnection() {
   if (!token) return { connected: false, error: 'Token manquant' };
   try {
     const data = await request('GET', '/supplier_invoices', { params: { limit: '1' } });
-    return { connected: true, invoiceCount: data.total_invoices ?? data.pagination?.total ?? '?' };
+    console.log('[pennylane] testConnection raw keys:', Object.keys(data || {}));
+    console.log('[pennylane] testConnection raw:', JSON.stringify(data).slice(0, 300));
+    return {
+      connected: true,
+      responseKeys: Object.keys(data || {}),
+      invoiceCount: data.total_invoices ?? data.total ?? data.pagination?.total ?? '?',
+    };
   } catch (err) {
     return { connected: false, error: err.message };
   }
