@@ -183,6 +183,8 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/pennylane/invoices?${qs}`);
   },
+  getPennylaneInvoice: (id) =>
+    request(`/pennylane/invoices/${id}`),
   getPennylaneTransactions: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/pennylane/transactions?${qs}`);

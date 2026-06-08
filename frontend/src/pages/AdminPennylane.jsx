@@ -146,6 +146,20 @@ export default function AdminPennylane() {
     }
   }
 
+  async function handleViewInvoice(invoiceId) {
+    try {
+      const detail = await api.getPennylaneInvoice(invoiceId);
+      const fileUrl = detail.file_url || detail.document_url || detail.pdf_url;
+      if (fileUrl) {
+        window.open(fileUrl, '_blank');
+      } else {
+        setToast({ message: `Pas d'URL de fichier disponible. Champs: ${Object.keys(detail).join(', ')}`, type: 'warning' });
+      }
+    } catch (err) {
+      setToast({ message: 'Erreur: ' + err.message, type: 'error' });
+    }
+  }
+
   function handleTabChange(tab) {
     setActiveTab(tab);
     if (tab === 'invoices' && !invoices) loadInvoices();
@@ -383,6 +397,34 @@ export default function AdminPennylane() {
                     </div>
                   </div>
 
+                  {/* Diagnostics */}
+                  {results.diagnostics && (
+                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-1">
+                      <p className="text-blue-400 text-[10px] font-medium uppercase tracking-widest">Diagnostic</p>
+                      <p className="text-text-muted text-[10px]">
+                        {results.diagnostics.totalInvoices} factures Pennylane ({results.diagnostics.unreconciledInvoices} non rapproch{'é'}es) en {results.diagnostics.invoicePages} page(s)
+                      </p>
+                      <p className="text-text-muted text-[10px]">
+                        {results.diagnostics.totalTransactions} transactions ({results.diagnostics.expenseTransactions} d{'é'}penses)
+                      </p>
+                      <p className="text-text-muted text-[10px]">
+                        D{'é'}penses avec fichier : {results.diagnostics.expensesWithFileName} / sans : {results.diagnostics.expensesWithoutFileName}
+                      </p>
+                      {results.diagnostics.sampleInvoices?.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-text-dim text-[10px] cursor-pointer">Exemples de factures Pennylane</summary>
+                          <div className="mt-1 space-y-1">
+                            {results.diagnostics.sampleInvoices.map(inv => (
+                              <p key={inv.id} className="text-text-dim text-[9px] font-mono truncate">
+                                {inv.filename || '(pas de filename)'} — {inv.label?.substring(0, 40)} — {Number(inv.amount || 0).toFixed(2)}{'€'} — {inv.date}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
                   {/* Detail list */}
                   <div className="space-y-2">
                     {results.results.map((r, i) => (
@@ -392,13 +434,13 @@ export default function AdminPennylane() {
                         'bg-card border-card-border'
                       }`}>
                         <div className="flex items-center justify-between">
-                          <div>
+                          <div className="flex-1 min-w-0 mr-2">
                             <p className="text-text text-sm font-medium">{r.merchant || 'Sans commerçant'}</p>
                             <p className="text-text-muted text-xs">
                               {Number(r.amount).toFixed(2)} {'€'} · {new Date(r.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                             </p>
                           </div>
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-medium ${
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-medium shrink-0 ${
                             r.status === 'matched' ? 'bg-green-500/20 text-green-400' :
                             r.status === 'no_invoice' ? 'bg-amber-500/20 text-amber-400' :
                             r.status === 'no_transaction' ? 'bg-blue-500/20 text-blue-400' :
@@ -411,10 +453,23 @@ export default function AdminPennylane() {
                           </span>
                         </div>
                         {r.message && <p className="text-text-dim text-[10px] mt-1">{r.message}</p>}
+                        {r.fileName && <p className="text-text-dim text-[9px] mt-0.5 font-mono truncate">Fichier : {r.fileName}</p>}
                         {r.invoiceScore && (
                           <p className="text-text-dim text-[10px] mt-1">
                             Score facture: {r.invoiceScore}{r.transactionScore ? ` · Score transaction: ${r.transactionScore}` : ''}
                           </p>
+                        )}
+                        {r.bestCandidates?.length > 0 && (
+                          <details className="mt-1">
+                            <summary className="text-text-dim text-[9px] cursor-pointer">Meilleurs candidats ({r.bestCandidates.length})</summary>
+                            <div className="mt-1 space-y-0.5">
+                              {r.bestCandidates.map((c, j) => (
+                                <p key={j} className="text-text-dim text-[9px] font-mono truncate">
+                                  score={c.score} — {c.filename || '(no filename)'} — {Number(c.amount || 0).toFixed(2)}{'€'}
+                                </p>
+                              ))}
+                            </div>
+                          </details>
                         )}
                       </div>
                     ))}
@@ -454,30 +509,41 @@ export default function AdminPennylane() {
                   <span className="w-6 h-6 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" />
                 </div>
               ) : (
+                <p className="text-text-dim text-[10px]">{(invoices.items || []).length} factures</p>
                 <div className="space-y-2">
                   {(invoices.items || []).map(inv => (
-                    <div key={inv.id} className="p-3 rounded-xl bg-card border border-card-border">
+                    <button
+                      key={inv.id}
+                      onClick={() => handleViewInvoice(inv.id)}
+                      className="w-full p-3 rounded-xl bg-card border border-card-border text-left active:scale-[0.98] transition-transform"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0 mr-3">
                           <p className="text-text text-sm font-medium truncate">{inv.filename || inv.label || `Facture #${inv.id}`}</p>
                           <p className="text-text-muted text-xs">
                             {inv.date} · {inv.payment_status || 'N/A'}
                           </p>
+                          {inv.label && inv.filename && (
+                            <p className="text-text-dim text-[10px] truncate mt-0.5">{inv.label}</p>
+                          )}
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-serif text-sm font-semibold text-text">
-                            {Number(inv.currency_amount || inv.amount || 0).toFixed(2)} {'€'}
-                          </p>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                            inv.reconciled ? 'bg-green-500/20 text-green-400' :
-                            inv.accounting_status === 'validation_needed' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-blue-500/20 text-blue-400'
-                          }`}>
-                            {inv.reconciled ? 'Rapproché' : inv.accounting_status || '?'}
-                          </span>
+                        <div className="text-right shrink-0 flex items-center gap-2">
+                          <div>
+                            <p className="font-serif text-sm font-semibold text-text">
+                              {Number(inv.currency_amount || inv.amount || 0).toFixed(2)} {'€'}
+                            </p>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              inv.reconciled ? 'bg-green-500/20 text-green-400' :
+                              inv.accounting_status === 'validation_needed' ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              {inv.reconciled ? 'Rapproché' : inv.accounting_status || '?'}
+                            </span>
+                          </div>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted shrink-0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                   {(invoices.items || []).length === 0 && (
                     <p className="text-text-dim text-center py-8 text-sm">Aucune facture</p>

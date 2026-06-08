@@ -54,22 +54,44 @@ router.post('/bank-accounts', async (req, res) => {
   }
 });
 
-// GET /api/pennylane/invoices — List supplier invoices from Pennylane
+// GET /api/pennylane/invoices — List supplier invoices from Pennylane (all pages)
 router.get('/invoices', async (req, res) => {
   try {
-    const { status: invStatus, date_from, date_to, limit, cursor } = req.query;
+    const { status: invStatus, date_from, date_to, limit } = req.query;
     const filter = [];
     if (invStatus) filter.push({ field: 'status', operator: 'eq', value: invStatus });
     if (date_from) filter.push({ field: 'date', operator: 'gteq', value: date_from });
     if (date_to) filter.push({ field: 'date', operator: 'lteq', value: date_to });
-    const data = await pennylane.getSupplierInvoices({
-      filter: filter.length ? filter : undefined,
-      limit: parseInt(limit) || 100,
-      cursor: cursor || undefined,
-    });
-    res.json(data);
+
+    let allItems = [];
+    let nextCursor;
+    const pageLimit = parseInt(limit) || 100;
+
+    do {
+      const batch = await pennylane.getSupplierInvoices({
+        filter: filter.length ? filter : undefined,
+        limit: pageLimit,
+        cursor: nextCursor,
+      });
+      allItems = allItems.concat(batch.items);
+      nextCursor = batch.has_more ? batch.next_cursor : null;
+      if (nextCursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
+    } while (nextCursor);
+
+    res.json({ items: allItems, has_more: false, total: allItems.length });
   } catch (err) {
     console.error('[pennylane] invoices error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/pennylane/invoices/:id — Get single invoice detail (includes file_url)
+router.get('/invoices/:id', async (req, res) => {
+  try {
+    const invoice = await pennylane.getSupplierInvoice(req.params.id);
+    res.json(invoice);
+  } catch (err) {
+    console.error('[pennylane] invoice detail error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -164,10 +186,9 @@ router.post('/reconcile', async (req, res) => {
     });
 
     if (expenses.length === 0) {
-      return res.json({ message: 'Aucune dépense à rapprocher', results: [], summary: { total: 0, matched: 0, noInvoice: 0, noTransaction: 0, errors: 0 } });
+      return res.json({ message: 'Aucune dépense à rapprocher', results: [], diagnostics: {}, summary: { total: 0, matched: 0, noInvoice: 0, noTransaction: 0, errors: 0 } });
     }
 
-    // Use full fiscal year to find all invoices and transactions
     const year = new Date().getFullYear();
     const fyStart = `${year}-01-01`;
     const fyEnd = `${year}-12-31`;
@@ -185,10 +206,12 @@ router.post('/reconcile', async (req, res) => {
 
     let allInvoices = [];
     let invoiceCursor;
+    let invoicePages = 0;
     do {
       const batch = await pennylane.getSupplierInvoices({ filter: invoiceFilter, limit: 100, cursor: invoiceCursor });
       allInvoices = allInvoices.concat(batch.items);
       invoiceCursor = batch.has_more ? batch.next_cursor : null;
+      invoicePages++;
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } while (invoiceCursor);
 
@@ -201,12 +224,19 @@ router.post('/reconcile', async (req, res) => {
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } while (txCursor);
 
-    // Filter out already reconciled invoices
     const unreconciledInvoices = allInvoices.filter(i => !i.reconciled);
-    // Only negative transactions (outgoing payments = card expenses)
     const expenseTransactions = allTransactions.filter(t => Number(t.amount || t.currency_amount) < 0);
 
-    console.log(`[pennylane] reconcile: ${allInvoices.length} invoices (${unreconciledInvoices.length} unreconciled), ${allTransactions.length} transactions (${expenseTransactions.length} expense-type)`);
+    console.log(`[pennylane] reconcile: ${allInvoices.length} invoices (${unreconciledInvoices.length} unreconciled) in ${invoicePages} pages, ${allTransactions.length} transactions (${expenseTransactions.length} expense-type)`);
+
+    const sampleInvoiceFilenames = allInvoices.slice(0, 10).map(i => ({
+      id: i.id,
+      filename: i.filename,
+      label: i.label,
+      amount: i.currency_amount || i.amount,
+      date: i.date,
+      reconciled: i.reconciled,
+    }));
 
     const results = [];
     const usedInvoiceIds = new Set();
@@ -214,7 +244,17 @@ router.post('/reconcile', async (req, res) => {
 
     for (const expense of expenses) {
       const availableInvoices = unreconciledInvoices.filter(i => !usedInvoiceIds.has(i.id));
-      const invoiceMatch = await pennylane.findMatchingInvoice(expense, availableInvoices);
+
+      const scored = availableInvoices.map(inv => ({
+        id: inv.id,
+        filename: inv.filename,
+        label: inv.label?.substring(0, 60),
+        amount: inv.currency_amount || inv.amount,
+        score: pennylane.scoreMatch(expense, inv),
+      })).sort((a, b) => b.score - a.score);
+      const top3 = scored.slice(0, 3);
+
+      const invoiceMatch = scored[0]?.score >= 25 ? { invoice: availableInvoices.find(i => i.id === scored[0].id), score: scored[0].score } : null;
 
       if (!invoiceMatch) {
         results.push({
@@ -222,8 +262,12 @@ router.post('/reconcile', async (req, res) => {
           merchant: expense.merchant,
           amount: Number(expense.amount),
           date: expense.date_ticket,
+          fileName: expense.file_name || null,
           status: 'no_invoice',
-          message: 'Aucune facture Pennylane correspondante',
+          message: expense.file_name
+            ? `Fichier "${expense.file_name}" non trouvé dans ${availableInvoices.length} factures Pennylane`
+            : 'Aucun file_name sur cette dépense (upload Drive manquant ?)',
+          bestCandidates: top3,
         });
         continue;
       }
@@ -237,10 +281,12 @@ router.post('/reconcile', async (req, res) => {
           merchant: expense.merchant,
           amount: Number(expense.amount),
           date: expense.date_ticket,
+          fileName: expense.file_name,
           status: 'no_transaction',
-          message: 'Facture trouvée mais pas de transaction bancaire correspondante',
+          message: `Facture trouvée (score ${invoiceMatch.score}) mais pas de transaction bancaire`,
           invoiceId: invoiceMatch.invoice.id,
           invoiceScore: invoiceMatch.score,
+          invoiceFilename: invoiceMatch.invoice.filename,
         });
         continue;
       }
@@ -263,6 +309,7 @@ router.post('/reconcile', async (req, res) => {
           merchant: expense.merchant,
           amount: Number(expense.amount),
           date: expense.date_ticket,
+          fileName: expense.file_name,
           status: 'matched',
           invoiceId: invoiceMatch.invoice.id,
           transactionId: txMatch.transaction.id,
@@ -276,6 +323,7 @@ router.post('/reconcile', async (req, res) => {
           merchant: expense.merchant,
           amount: Number(expense.amount),
           date: expense.date_ticket,
+          fileName: expense.file_name,
           status: 'error',
           message: matchErr.message,
           invoiceId: invoiceMatch.invoice.id,
@@ -297,6 +345,16 @@ router.post('/reconcile', async (req, res) => {
 
     res.json({
       results,
+      diagnostics: {
+        totalInvoices: allInvoices.length,
+        unreconciledInvoices: unreconciledInvoices.length,
+        invoicePages,
+        totalTransactions: allTransactions.length,
+        expenseTransactions: expenseTransactions.length,
+        sampleInvoices: sampleInvoiceFilenames,
+        expensesWithFileName: expenses.filter(e => e.file_name).length,
+        expensesWithoutFileName: expenses.filter(e => !e.file_name).length,
+      },
       summary: { total: expenses.length, matched, noInvoice, noTransaction: noTx, errors },
     });
   } catch (err) {
