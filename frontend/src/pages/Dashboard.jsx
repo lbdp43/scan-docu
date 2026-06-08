@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
@@ -7,9 +7,10 @@ import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 import TypeIcon from '../components/TypeIcon';
+import usePullToRefresh from '../hooks/usePullToRefresh.jsx';
 
 const CACHE_KEY = 'dash_v2';
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = 3 * 60 * 1000;
 
 function readCache() {
   try {
@@ -27,10 +28,10 @@ function writeCache(data) {
 }
 
 const STATUS_ICONS = {
-  uploaded: '\u2713',
-  exported: '\u2713',
-  pending: '\u00B7\u00B7\u00B7',
-  error: '\u2717',
+  uploaded: '✓',
+  exported: '✓',
+  pending: '···',
+  error: '✗',
 };
 
 export default function Dashboard() {
@@ -38,15 +39,38 @@ export default function Dashboard() {
   const { isOnline } = useOutletContext() || {};
   const { typesMap: TYPE_ICONS } = useExpenseTypes();
   const cached = readCache();
-  // Show cached data immediately — no spinner for returning users
   const [stats, setStats] = useState(cached?.stats ?? null);
   const [recent, setRecent] = useState(cached?.recent ?? []);
   const [loading, setLoading] = useState(!cached);
-  const [refreshing, setRefreshing] = useState(!!cached); // silent background refresh
+  const [refreshing, setRefreshing] = useState(!!cached);
   const [editingExpense, setEditingExpense] = useState(null);
   const [toast, setToast] = useState(null);
   const [pendingExpenses, setPendingExpenses] = useState([]);
   const loadedRef = useRef(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [statsData, recentData] = await Promise.all([
+        api.getStats(),
+        api.getRecentExpenses(),
+      ]);
+      setStats(statsData);
+      setRecent(recentData.expenses);
+      writeCache({ stats: statsData, recent: recentData.expenses });
+    } catch (err) {
+      console.error('Dashboard load error:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  const { containerRef, PullIndicator, isRefreshing: isPullRefreshing } = usePullToRefresh(
+    useCallback(async () => {
+      await loadData();
+      await loadPending();
+    }, [loadData])
+  );
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -55,7 +79,6 @@ export default function Dashboard() {
     loadPending();
   }, []);
 
-  // Refresh pending list when coming back online
   useEffect(() => {
     loadPending();
   }, [isOnline]);
@@ -85,23 +108,6 @@ export default function Dashboard() {
     }
   }
 
-  async function loadData() {
-    try {
-      const [statsData, recentData] = await Promise.all([
-        api.getStats(),
-        api.getRecentExpenses(),
-      ]);
-      setStats(statsData);
-      setRecent(recentData.expenses);
-      writeCache({ stats: statsData, recent: recentData.expenses });
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
   const firstName = user?.name?.split(' ')[0] || 'Utilisateur';
 
   if (loading) {
@@ -125,8 +131,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={containerRef}>
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+
+      <PullIndicator />
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -136,8 +144,13 @@ export default function Dashboard() {
           </h1>
           <p className="text-text-muted text-sm mt-1">Vos notes de frais</p>
         </div>
-        <div className="w-[42px] h-[42px] rounded-full bg-green-mid/30 flex items-center justify-center text-lg font-semibold text-green-light">
-          {firstName[0]}
+        <div className="flex items-center gap-2">
+          {(refreshing || isPullRefreshing) && (
+            <span className="w-4 h-4 border-2 border-green-mid/30 border-t-green-light rounded-full animate-spin" />
+          )}
+          <div className="w-[42px] h-[42px] rounded-full bg-green-mid/30 flex items-center justify-center text-lg font-semibold text-green-light">
+            {firstName[0]}
+          </div>
         </div>
       </div>
 
@@ -148,7 +161,7 @@ export default function Dashboard() {
           <p className="text-text-muted text-sm mb-2">Total du mois</p>
           <p className="font-serif text-[46px] font-bold text-white leading-tight">
             {stats?.month?.total ? Number(stats.month.total).toFixed(2) : '0.00'}
-            <span className="text-2xl ml-1">€</span>
+            <span className="text-2xl ml-1">{'€'}</span>
           </p>
         </div>
 
@@ -165,7 +178,7 @@ export default function Dashboard() {
             );
           })}
           {(!stats?.byType || stats.byType.length === 0) && (
-            <p className="text-text-muted text-sm text-center w-full">Aucune dépense ce mois</p>
+            <p className="text-text-muted text-sm text-center w-full">Aucune d{'é'}pense ce mois</p>
           )}
         </div>
 
@@ -191,7 +204,7 @@ export default function Dashboard() {
           <p className="text-white font-semibold text-base">Scanner un ticket</p>
           <p className="text-white/60 text-xs mt-0.5">Tesseract analyse le ticket</p>
         </div>
-        <span className="text-white/40 text-xl">›</span>
+        <span className="text-white/40 text-xl">{'›'}</span>
       </Link>
 
       <Link viewTransition
@@ -205,7 +218,7 @@ export default function Dashboard() {
           <p className="text-text font-semibold text-base">Saisie sans ticket</p>
           <p className="text-text-muted text-xs mt-0.5">Saisie manuelle rapide</p>
         </div>
-        <span className="text-text-dim text-xl">›</span>
+        <span className="text-text-dim text-xl">{'›'}</span>
       </Link>
 
       {/* Pending offline expenses */}
@@ -242,19 +255,19 @@ export default function Dashboard() {
                       {expense.merchant || 'Sans commerçant'}
                     </p>
                     <p className="text-amber-300/60 text-xs">
-                      {expense.date_ticket} · {expense.type} · {navigator.onLine ? 'Synchronisation...' : 'Hors ligne'}
+                      {expense.date_ticket} {'·'} {expense.type} {'·'} {navigator.onLine ? 'Synchronisation...' : 'Hors ligne'}
                     </p>
                   </div>
                   <div className="text-right shrink-0 flex items-center gap-2">
                     <p className="font-serif text-lg font-semibold text-text">
-                      {Number(expense.amount).toFixed(2)}€
+                      {Number(expense.amount).toFixed(2)}{'€'}
                     </p>
                     <button
                       onClick={() => handleDeletePending(expense.id)}
                       className="text-red-400/60 hover:text-red-400 text-xs p-1"
                       title="Supprimer"
                     >
-                      ✕
+                      {'✕'}
                     </button>
                   </div>
                 </div>
@@ -270,9 +283,6 @@ export default function Dashboard() {
           <h2 className="text-text-muted text-xs uppercase tracking-widest">
             3 derniers tickets
           </h2>
-          {refreshing && (
-            <span className="w-3 h-3 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" />
-          )}
         </div>
         <div className="space-y-3">
           {recent.map((expense, i) => {
@@ -301,12 +311,12 @@ export default function Dashboard() {
                     {user?.role === 'admin' && expense.user?.name && (
                       <span className="text-green-light/80 font-medium">{expense.user.name} &middot; </span>
                     )}
-                    {date} · {expense.type}
+                    {date} {'·'} {expense.type}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-serif text-lg font-semibold text-text">
-                    {Number(expense.amount).toFixed(2)}€
+                    {Number(expense.amount).toFixed(2)}{'€'}
                   </p>
                   <span className={`text-xs ${
                     expense.upload_status === 'error' ? 'text-red-400' :
@@ -314,7 +324,7 @@ export default function Dashboard() {
                     'text-text-dim'
                   }`}>
                     {expense.has_receipt
-                      ? (STATUS_ICONS[expense.upload_status] || '\u00B7\u00B7\u00B7')
+                      ? (STATUS_ICONS[expense.upload_status] || '···')
                       : ''}
                   </span>
                 </div>
@@ -334,13 +344,13 @@ export default function Dashboard() {
         onClose={() => setEditingExpense(null)}
         onSaved={(driveUpdated) => {
           setToast({
-            message: driveUpdated ? 'D\u00E9pense modifi\u00E9e et Drive mis \u00E0 jour' : 'D\u00E9pense modifi\u00E9e',
+            message: driveUpdated ? 'Dépense modifiée et Drive mis à jour' : 'Dépense modifiée',
             type: 'success',
           });
           loadData();
         }}
         onDeleted={() => {
-          setToast({ message: 'D\u00E9pense supprim\u00E9e', type: 'success' });
+          setToast({ message: 'Dépense supprimée', type: 'success' });
           loadData();
         }}
       />
