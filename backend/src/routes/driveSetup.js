@@ -16,7 +16,7 @@ const express = require('express');
 const { google } = require('googleapis');
 const { PrismaClient } = require('@prisma/client');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
-const { resetDriveClient } = require('../services/drive');
+const { resetDriveClient, saveRefreshToken } = require('../services/drive');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -34,6 +34,21 @@ function getOAuth2Client() {
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
+
+// POST /api/drive/set-token — Save a refresh token pasted by admin (validated first)
+router.post('/set-token', authenticateToken, checkAdmin, async (req, res) => {
+  const { refreshToken } = req.body || {};
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'Token requis' });
+  }
+  try {
+    const result = await saveRefreshToken(refreshToken);
+    res.json({ success: true, email: result.email });
+  } catch (err) {
+    console.error('[drive-setup] set-token error:', err.message);
+    res.status(400).json({ error: `Token invalide ou refusé par Google : ${err.message}` });
+  }
+});
 
 // GET /api/drive/auth-url — Returns the Google OAuth URL (admin only, JWT auth)
 router.get('/auth-url', authenticateToken, checkAdmin, (req, res) => {

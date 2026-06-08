@@ -45,6 +45,9 @@ export default function Admin() {
   const [acknowledging, setAcknowledging] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [reconnecting, setReconnecting] = useState(false);
+  const [showPasteToken, setShowPasteToken] = useState(false);
+  const [pastedToken, setPastedToken] = useState('');
+  const [savingToken, setSavingToken] = useState(false);
 
   // Handle OAuth redirect params
   useEffect(() => {
@@ -98,6 +101,22 @@ export default function Admin() {
     } catch (err) {
       setToast({ message: err.message || 'Erreur', type: 'error' });
       setReconnecting(false);
+    }
+  }
+
+  async function handleSaveToken() {
+    if (!pastedToken.trim()) return;
+    setSavingToken(true);
+    try {
+      const result = await api.setDriveToken(pastedToken.trim());
+      setToast({ message: `Drive reconnecté (${result.email || 'OK'})`, type: 'success' });
+      setShowPasteToken(false);
+      setPastedToken('');
+      api.getDriveStatus().then(setDriveStatus).catch(() => {});
+    } catch (err) {
+      setToast({ message: err.message || 'Token invalide', type: 'error' });
+    } finally {
+      setSavingToken(false);
     }
   }
 
@@ -260,6 +279,48 @@ export default function Admin() {
               </>
             )}
           </button>
+
+          {/* Paste token fallback */}
+          {!showPasteToken ? (
+            <button
+              onClick={() => setShowPasteToken(true)}
+              className="w-full text-text-muted text-[11px] underline underline-offset-2 hover:text-text"
+            >
+              Ou coller un refresh token manuellement
+            </button>
+          ) : (
+            <div className="space-y-2 pt-1">
+              <p className="text-text-muted text-[10px] leading-relaxed">
+                Collez un <strong className="text-text">refresh token</strong> obtenu via le OAuth Playground (avec vos propres identifiants OAuth). Il sera validé puis sauvegardé.
+              </p>
+              <input
+                type="text"
+                value={pastedToken}
+                onChange={(e) => setPastedToken(e.target.value)}
+                placeholder="1//0g..."
+                className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-xs font-mono focus:outline-none focus:border-green-mid"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowPasteToken(false); setPastedToken(''); }}
+                  className="flex-1 py-2 rounded-xl bg-card border border-card-border text-text-muted text-xs font-medium"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSaveToken}
+                  disabled={savingToken || !pastedToken.trim()}
+                  className="flex-1 py-2 rounded-xl bg-green-mid text-white text-xs font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingToken ? (
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Valider et sauvegarder'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {driveStatus && driveStatus.connected && !driveStatus.folderAccessible && (

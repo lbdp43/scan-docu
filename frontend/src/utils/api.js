@@ -130,6 +130,8 @@ export const api = {
     request('/admin/drive-status'),
   getDriveAuthUrl: () =>
     request('/drive/auth-url'),
+  setDriveToken: (refreshToken) =>
+    request('/drive/set-token', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
   getUsers: () =>
     request('/admin/users'),
   createUser: (data) =>

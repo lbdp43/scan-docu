@@ -20,6 +20,38 @@ async function getRefreshTokenFromDb() {
   }
 }
 
+// Validate a refresh token by making a test API call, then save to DB
+async function saveRefreshToken(refreshToken) {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  const token = (refreshToken || '').trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error('GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET requis (variables Railway)');
+  }
+  if (!token) {
+    throw new Error('Token vide');
+  }
+
+  // Test the token before saving
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: token });
+  const testDrive = google.drive({ version: 'v3', auth: oauth2Client });
+  const about = await testDrive.about.get({ fields: 'user' }); // throws if token invalid
+
+  // Save to DB
+  await settingsPrisma.setting.upsert({
+    where: { key: 'GOOGLE_REFRESH_TOKEN' },
+    update: { value: token },
+    create: { key: 'GOOGLE_REFRESH_TOKEN', value: token },
+  });
+
+  resetDriveClient();
+  console.log('[drive] Refresh token validated and saved to DB');
+
+  return { email: about.data.user?.emailAddress };
+}
+
 async function getDriveClient() {
   if (driveClient) return driveClient;
 
@@ -208,4 +240,4 @@ async function downloadDriveFile(fileId) {
   };
 }
 
-module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection };
+module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection, saveRefreshToken };
