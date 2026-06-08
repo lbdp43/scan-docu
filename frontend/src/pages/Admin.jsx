@@ -48,6 +48,8 @@ export default function Admin() {
   const [showPasteToken, setShowPasteToken] = useState(false);
   const [pastedToken, setPastedToken] = useState('');
   const [savingToken, setSavingToken] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
+  const [redirectUri, setRedirectUri] = useState('');
 
   // Handle OAuth redirect params
   useEffect(() => {
@@ -101,6 +103,16 @@ export default function Admin() {
     } catch (err) {
       setToast({ message: err.message || 'Erreur', type: 'error' });
       setReconnecting(false);
+    }
+  }
+
+  async function handleShowSetup() {
+    setShowSetup(!showSetup);
+    if (!redirectUri) {
+      try {
+        const { redirectUri: uri } = await api.getDriveRedirectUri();
+        setRedirectUri(uri);
+      } catch {}
     }
   }
 
@@ -279,6 +291,45 @@ export default function Admin() {
               </>
             )}
           </button>
+
+          {/* One-time setup helper for the reconnect button */}
+          <button
+            onClick={handleShowSetup}
+            className="w-full text-text-muted text-[11px] underline underline-offset-2 hover:text-text"
+          >
+            {showSetup ? 'Masquer' : 'Le bouton ne marche pas ? Configurer (1 fois)'}
+          </button>
+          {showSetup && (
+            <div className="space-y-2 p-3 rounded-xl bg-bg/50 border border-card-border">
+              <p className="text-text-muted text-[10px] leading-relaxed">
+                Pour que le bouton fonctionne en un clic, ajoutez cette URL aux <strong className="text-text">URI de redirection autoris{'é'}s</strong> de votre client OAuth dans Google&nbsp;Console&nbsp;:
+              </p>
+              <div className="flex gap-2 items-center">
+                <code className="flex-1 bg-bg border border-card-border rounded-lg px-2 py-1.5 text-[10px] text-green-light font-mono break-all">
+                  {redirectUri || 'Chargement...'}
+                </code>
+                {redirectUri && (
+                  <button
+                    onClick={() => { navigator.clipboard?.writeText(redirectUri); setToast({ message: 'URL copiée', type: 'success' }); }}
+                    className="shrink-0 px-2 py-1.5 rounded-lg bg-card border border-card-border text-text-muted text-[10px]"
+                  >
+                    Copier
+                  </button>
+                )}
+              </div>
+              <a
+                href="https://console.cloud.google.com/apis/credentials"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-blue-400 text-[10px] underline underline-offset-2"
+              >
+                Ouvrir Google Console → Identifiants
+              </a>
+              <p className="text-text-dim text-[9px] leading-relaxed">
+                Identifiants → votre client OAuth 2.0 → « URI de redirection autoris{'é'}s » → Ajouter → coller l'URL → Enregistrer. Ensuite le bouton « Reconnecter » fonctionnera directement.
+              </p>
+            </div>
+          )}
 
           {/* Paste token fallback */}
           {!showPasteToken ? (

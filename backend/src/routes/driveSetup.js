@@ -23,10 +23,27 @@ const prisma = new PrismaClient();
 
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
-function getOAuth2Client() {
+// Derive the app's own callback URL from the incoming request host.
+// This makes the OAuth flow self-configuring regardless of GOOGLE_REDIRECT_URI.
+function getRedirectUri(req) {
+  // Explicit override wins, but only if it points to this app's callback (not the Playground)
+  const envUri = (process.env.GOOGLE_REDIRECT_URI || '').trim();
+  if (envUri && envUri.includes('/api/drive/callback')) {
+    return envUri;
+  }
+  if (req) {
+    // Railway terminates TLS at the proxy; trust x-forwarded-proto
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    if (host) return `${proto}://${host}/api/drive/callback`;
+  }
+  return `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/drive/callback`;
+}
+
+function getOAuth2Client(req) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/drive/callback`;
+  const redirectUri = getRedirectUri(req);
 
   if (!clientId || !clientSecret) {
     throw new Error('GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET requis');
@@ -53,17 +70,23 @@ router.post('/set-token', authenticateToken, checkAdmin, async (req, res) => {
 // GET /api/drive/auth-url — Returns the Google OAuth URL (admin only, JWT auth)
 router.get('/auth-url', authenticateToken, checkAdmin, (req, res) => {
   try {
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
       prompt: 'consent',
       state: 'app',
     });
-    res.json({ url: authUrl });
+    // Return the redirect URI too, so the admin knows what to register in Google Console
+    res.json({ url: authUrl, redirectUri: getRedirectUri(req) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/drive/redirect-uri — Returns the callback URL to register in Google Console
+router.get('/redirect-uri', authenticateToken, checkAdmin, (req, res) => {
+  res.json({ redirectUri: getRedirectUri(req) });
 });
 
 // Legacy: GET /api/drive/setup?secret=xxx
@@ -73,7 +96,7 @@ router.get('/setup', (req, res) => {
     return res.status(403).send('<h2>Secret invalide.</h2>');
   }
   try {
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
@@ -104,7 +127,7 @@ router.get('/callback', async (req, res) => {
   }
 
   try {
-    const oauth2Client = getOAuth2Client();
+    const oauth2Client = getOAuth2Client(req);
     const { tokens } = await oauth2Client.getToken(code);
     const refreshToken = tokens.refresh_token;
 
