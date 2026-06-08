@@ -174,23 +174,23 @@ router.get('/unmatched', async (req, res) => {
 // POST /api/pennylane/reconcile — Auto-reconcile unmatched expenses
 router.post('/reconcile', async (req, res) => {
   try {
+    const year = new Date().getFullYear();
+    const fyStart = `${year}-01-01`;
+
     const expenses = await req.prisma.expense.findMany({
       where: {
-        pennylane_matched: false,
         upload_status: 'uploaded',
+        date_ticket: { gte: new Date(fyStart) },
       },
       omit: { receipt_image: true },
       include: { user: { select: { name: true, card_id: true } } },
       orderBy: { date_ticket: 'desc' },
-      take: 100,
     });
 
     if (expenses.length === 0) {
-      return res.json({ message: 'Aucune dépense à rapprocher', results: [], diagnostics: {}, summary: { total: 0, matched: 0, noInvoice: 0, noTransaction: 0, errors: 0 } });
+      return res.json({ message: 'Aucune dépense', results: [], diagnostics: {}, summary: { total: 0, matched: 0, alreadyReconciled: 0, noInvoice: 0, noTransaction: 0, errors: 0 } });
     }
 
-    const year = new Date().getFullYear();
-    const fyStart = `${year}-01-01`;
     const fyEnd = `${year}-12-31`;
 
     const invoiceFilter = [
@@ -249,12 +249,24 @@ router.post('/reconcile', async (req, res) => {
       const base = {
         expenseId: expense.id,
         merchant: expense.merchant,
+        type: expense.type,
         amount: Number(expense.amount),
         date: expense.date_ticket,
         fileName: expense.file_name || null,
         userName,
         cardId,
       };
+
+      // Step 0: Already matched in our DB — just show status
+      if (expense.pennylane_matched) {
+        results.push({
+          ...base,
+          status: 'already_reconciled',
+          message: 'Déjà rapproché',
+          invoiceId: expense.pennylane_invoice_id,
+        });
+        continue;
+      }
 
       // Step 1: Check if invoice already reconciled in Pennylane (filename match)
       if (expense.file_name) {
