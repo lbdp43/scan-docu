@@ -73,3 +73,11 @@ model TokenBlacklist {
 
   @@map("token_blacklist")
 }
+
+model Setting {
+  key        String   @id @db.VarChar(100)
+  value      String
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("settings")
+}

@@ -1,18 +1,36 @@
 const { google } = require('googleapis');
 const { Readable } = require('stream');
+const { PrismaClient } = require('@prisma/client');
 
 let driveClient = null;
+let cachedDbToken = null;
+const settingsPrisma = new PrismaClient();
 
 function resetDriveClient() {
   driveClient = null;
+  cachedDbToken = null;
 }
 
-function getDriveClient() {
+async function getRefreshTokenFromDb() {
+  try {
+    const setting = await settingsPrisma.setting.findUnique({ where: { key: 'GOOGLE_REFRESH_TOKEN' } });
+    return setting?.value?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getDriveClient() {
   if (driveClient) return driveClient;
 
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
-  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
+
+  // DB token takes priority over env var
+  if (!cachedDbToken) {
+    cachedDbToken = await getRefreshTokenFromDb();
+  }
+  const refreshToken = cachedDbToken || (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new Error(
@@ -20,11 +38,9 @@ function getDriveClient() {
     );
   }
 
-  // Log masked credentials for debugging
   const mask = (s) => s ? `${s.slice(0, 8)}...${s.slice(-4)} (len=${s.length})` : 'MISSING';
   console.log('[drive] Client ID:', mask(clientId));
-  console.log('[drive] Client Secret:', mask(clientSecret));
-  console.log('[drive] Refresh Token:', mask(refreshToken));
+  console.log('[drive] Refresh Token:', mask(refreshToken), cachedDbToken ? '(from DB)' : '(from env)');
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
   oauth2Client.setCredentials({ refresh_token: refreshToken });
@@ -72,7 +88,7 @@ async function testConnection() {
   status.configured = true;
 
   try {
-    const drive = getDriveClient();
+    const drive = await getDriveClient();
     // Test: get Drive storage quota (lightweight call)
     const about = await drive.about.get({ fields: 'user' });
     status.connected = true;
@@ -101,7 +117,7 @@ async function testConnection() {
 }
 
 async function uploadToDrive(pdfBuffer, fileName, folderId) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const stream = new Readable();
   stream.push(pdfBuffer);
@@ -127,7 +143,7 @@ async function uploadToDrive(pdfBuffer, fileName, folderId) {
 }
 
 async function listDriveFiles(folderId) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
@@ -140,7 +156,7 @@ async function listDriveFiles(folderId) {
 }
 
 async function updateDriveFile(fileId, pdfBuffer, fileName) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const stream = new Readable();
   stream.push(pdfBuffer);
@@ -165,12 +181,12 @@ async function updateDriveFile(fileId, pdfBuffer, fileName) {
 }
 
 async function deleteDriveFile(fileId) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   await drive.files.delete({ fileId });
 }
 
 async function downloadDriveFile(fileId) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   // Get file metadata first
   const meta = await drive.files.get({

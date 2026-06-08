@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { api } from '../utils/api';
@@ -28,6 +28,7 @@ function writeCache(data) {
 export default function Admin() {
   const { user } = useAuth();
   const { types: expenseTypes, typesMap: TYPE_ICONS } = useExpenseTypes();
+  const [searchParams, setSearchParams] = useSearchParams();
   const cached = readCache();
   const [stats, setStats] = useState(cached?.stats ?? null);
   const [expenses, setExpenses] = useState(cached?.expenses ?? []);
@@ -43,6 +44,23 @@ export default function Admin() {
   const [zipDownloaded, setZipDownloaded] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+  const [reconnecting, setReconnecting] = useState(false);
+
+  // Handle OAuth redirect params
+  useEffect(() => {
+    const driveResult = searchParams.get('drive');
+    if (driveResult) {
+      if (driveResult === 'success') {
+        setToast({ message: 'Google Drive reconnecté avec succès', type: 'success' });
+        api.getDriveStatus().then(setDriveStatus).catch(() => {});
+      } else if (driveResult === 'no_token') {
+        setToast({ message: searchParams.get('msg') || 'Pas de token reçu — révoquez l\'accès puis réessayez', type: 'error' });
+      } else if (driveResult === 'error') {
+        setToast({ message: searchParams.get('msg') || 'Erreur de connexion Drive', type: 'error' });
+      }
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -70,6 +88,17 @@ export default function Admin() {
       setLoading(false);
     }
     api.getDriveStatus().then(setDriveStatus).catch(() => {});
+  }
+
+  async function handleReconnectDrive() {
+    setReconnecting(true);
+    try {
+      const { url } = await api.getDriveAuthUrl();
+      window.location.href = url;
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur', type: 'error' });
+      setReconnecting(false);
+    }
   }
 
   async function loadExpenses() {
@@ -202,7 +231,7 @@ export default function Admin() {
 
       {/* Drive status alert */}
       {driveStatus && !driveStatus.connected && (
-        <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-2">
+        <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-3">
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400 shrink-0"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
             <p className="text-red-400 text-sm font-medium">Google Drive d{'é'}connect{'é'}</p>
@@ -214,6 +243,23 @@ export default function Admin() {
             <p>Refresh Token : {driveStatus.details?.hasRefreshToken ? 'OK' : 'Manquant'}</p>
             <p>Folder ID : {driveStatus.details?.hasFolderId ? driveStatus.details.folderId : 'Manquant'}</p>
           </div>
+          <button
+            onClick={handleReconnectDrive}
+            disabled={reconnecting}
+            className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium text-xs transition-transform active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {reconnecting ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                Redirection vers Google...
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 100-6.36L1 10" /></svg>
+                Reconnecter Google Drive
+              </>
+            )}
+          </button>
         </div>
       )}
       {driveStatus && driveStatus.connected && !driveStatus.folderAccessible && (

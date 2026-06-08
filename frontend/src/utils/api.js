@@ -128,6 +128,8 @@ export const api = {
   // Admin
   getDriveStatus: () =>
     request('/admin/drive-status'),
+  getDriveAuthUrl: () =>
+    request('/drive/auth-url'),
   getUsers: () =>
     request('/admin/users'),
   createUser: (data) =>
