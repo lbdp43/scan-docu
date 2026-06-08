@@ -72,10 +72,11 @@ export default function AdminPennylane() {
     try {
       const data = await api.pennylaneReconcile();
       setResults(data);
-      const { matched, noInvoice, noTransaction, errors } = data.summary;
+      const { matched, alreadyReconciled, noInvoice, noTransaction, errors } = data.summary;
+      const totalOk = matched + (alreadyReconciled || 0);
       setToast({
-        message: `Rapprochement terminé : ${matched} rapproché(s), ${noInvoice + noTransaction} sans match, ${errors} erreur(s)`,
-        type: matched > 0 ? 'success' : 'warning',
+        message: `Rapprochement terminé : ${totalOk} rapproché(s)${alreadyReconciled ? ` (dont ${alreadyReconciled} déjà fait)` : ''}, ${noInvoice + noTransaction} sans match, ${errors} erreur(s)`,
+        type: totalOk > 0 ? 'success' : 'warning',
       });
       const u = await api.getPennylaneUnmatched().catch(() => ({ expenses: [] }));
       setUnmatched(u.expenses || []);
@@ -383,6 +384,12 @@ export default function AdminPennylane() {
                       <p className="text-green-400 text-lg font-bold">{results.summary.matched}</p>
                       <p className="text-text-muted text-[10px]">Rapproch{'é'}(s)</p>
                     </div>
+                    {results.summary.alreadyReconciled > 0 && (
+                      <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/20">
+                        <p className="text-green-300 text-lg font-bold">{results.summary.alreadyReconciled}</p>
+                        <p className="text-text-muted text-[10px]">D{'é'}j{'à'} fait dans Pennylane</p>
+                      </div>
+                    )}
                     <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
                       <p className="text-amber-400 text-lg font-bold">{results.summary.noInvoice}</p>
                       <p className="text-text-muted text-[10px]">Sans facture</p>
@@ -429,7 +436,7 @@ export default function AdminPennylane() {
                   <div className="space-y-2">
                     {results.results.map((r, i) => (
                       <div key={i} className={`p-3 rounded-xl border ${
-                        r.status === 'matched' ? 'bg-green-500/5 border-green-500/20' :
+                        r.status === 'matched' || r.status === 'already_reconciled' ? 'bg-green-500/5 border-green-500/20' :
                         r.status === 'error' ? 'bg-red-500/5 border-red-500/20' :
                         'bg-card border-card-border'
                       }`}>
@@ -441,12 +448,13 @@ export default function AdminPennylane() {
                             </p>
                           </div>
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-medium shrink-0 ${
-                            r.status === 'matched' ? 'bg-green-500/20 text-green-400' :
+                            r.status === 'matched' || r.status === 'already_reconciled' ? 'bg-green-500/20 text-green-400' :
                             r.status === 'no_invoice' ? 'bg-amber-500/20 text-amber-400' :
                             r.status === 'no_transaction' ? 'bg-blue-500/20 text-blue-400' :
                             'bg-red-500/20 text-red-400'
                           }`}>
                             {r.status === 'matched' ? 'Rapproché' :
+                             r.status === 'already_reconciled' ? 'Déjà fait' :
                              r.status === 'no_invoice' ? 'Pas de facture' :
                              r.status === 'no_transaction' ? 'Pas de transaction' :
                              'Erreur'}

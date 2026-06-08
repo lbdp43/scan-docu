@@ -224,10 +224,11 @@ router.post('/reconcile', async (req, res) => {
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } while (txCursor);
 
+    const reconciledInvoices = allInvoices.filter(i => i.reconciled);
     const unreconciledInvoices = allInvoices.filter(i => !i.reconciled);
     const expenseTransactions = allTransactions.filter(t => Number(t.amount || t.currency_amount) < 0);
 
-    console.log(`[pennylane] reconcile: ${allInvoices.length} invoices (${unreconciledInvoices.length} unreconciled) in ${invoicePages} pages, ${allTransactions.length} transactions (${expenseTransactions.length} expense-type)`);
+    console.log(`[pennylane] reconcile: ${allInvoices.length} invoices (${unreconciledInvoices.length} unreconciled, ${reconciledInvoices.length} reconciled) in ${invoicePages} pages, ${allTransactions.length} transactions (${expenseTransactions.length} expense-type)`);
 
     const sampleInvoiceFilenames = allInvoices.slice(0, 10).map(i => ({
       id: i.id,
@@ -243,6 +244,36 @@ router.post('/reconcile', async (req, res) => {
     const usedTransactionIds = new Set();
 
     for (const expense of expenses) {
+      // Step 1: Check if invoice already reconciled in Pennylane (filename match)
+      if (expense.file_name) {
+        const alreadyReconciled = reconciledInvoices.find(i =>
+          i.filename === expense.file_name ||
+          i.filename?.replace('.pdf', '').toLowerCase() === expense.file_name.replace('.pdf', '').toLowerCase()
+        );
+        if (alreadyReconciled) {
+          await req.prisma.expense.update({
+            where: { id: expense.id },
+            data: {
+              pennylane_invoice_id: String(alreadyReconciled.id),
+              pennylane_matched: true,
+            },
+          });
+          results.push({
+            expenseId: expense.id,
+            merchant: expense.merchant,
+            amount: Number(expense.amount),
+            date: expense.date_ticket,
+            fileName: expense.file_name,
+            status: 'already_reconciled',
+            message: 'Facture déjà rapprochée dans Pennylane',
+            invoiceId: alreadyReconciled.id,
+            invoiceFilename: alreadyReconciled.filename,
+          });
+          continue;
+        }
+      }
+
+      // Step 2: Try to match with unreconciled invoices
       const availableInvoices = unreconciledInvoices.filter(i => !usedInvoiceIds.has(i.id));
 
       const scored = availableInvoices.map(inv => ({
@@ -265,13 +296,14 @@ router.post('/reconcile', async (req, res) => {
           fileName: expense.file_name || null,
           status: 'no_invoice',
           message: expense.file_name
-            ? `Fichier "${expense.file_name}" non trouvé dans ${availableInvoices.length} factures Pennylane`
+            ? `Fichier "${expense.file_name}" non trouvé dans ${availableInvoices.length} factures non rapprochées`
             : 'Aucun file_name sur cette dépense (upload Drive manquant ?)',
           bestCandidates: top3,
         });
         continue;
       }
 
+      // Step 3: Find matching transaction
       const availableTx = expenseTransactions.filter(t => !usedTransactionIds.has(t.id));
       const txMatch = await pennylane.findMatchingTransaction(expense, availableTx);
 
@@ -291,6 +323,7 @@ router.post('/reconcile', async (req, res) => {
         continue;
       }
 
+      // Step 4: Reconcile via Pennylane API
       try {
         await pennylane.matchTransaction(invoiceMatch.invoice.id, txMatch.transaction.id);
         usedInvoiceIds.add(invoiceMatch.invoice.id);
@@ -339,6 +372,7 @@ router.post('/reconcile', async (req, res) => {
     }
 
     const matched = results.filter(r => r.status === 'matched').length;
+    const alreadyReconciled = results.filter(r => r.status === 'already_reconciled').length;
     const noInvoice = results.filter(r => r.status === 'no_invoice').length;
     const noTx = results.filter(r => r.status === 'no_transaction').length;
     const errors = results.filter(r => r.status === 'error').length;
@@ -355,7 +389,7 @@ router.post('/reconcile', async (req, res) => {
         expensesWithFileName: expenses.filter(e => e.file_name).length,
         expensesWithoutFileName: expenses.filter(e => !e.file_name).length,
       },
-      summary: { total: expenses.length, matched, noInvoice, noTransaction: noTx, errors },
+      summary: { total: expenses.length, matched, alreadyReconciled, noInvoice, noTransaction: noTx, errors },
     });
   } catch (err) {
     console.error('[pennylane] reconcile error:', err.message);
