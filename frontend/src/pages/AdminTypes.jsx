@@ -162,12 +162,12 @@ export default function AdminTypes() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/admin" className="text-green-light text-xs font-medium">&larr; Admin</Link>
+          <Link viewTransition to="/admin" className="text-green-light text-xs font-medium">&larr; Admin</Link>
           <h1 className="font-serif text-xl font-semibold mt-1">Types de d&eacute;penses</h1>
         </div>
         <button

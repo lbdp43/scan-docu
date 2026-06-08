@@ -120,8 +120,12 @@ export default function Layout() {
     }
   }, [syncing, refreshPendingCount]);
 
+  const activeIndex = items.findIndex((item) =>
+    item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+  );
+
   return (
-    <div className="min-h-screen bg-bg pb-24">
+    <div className="min-h-screen bg-bg pb-24 app-shell-in">
       {/* Offline banner */}
       {!isOnline && (
         <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-600 text-white text-xs text-center py-2 font-medium">
@@ -155,9 +159,22 @@ export default function Layout() {
         <Outlet context={{ isOnline, refreshPendingCount }} />
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 h-[84px] bg-black/95 backdrop-blur-xl border-t border-white/[0.08] z-50">
-        <div className="max-w-lg mx-auto h-full flex items-center justify-around px-2">
+      {/* Bottom Navigation — named so it stays fixed during page transitions */}
+      <nav className="fixed bottom-0 left-0 right-0 h-[84px] bg-black/95 backdrop-blur-xl border-t border-white/[0.08] z-50 [view-transition-name:bottom-nav]">
+        <div className="relative max-w-lg mx-auto h-full flex items-center justify-around px-2">
+          {/* Sliding active indicator (shared element via View Transitions) */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 h-[3px] w-7 rounded-full bg-green-light"
+            style={{
+              left: `${((activeIndex + 0.5) / items.length) * 100}%`,
+              transform: 'translateX(-50%)',
+              opacity: activeIndex < 0 ? 0 : 1,
+              viewTransitionName: 'nav-indicator',
+              transition: 'left 0.34s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease',
+              boxShadow: '0 0 12px rgba(127, 212, 114, 0.6)',
+            }}
+          />
           {items.map(item => {
             const isActive = item.path === '/'
               ? location.pathname === '/'
@@ -167,11 +184,20 @@ export default function Layout() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                viewTransition
                 className={`flex flex-col items-center gap-1.5 py-2 px-3 transition-all duration-200 ${
                   isActive ? 'text-green-light' : 'text-text-dim'
                 }`}
               >
-                <NavIcon name={item.icon} active={isActive} />
+                <span
+                  className="transition-transform duration-300"
+                  style={{
+                    transform: isActive ? 'translateY(-2px) scale(1.12)' : 'none',
+                    transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  }}
+                >
+                  <NavIcon name={item.icon} active={isActive} />
+                </span>
                 <span className="text-[10px] font-medium tracking-wide">{item.label}</span>
               </NavLink>
             );

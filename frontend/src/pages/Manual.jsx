@@ -103,7 +103,7 @@ export default function Manual() {
         await savePendingExpense(expenseData, photoFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
-        setTimeout(() => navigate('/dashboard'), 2000);
+        setTimeout(() => navigate('/dashboard', { viewTransition: true }), 2000);
       } catch (offlineErr) {
         setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
         setLoading(false);
@@ -127,7 +127,7 @@ export default function Manual() {
       } else {
         setToast({ message: 'Dépense enregistrée', type: 'success' });
       }
-      setTimeout(() => navigate('/dashboard'), 2000);
+      setTimeout(() => navigate('/dashboard', { viewTransition: true }), 2000);
     } catch (err) {
       // If network error, try offline save (with optional photo)
       if (!navigator.onLine || err.message?.includes('fetch')) {
@@ -135,7 +135,7 @@ export default function Manual() {
           await savePendingExpense(expenseData, photoFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
-          setTimeout(() => navigate('/dashboard'), 2000);
+          setTimeout(() => navigate('/dashboard', { viewTransition: true }), 2000);
           return;
         } catch {}
       }
@@ -148,7 +148,7 @@ export default function Manual() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <div>

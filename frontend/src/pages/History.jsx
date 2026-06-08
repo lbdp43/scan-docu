@@ -89,7 +89,7 @@ export default function History() {
   const total = useMemo(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0), [expenses]);
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <h1 className="font-serif text-xl font-semibold">Historique</h1>

@@ -41,3 +41,54 @@ input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 30px #111B12 inset !important;
   -webkit-text-fill-color: #F0F4F0 !important;
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Page transitions (View Transitions API)
+   Smooth crossfade + gentle vertical slide between routes.
+   Falls back to an instant swap on browsers without VT support.
+   ────────────────────────────────────────────────────────────── */
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-slide-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+::view-transition-old(root) {
+  animation: vt-fade-out 150ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-new(root) {
+  animation: vt-slide-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The bottom-nav active indicator is a shared element: the browser
+   morphs its position from the old tab to the new tab → native slide. */
+::view-transition-group(nav-indicator) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* One-time entrance of the app shell (first paint / after login) */
+@keyframes shell-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.app-shell-in {
+  animation: shell-in 0.4s ease both;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  .app-shell-in { animation: none; }
+}

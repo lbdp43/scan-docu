@@ -148,7 +148,7 @@ export default function Scan() {
         await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
         refreshPendingCount?.();
         setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
-        setTimeout(() => navigate('/dashboard'), 1800);
+        setTimeout(() => navigate('/dashboard', { viewTransition: true }), 1800);
       } catch {
         setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
         setSubmitting(false);
@@ -178,14 +178,14 @@ export default function Scan() {
           type: 'success',
         });
       }
-      setTimeout(() => navigate('/dashboard'), 1800);
+      setTimeout(() => navigate('/dashboard', { viewTransition: true }), 1800);
     } catch (err) {
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
           await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
           refreshPendingCount?.();
           setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
-          setTimeout(() => navigate('/dashboard'), 1800);
+          setTimeout(() => navigate('/dashboard', { viewTransition: true }), 1800);
           return;
         } catch {}
       }
@@ -213,7 +213,7 @@ export default function Scan() {
   // ── Capture screen ──────────────────────────────────────────
   if (!hasImage) {
     return (
-      <div className="flex flex-col min-h-[calc(100vh-180px)] animate-fade-up">
+      <div className="flex flex-col min-h-[calc(100vh-180px)]">
         {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
         <h1 className="font-serif text-xl font-semibold">Scanner un ticket</h1>
@@ -258,7 +258,7 @@ export default function Scan() {
 
   // ── Form (shown immediately after photo) ─────────────────────
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="space-y-5">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       {/* Image preview + OCR status bar */}

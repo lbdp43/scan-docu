@@ -263,7 +263,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       {/* Header */}
@@ -459,7 +459,7 @@ export default function Admin() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-text-muted text-xs uppercase tracking-widest">Collaborateurs ce mois</h2>
-          <Link to="/admin/users" className="text-green-light text-xs font-medium">
+          <Link viewTransition to="/admin/users" className="text-green-light text-xs font-medium">
             Gérer →
           </Link>
         </div>
@@ -492,13 +492,13 @@ export default function Admin() {
         >
           Export CSV
         </button>
-        <Link
+        <Link viewTransition
           to="/admin/types"
           className="flex-1 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-medium text-sm text-center transition-transform active:scale-[0.97]"
         >
           Types
         </Link>
-        <Link
+        <Link viewTransition
           to="/"
           className="flex-1 py-3 rounded-2xl bg-green-mid text-white font-medium text-sm text-center transition-transform active:scale-[0.97]"
         >

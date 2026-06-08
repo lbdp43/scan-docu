@@ -125,7 +125,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       {/* Header */}
@@ -176,7 +176,7 @@ export default function Dashboard() {
       </div>
 
       {/* Action Buttons */}
-      <Link
+      <Link viewTransition
         to="/"
         className="flex items-center gap-4 w-full p-5 rounded-3xl transition-transform active:scale-[0.97]"
         style={{
@@ -194,7 +194,7 @@ export default function Dashboard() {
         <span className="text-white/40 text-xl">›</span>
       </Link>
 
-      <Link
+      <Link viewTransition
         to="/manual"
         className="flex items-center gap-4 w-full p-4 rounded-3xl border border-green-mid/30 bg-card transition-transform active:scale-[0.97]"
       >

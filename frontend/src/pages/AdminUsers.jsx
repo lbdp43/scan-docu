@@ -141,12 +141,12 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/admin" className="text-green-light text-xs mb-1 inline-block">← Administration</Link>
+          <Link viewTransition to="/admin" className="text-green-light text-xs mb-1 inline-block">← Administration</Link>
           <h1 className="font-serif text-xl font-semibold">Gestion utilisateurs</h1>
         </div>
         <button

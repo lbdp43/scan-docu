@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ExpenseTypesProvider } from './context/ExpenseTypesContext';
 import Layout from './components/Layout';
@@ -27,17 +27,18 @@ function PageFallback() {
   );
 }
 
+function Spinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg">
+      <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+    </div>
+  );
+}
+
 function PrivateRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-bg">
-        <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
+  if (loading) return <Spinner />;
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== 'admin') return <Navigate to="/" replace />;
 
@@ -51,30 +52,51 @@ function PublicRoute({ children }) {
   return children;
 }
 
+// Wrap a lazy page in its own Suspense boundary
+const page = (Component) => (
+  <Suspense fallback={<PageFallback />}>
+    <Component />
+  </Suspense>
+);
+
+const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: (
+      <PublicRoute>
+        <Suspense fallback={<Spinner />}>
+          <Login />
+        </Suspense>
+      </PublicRoute>
+    ),
+  },
+  {
+    element: (
+      <PrivateRoute>
+        <Layout />
+      </PrivateRoute>
+    ),
+    children: [
+      { index: true, element: page(Scan) },
+      { path: 'dashboard', element: page(Dashboard) },
+      { path: 'manual', element: page(Manual) },
+      { path: 'history', element: page(History) },
+      { path: 'stats', element: page(Stats) },
+      { path: 'profile', element: page(Profile) },
+      { path: 'admin', element: <PrivateRoute adminOnly>{page(Admin)}</PrivateRoute> },
+      { path: 'admin/users', element: <PrivateRoute adminOnly>{page(AdminUsers)}</PrivateRoute> },
+      { path: 'admin/types', element: <PrivateRoute adminOnly>{page(AdminTypes)}</PrivateRoute> },
+    ],
+  },
+  { path: '*', element: <Navigate to="/" replace /> },
+]);
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ExpenseTypesProvider>
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-bg"><div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" /></div>}>
-          <Routes>
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route path="/" element={<Suspense fallback={<PageFallback />}><Scan /></Suspense>} />
-              <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-              <Route path="/manual" element={<Suspense fallback={<PageFallback />}><Manual /></Suspense>} />
-              <Route path="/history" element={<Suspense fallback={<PageFallback />}><History /></Suspense>} />
-              <Route path="/stats" element={<Suspense fallback={<PageFallback />}><Stats /></Suspense>} />
-              <Route path="/profile" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
-              <Route path="/admin" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><Admin /></Suspense></PrivateRoute>} />
-              <Route path="/admin/users" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><AdminUsers /></Suspense></PrivateRoute>} />
-              <Route path="/admin/types" element={<PrivateRoute adminOnly><Suspense fallback={<PageFallback />}><AdminTypes /></Suspense></PrivateRoute>} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-        </ExpenseTypesProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <ExpenseTypesProvider>
+        <RouterProvider router={router} />
+      </ExpenseTypesProvider>
+    </AuthProvider>
   );
 }

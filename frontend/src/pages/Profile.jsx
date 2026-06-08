@@ -38,7 +38,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <h1 className="font-serif text-xl font-semibold">Mon profil</h1>

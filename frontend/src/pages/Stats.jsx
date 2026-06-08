@@ -161,7 +161,7 @@ export default function Stats() {
 
   if (!data) {
     return (
-      <div className="space-y-6 animate-fade-up">
+      <div className="space-y-6">
         <h1 className="font-serif text-xl font-semibold">Statistiques</h1>
         <p className="text-text-dim text-sm text-center py-12">Impossible de charger les statistiques</p>
       </div>
@@ -174,7 +174,7 @@ export default function Stats() {
   const activeMonths = monthly.filter(m => m.total > 0).length;
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       <h1 className="font-serif text-xl font-semibold">Statistiques</h1>
 
       {/* Period selector */}
