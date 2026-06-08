@@ -11,7 +11,6 @@ self.addEventListener('install', (event) => {
       ]);
     })
   );
-  self.skipWaiting();
 });
 
 // Activate: clean old caches

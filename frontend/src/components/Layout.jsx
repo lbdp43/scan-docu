@@ -39,6 +39,7 @@ export default function Layout() {
   const [installDismissed, setInstallDismissed] = useState(
     () => localStorage.getItem('pwa-install-dismissed') === '1'
   );
+  const [swWaiting, setSwWaiting] = useState(null);
 
   const items = useMemo(() => {
     const list = [...navItems];
@@ -74,10 +75,15 @@ export default function Layout() {
       setInstallPrompt(e);
     };
 
+    const onSwUpdate = (e) => {
+      setSwWaiting(e.detail);
+    };
+
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     window.addEventListener('sw-sync-pending', onSwSync);
     window.addEventListener('beforeinstallprompt', onInstallPrompt);
+    window.addEventListener('sw-update-available', onSwUpdate);
 
     // Check pending on mount
     refreshPendingCount();
@@ -98,6 +104,7 @@ export default function Layout() {
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('sw-sync-pending', onSwSync);
       window.removeEventListener('beforeinstallprompt', onInstallPrompt);
+      window.removeEventListener('sw-update-available', onSwUpdate);
       clearInterval(retryInterval);
     };
   }, []);
@@ -144,6 +151,11 @@ export default function Layout() {
     setInstallDismissed(true);
     localStorage.setItem('pwa-install-dismissed', '1');
   }, []);
+
+  const handleSwUpdate = useCallback(() => {
+    if (!swWaiting?.waiting) return;
+    swWaiting.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }, [swWaiting]);
 
   const showInstallBanner = installPrompt && !installDismissed;
 
@@ -223,7 +235,38 @@ export default function Layout() {
         </div>
       )}
 
-      <main className={`max-w-lg mx-auto px-4 pt-6 ${(!isOnline || showInstallBanner || (isOnline && pendingCount > 0)) ? 'mt-12' : ''}`}>
+      {/* SW update banner */}
+      {swWaiting && (
+        <div className="fixed top-0 left-0 right-0 z-[65] bg-blue-900/95 backdrop-blur-lg border-b border-blue-500/30 px-4 py-3">
+          <div className="max-w-lg mx-auto flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                <path d="M21 12a9 9 0 00-9-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 009 9 9.75 9.75 0 006.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+              </svg>
+            </div>
+            <p className="flex-1 text-white text-xs font-medium">
+              Nouvelle version disponible
+            </p>
+            <button
+              onClick={handleSwUpdate}
+              className="px-3 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shrink-0"
+            >
+              Recharger
+            </button>
+            <button
+              onClick={() => setSwWaiting(null)}
+              className="text-white/40 text-lg leading-none p-1 shrink-0"
+            >
+              {'×'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className={`max-w-lg mx-auto px-4 pt-6 ${(swWaiting || !isOnline || showInstallBanner || (isOnline && pendingCount > 0)) ? 'mt-12' : ''}`}>
         <Outlet context={{ isOnline, refreshPendingCount }} />
       </main>
 
