@@ -180,7 +180,7 @@ router.post('/reconcile', async (req, res) => {
         upload_status: 'uploaded',
       },
       omit: { receipt_image: true },
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { name: true, card_id: true } } },
       orderBy: { date_ticket: 'desc' },
       take: 100,
     });
@@ -244,6 +244,18 @@ router.post('/reconcile', async (req, res) => {
     const usedTransactionIds = new Set();
 
     for (const expense of expenses) {
+      const userName = expense.user?.name || '?';
+      const cardId = expense.card_id || expense.user?.card_id || null;
+      const base = {
+        expenseId: expense.id,
+        merchant: expense.merchant,
+        amount: Number(expense.amount),
+        date: expense.date_ticket,
+        fileName: expense.file_name || null,
+        userName,
+        cardId,
+      };
+
       // Step 1: Check if invoice already reconciled in Pennylane (filename match)
       if (expense.file_name) {
         const alreadyReconciled = reconciledInvoices.find(i =>
@@ -259,11 +271,7 @@ router.post('/reconcile', async (req, res) => {
             },
           });
           results.push({
-            expenseId: expense.id,
-            merchant: expense.merchant,
-            amount: Number(expense.amount),
-            date: expense.date_ticket,
-            fileName: expense.file_name,
+            ...base,
             status: 'already_reconciled',
             message: 'Facture déjà rapprochée dans Pennylane',
             invoiceId: alreadyReconciled.id,
@@ -288,17 +296,23 @@ router.post('/reconcile', async (req, res) => {
       const invoiceMatch = scored[0]?.score >= 25 ? { invoice: availableInvoices.find(i => i.id === scored[0].id), score: scored[0].score } : null;
 
       if (!invoiceMatch) {
+        // Still look for a matching bank transaction to show payment status
+        const availableTx = expenseTransactions.filter(t => !usedTransactionIds.has(t.id));
+        const txMatch = await pennylane.findMatchingTransaction(expense, availableTx);
         results.push({
-          expenseId: expense.id,
-          merchant: expense.merchant,
-          amount: Number(expense.amount),
-          date: expense.date_ticket,
-          fileName: expense.file_name || null,
+          ...base,
           status: 'no_invoice',
           message: expense.file_name
             ? `Fichier "${expense.file_name}" non trouvé dans ${availableInvoices.length} factures non rapprochées`
             : 'Aucun file_name sur cette dépense (upload Drive manquant ?)',
           bestCandidates: top3,
+          paymentFound: !!txMatch,
+          paymentInfo: txMatch ? {
+            amount: Math.abs(Number(txMatch.transaction.amount)),
+            date: txMatch.transaction.date,
+            label: txMatch.transaction.label,
+            score: txMatch.score,
+          } : null,
         });
         continue;
       }
@@ -309,11 +323,7 @@ router.post('/reconcile', async (req, res) => {
 
       if (!txMatch) {
         results.push({
-          expenseId: expense.id,
-          merchant: expense.merchant,
-          amount: Number(expense.amount),
-          date: expense.date_ticket,
-          fileName: expense.file_name,
+          ...base,
           status: 'no_transaction',
           message: `Facture trouvée (score ${invoiceMatch.score}) mais pas de transaction bancaire`,
           invoiceId: invoiceMatch.invoice.id,
@@ -338,11 +348,7 @@ router.post('/reconcile', async (req, res) => {
         });
 
         results.push({
-          expenseId: expense.id,
-          merchant: expense.merchant,
-          amount: Number(expense.amount),
-          date: expense.date_ticket,
-          fileName: expense.file_name,
+          ...base,
           status: 'matched',
           invoiceId: invoiceMatch.invoice.id,
           transactionId: txMatch.transaction.id,
@@ -352,11 +358,7 @@ router.post('/reconcile', async (req, res) => {
       } catch (matchErr) {
         console.error(`[pennylane] match error expense ${expense.id}:`, matchErr.message);
         results.push({
-          expenseId: expense.id,
-          merchant: expense.merchant,
-          amount: Number(expense.amount),
-          date: expense.date_ticket,
-          fileName: expense.file_name,
+          ...base,
           status: 'error',
           message: matchErr.message,
           invoiceId: invoiceMatch.invoice.id,

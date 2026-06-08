@@ -446,6 +446,9 @@ export default function AdminPennylane() {
                             <p className="text-text-muted text-xs">
                               {Number(r.amount).toFixed(2)} {'€'} · {new Date(r.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                             </p>
+                            <p className="text-text-dim text-[10px]">
+                              {r.userName}{r.cardId ? ` · Carte ${r.cardId}` : ''}
+                            </p>
                           </div>
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-medium shrink-0 ${
                             r.status === 'matched' || r.status === 'already_reconciled' ? 'bg-green-500/20 text-green-400' :
@@ -461,7 +464,13 @@ export default function AdminPennylane() {
                           </span>
                         </div>
                         {r.message && <p className="text-text-dim text-[10px] mt-1">{r.message}</p>}
-                        {r.fileName && <p className="text-text-dim text-[9px] mt-0.5 font-mono truncate">Fichier : {r.fileName}</p>}
+                        {r.paymentFound !== undefined && (
+                          <p className={`text-[10px] mt-1 ${r.paymentFound ? 'text-green-400' : 'text-amber-400'}`}>
+                            {r.paymentFound
+                              ? `Paiement trouvé : ${Number(r.paymentInfo.amount).toFixed(2)}€ le ${r.paymentInfo.date} — ${r.paymentInfo.label}`
+                              : 'Aucun paiement correspondant sur le compte bancaire'}
+                          </p>
+                        )}
                         {r.invoiceScore && (
                           <p className="text-text-dim text-[10px] mt-1">
                             Score facture: {r.invoiceScore}{r.transactionScore ? ` · Score transaction: ${r.transactionScore}` : ''}
