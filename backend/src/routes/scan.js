@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
-const { uploadToDrive, resetDriveClient, updateDriveFile, isAuthError, getRootFolderId } = require('../services/drive');
+const { uploadToDrive, uploadPhotoToDrive, resetDriveClient, updateDriveFile, isAuthError, getRootFolderId } = require('../services/drive');
 
 const router = express.Router();
 
@@ -169,6 +169,18 @@ router.post('/submit', upload.single('image'), async (req, res) => {
       }
     } else {
       console.warn('[drive] Skipped upload — no folder ID configured (set DRIVE_ROOT_FOLDER_ID or user.drive_folder_id)');
+    }
+
+    // Archive the raw photo to a SEPARATE Drive folder (renamed differently) so the
+    // main justificatifs folder stays PDF-only. Best-effort — never blocks the expense.
+    if (uploadStatus === 'uploaded' && hasImage && pdfImageBuffer && pdfImageMime?.startsWith('image/')) {
+      try {
+        const photoName = `photo_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.jpg`;
+        await uploadPhotoToDrive(pdfImageBuffer, photoName, pdfImageMime);
+        console.log(`[drive] Photo archived to photos folder: ${photoName}`);
+      } catch (photoErr) {
+        console.warn('[drive] Photo archive failed (non-blocking):', photoErr.message);
+      }
     }
 
     // Save expense to database (store compressed image for PDF regeneration on updates)

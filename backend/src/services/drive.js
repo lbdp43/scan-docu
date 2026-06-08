@@ -5,12 +5,14 @@ const { PrismaClient } = require('@prisma/client');
 let driveClient = null;
 let cachedDbToken = null;
 let cachedRootFolderId = null;
+let cachedPhotosFolderId = null;
 const settingsPrisma = new PrismaClient();
 
 function resetDriveClient() {
   driveClient = null;
   cachedDbToken = null;
   cachedRootFolderId = null;
+  cachedPhotosFolderId = null;
 }
 
 async function getRefreshTokenFromDb() {
@@ -100,6 +102,47 @@ async function createRootFolder(name = 'LBDP Notes de Frais') {
     name: response.data.name,
     webViewLink: response.data.webViewLink,
   };
+}
+
+// Resolve the dedicated "photos" folder ID (separate from the PDF folder).
+async function getPhotosFolderId() {
+  if (cachedPhotosFolderId) return cachedPhotosFolderId;
+  try {
+    const setting = await settingsPrisma.setting.findUnique({ where: { key: 'DRIVE_PHOTOS_FOLDER_ID' } });
+    if (setting?.value?.trim()) {
+      cachedPhotosFolderId = setting.value.trim();
+      return cachedPhotosFolderId;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+// Return the photos folder ID, creating an app-owned folder on first use.
+async function ensurePhotosFolder(name = 'LBDP Photos tickets') {
+  const existing = await getPhotosFolderId();
+  if (existing) return existing;
+
+  const drive = await getDriveClient();
+  const response = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+    },
+    fields: 'id',
+  });
+
+  const folderId = response.data.id;
+  await settingsPrisma.setting.upsert({
+    where: { key: 'DRIVE_PHOTOS_FOLDER_ID' },
+    update: { value: folderId },
+    create: { key: 'DRIVE_PHOTOS_FOLDER_ID', value: folderId },
+  });
+
+  cachedPhotosFolderId = folderId;
+  console.log(`[drive] Photos folder created and saved: ${folderId}`);
+  return folderId;
 }
 
 async function getDriveClient() {
@@ -201,21 +244,21 @@ async function testConnection() {
   return status;
 }
 
-async function uploadToDrive(pdfBuffer, fileName, folderId) {
+async function uploadBufferToDrive(buffer, fileName, folderId, mimeType) {
   const drive = await getDriveClient();
 
   const stream = new Readable();
-  stream.push(pdfBuffer);
+  stream.push(buffer);
   stream.push(null);
 
   const response = await drive.files.create({
     requestBody: {
       name: fileName,
       parents: [folderId],
-      mimeType: 'application/pdf',
+      mimeType,
     },
     media: {
-      mimeType: 'application/pdf',
+      mimeType,
       body: stream,
     },
     fields: 'id, webViewLink',
@@ -225,6 +268,18 @@ async function uploadToDrive(pdfBuffer, fileName, folderId) {
     fileId: response.data.id,
     webViewLink: response.data.webViewLink,
   };
+}
+
+async function uploadToDrive(pdfBuffer, fileName, folderId) {
+  return uploadBufferToDrive(pdfBuffer, fileName, folderId, 'application/pdf');
+}
+
+// Upload the raw receipt photo to a dedicated, separate Drive folder so the
+// main "justificatifs" folder stays PDF-only. The photos folder is app-owned
+// (works with the drive.file scope) and auto-created on first use.
+async function uploadPhotoToDrive(imageBuffer, fileName, mimeType = 'image/jpeg') {
+  const folderId = await ensurePhotosFolder();
+  return uploadBufferToDrive(imageBuffer, fileName, folderId, mimeType);
 }
 
 async function listDriveFiles(folderId) {
@@ -293,4 +348,4 @@ async function downloadDriveFile(fileId) {
   };
 }
 
-module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection, saveRefreshToken, getRootFolderId, createRootFolder };
+module.exports = { uploadToDrive, uploadPhotoToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection, saveRefreshToken, getRootFolderId, createRootFolder, ensurePhotosFolder, getPhotosFolderId };
