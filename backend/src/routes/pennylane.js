@@ -157,12 +157,10 @@ router.get('/unmatched', async (req, res) => {
     const expenses = await req.prisma.expense.findMany({
       where: {
         pennylane_matched: false,
-        upload_status: 'uploaded',
       },
       omit: { receipt_image: true },
       include: { user: { select: { name: true, card_id: true } } },
       orderBy: { date_ticket: 'desc' },
-      take: 100,
     });
     res.json({ expenses, count: expenses.length });
   } catch (err) {
@@ -179,7 +177,6 @@ router.post('/reconcile', async (req, res) => {
 
     const expenses = await req.prisma.expense.findMany({
       where: {
-        upload_status: 'uploaded',
         date_ticket: { gte: new Date(fyStart) },
       },
       omit: { receipt_image: true },
@@ -438,7 +435,6 @@ router.get('/missing', async (req, res) => {
 
     const expenses = await req.prisma.expense.findMany({
       where: {
-        upload_status: 'uploaded',
         date_ticket: { gte: new Date(fyStart) },
       },
       omit: { receipt_image: true },
