@@ -165,23 +165,21 @@ function scoreMatch(expense, invoice) {
 
   if (Math.abs(expenseAmount - invoiceAmount) < 0.02) score += 20;
   else if (Math.abs(expenseAmount - invoiceAmount) < 0.10) score += 10;
+  else if (Math.abs(expenseAmount - invoiceAmount) < 1.00) score += 5;
 
   const expDate = new Date(expense.date_ticket).getTime();
   const invDate = new Date(invoice.date).getTime();
   const daysDiff = Math.abs(expDate - invDate) / (1000 * 60 * 60 * 24);
-  if (daysDiff < 1) score += 10;
-  else if (daysDiff < 3) score += 5;
-  else if (daysDiff < 5) score += 2;
+  if (daysDiff < 2) score += 10;
+  else if (daysDiff < 5) score += 5;
+  else if (daysDiff < 10) score += 2;
 
-  // Supplier name is in `label` field (e.g. "Facture LECLERC - ...")
+  // Merchant name is weak — our OCR vs Pennylane's OCR can differ a lot
   if (expense.merchant && invoice.label) {
-    const expMerch = expense.merchant.toLowerCase();
-    const invLabel = invoice.label.toLowerCase();
-    if (invLabel.includes(expMerch) || expMerch.includes(invLabel)) score += 15;
-    else {
-      const expWords = expMerch.split(/\s+/).filter(w => w.length > 2);
-      if (expWords.some(w => invLabel.includes(w))) score += 8;
-    }
+    const expMerch = expense.merchant.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    const invLabel = invoice.label.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    const expWords = expMerch.split(/\s+/).filter(w => w.length > 2);
+    if (expWords.some(w => invLabel.includes(w))) score += 3;
   }
 
   return score;
@@ -208,14 +206,12 @@ function scoreTransactionMatch(expense, transaction) {
     else score += 2;
   }
 
+  // Merchant name is a weak bonus — names can differ between our OCR and bank label
   if (expense.merchant && transaction.label) {
     const merchant = expense.merchant.toLowerCase().replace(/[^a-z0-9\s]/g, '');
     const label = transaction.label.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-    if (label.includes(merchant) || merchant.includes(label)) score += 15;
-    else {
-      const words = merchant.split(/\s+/).filter(w => w.length > 2);
-      if (words.some(w => label.includes(w))) score += 8;
-    }
+    const words = merchant.split(/\s+/).filter(w => w.length > 2);
+    if (words.some(w => label.includes(w))) score += 3;
   }
 
   return score;
