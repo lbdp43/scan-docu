@@ -9,7 +9,6 @@ import CreateTypeInline from '../components/CreateTypeInline';
 import DuplicateWarning from '../components/DuplicateWarning';
 import { haptic } from '../utils/haptic';
 
-// Compress image client-side — 1200px is enough for OCR + PDF
 function compressImage(file, maxWidth = 1200, quality = 0.78) {
   return new Promise((resolve) => {
     if (file.size < 300_000 || !file.type.startsWith('image/')) {
@@ -49,13 +48,11 @@ export default function Scan() {
   const [hasImage, setHasImage] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  // 'idle' | 'running' | 'done' | 'failed'
   const [ocrState, setOcrState] = useState('idle');
   const [ocrConfidence, setOcrConfidence] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Form fields — no type pre-selected, user must choose
   const [amount, setAmount] = useState('');
   const [dateTicket, setDateTicket] = useState('');
   const [type, setType] = useState('');
@@ -65,12 +62,11 @@ export default function Scan() {
   const [ocrSuggestedType, setOcrSuggestedType] = useState(null);
   const [duplicateFound, setDuplicateFound] = useState(null);
   const [skipDuplicateCheck, setSkipDuplicateCheck] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [lastResult, setLastResult] = useState(null);
 
-  // Track which fields the user has already manually edited
-  // so OCR result doesn't overwrite user input
   const userEdited = useRef({ amount: false, merchant: false });
 
-  // Auto-open camera when launched via PWA shortcut (?action=scan)
   useEffect(() => {
     if (searchParams.get('action') === 'scan' && !autoScanTriggered.current && !hasImage) {
       autoScanTriggered.current = true;
@@ -84,8 +80,7 @@ export default function Scan() {
     if (!file) return;
 
     haptic('medium');
-
-    // 1. Show preview + form IMMEDIATELY (no waiting)
+    setLastResult(null);
     setImagePreview(URL.createObjectURL(file));
     setHasImage(true);
     setDateTicket(new Date().toISOString().slice(0, 10));
@@ -98,14 +93,11 @@ export default function Scan() {
     setOcrState('running');
     setOcrConfidence(null);
 
-    // 2. Focus amount field for quick entry while OCR runs
     setTimeout(() => amountRef.current?.focus(), 80);
 
-    // 3. Compress (client-side, works offline)
     const compressed = await compressImage(file);
     setImageFile(compressed);
 
-    // 4. OCR in background — if offline or error, user already has the form
     if (!navigator.onLine) {
       setOcrState('failed');
       return;
@@ -118,7 +110,6 @@ export default function Scan() {
 
       setOcrConfidence(result.confidence);
 
-      // Update fields only if user hasn't already typed something
       if (result.extracted) {
         if (result.extracted.amount && !userEdited.current.amount) {
           setAmount(String(result.extracted.amount));
@@ -126,7 +117,6 @@ export default function Scan() {
         if (result.extracted.date) {
           setDateTicket(result.extracted.date);
         }
-        // Type is NEVER auto-selected — shown as a suggestion only
         if (result.extracted.type && result.extracted.type !== 'autre') {
           setOcrSuggestedType(result.extracted.type);
         }
@@ -151,8 +141,10 @@ export default function Scan() {
       try {
         await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
         refreshPendingCount?.();
-        setToast({ message: 'Sauvegardé hors ligne — sera envoyé au retour du réseau', type: 'warning' });
-        setTimeout(() => navigate('/dashboard', { viewTransition: true }), 1800);
+        haptic('success');
+        setScanCount(c => c + 1);
+        setLastResult({ success: true, message: 'Sauvegardé hors ligne' });
+        setSubmitting(false);
       } catch {
         setToast({ message: 'Erreur de sauvegarde hors ligne', type: 'error' });
         setSubmitting(false);
@@ -171,26 +163,27 @@ export default function Scan() {
 
       const result = await api.submitScan(formData);
 
+      haptic('success');
+      setScanCount(c => c + 1);
+
       if (result.uploadStatus === 'error') {
-        setToast({
-          message: 'Dépense enregistrée, mais l\'envoi Drive a échoué (token expiré ?)',
-          type: 'warning',
-        });
+        setLastResult({ success: true, message: 'Enregistré (Drive échoué)' });
       } else {
-        haptic('success');
-        setToast({
-          message: result.driveUrl ? 'Ticket envoyé dans Google Drive ✓' : 'Dépense enregistrée',
-          type: 'success',
+        setLastResult({
+          success: true,
+          message: result.driveUrl ? 'Envoyé sur Google Drive' : 'Dépense enregistrée',
         });
       }
-      setTimeout(() => navigate('/dashboard', { viewTransition: true }), 1800);
+      setSubmitting(false);
     } catch (err) {
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
           await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
           refreshPendingCount?.();
-          setToast({ message: 'Connexion perdue — sauvegardé hors ligne', type: 'warning' });
-          setTimeout(() => navigate('/dashboard', { viewTransition: true }), 1800);
+          haptic('success');
+          setScanCount(c => c + 1);
+          setLastResult({ success: true, message: 'Connexion perdue — sauvegardé hors ligne' });
+          setSubmitting(false);
           return;
         } catch {}
       }
@@ -242,8 +235,77 @@ export default function Scan() {
     setOcrSuggestedType(null);
     setMerchant('');
     setDescription('');
+    setLastResult(null);
+    setSkipDuplicateCheck(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const scanAnother = () => {
+    reset();
+    setTimeout(() => fileInputRef.current?.click(), 200);
+  };
+
+  // ── Hidden file input (shared across all screens) ────────────
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/jpeg,image/png,image/webp,application/pdf"
+      capture="environment"
+      onChange={handleCapture}
+      className="hidden"
+    />
+  );
+
+  // ── Success screen (multi-scan) ──────────────────────────────
+  if (lastResult) {
+    return (
+      <div className="flex flex-col min-h-[calc(100vh-180px)]">
+        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+        {fileInput}
+
+        <div className="flex-1 flex flex-col items-center justify-center py-8 gap-6">
+          <div className="w-20 h-20 rounded-full bg-green-mid/20 flex items-center justify-center">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-light">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+
+          <div className="text-center">
+            <p className="text-white font-semibold text-lg">{lastResult.message}</p>
+            <p className="text-text-muted text-sm mt-2">
+              {scanCount} ticket{scanCount > 1 ? 's' : ''} scann{'é'}{scanCount > 1 ? 's' : ''} dans cette session
+            </p>
+          </div>
+
+          <div className="w-full space-y-3 mt-4">
+            <button
+              onClick={scanAnother}
+              className="w-full py-5 rounded-3xl text-white font-semibold text-base transition-transform active:scale-[0.97] flex items-center justify-center gap-3"
+              style={{
+                background: 'linear-gradient(135deg, #2D6A27, #4A9E40)',
+                boxShadow: '0 4px 20px rgba(77, 158, 64, 0.3)',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="15" rx="3" />
+                <circle cx="12" cy="13" r="4" />
+                <path d="M8.5 5L9.5 3h5l1 2" />
+              </svg>
+              Scanner un autre ticket
+            </button>
+
+            <button
+              onClick={() => navigate('/dashboard', { viewTransition: true })}
+              className="w-full py-4 rounded-3xl border border-card-border text-text-muted font-medium text-sm transition-transform active:scale-[0.97]"
+            >
+              Terminer ({scanCount} ticket{scanCount > 1 ? 's' : ''})
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Capture screen ──────────────────────────────────────────
   if (!hasImage) {
@@ -251,42 +313,52 @@ export default function Scan() {
       <div className="flex flex-col min-h-[calc(100vh-180px)]">
         {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
-        <h1 className="font-serif text-xl font-semibold">Scanner un ticket</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="font-serif text-xl font-semibold">Scanner un ticket</h1>
+          {scanCount > 0 && (
+            <span className="px-2.5 py-1 rounded-full bg-green-mid/20 text-green-light text-xs font-semibold">
+              {scanCount} scann{'é'}{scanCount > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
 
-        {/* Big capture button — centered vertically */}
         <div className="flex-1 flex items-center justify-center py-8">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full border border-green-mid/25 rounded-3xl p-12 flex flex-col items-center gap-5 bg-green-mid/[0.04] transition-all hover:bg-green-mid/[0.08] hover:border-green-mid/40 active:scale-[0.98]"
-        >
-          <div className="w-16 h-16 rounded-2xl bg-green-mid/10 flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-light">
-              <rect x="2" y="5" width="20" height="15" rx="3" />
-              <circle cx="12" cy="13" r="4" />
-              <path d="M8.5 5L9.5 3h5l1 2" />
-            </svg>
-          </div>
-          <div className="text-center">
-            <p className="text-text font-semibold text-base">Prendre une photo</p>
-            <p className="text-text-muted text-sm mt-1">ou choisir depuis la galerie</p>
-          </div>
-        </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full border border-green-mid/25 rounded-3xl p-12 flex flex-col items-center gap-5 bg-green-mid/[0.04] transition-all hover:bg-green-mid/[0.08] hover:border-green-mid/40 active:scale-[0.98]"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-green-mid/10 flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-light">
+                <rect x="2" y="5" width="20" height="15" rx="3" />
+                <circle cx="12" cy="13" r="4" />
+                <path d="M8.5 5L9.5 3h5l1 2" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-text font-semibold text-base">
+                {scanCount > 0 ? 'Scanner le ticket suivant' : 'Prendre une photo'}
+              </p>
+              <p className="text-text-muted text-sm mt-1">ou choisir depuis la galerie</p>
+            </div>
+          </button>
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
-          capture="environment"
-          onChange={handleCapture}
-          className="hidden"
-        />
+        {fileInput}
 
-        <div className="p-4 rounded-2xl bg-card border border-card-border">
-          <p className="text-text-muted text-xs leading-relaxed">
-            <strong className="text-text">Conseil :</strong> Ticket {'\u00E0'} plat, bonne lumi{'\u00E8'}re. L'OCR s'analyse en arri{'\u00E8'}re-plan — vous pouvez saisir le montant pendant ce temps.
-          </p>
-        </div>
+        {scanCount === 0 ? (
+          <div className="p-4 rounded-2xl bg-card border border-card-border">
+            <p className="text-text-muted text-xs leading-relaxed">
+              <strong className="text-text">Conseil :</strong> Ticket {'à'} plat, bonne lumi{'è'}re. L'OCR s'analyse en arri{'è'}re-plan {'—'} vous pouvez saisir le montant pendant ce temps.
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={() => navigate('/dashboard', { viewTransition: true })}
+            className="w-full py-4 rounded-3xl border border-card-border text-text-muted font-medium text-sm transition-transform active:scale-[0.97]"
+          >
+            Terminer ({scanCount} ticket{scanCount > 1 ? 's' : ''})
+          </button>
+        )}
       </div>
     );
   }
@@ -295,6 +367,16 @@ export default function Scan() {
   return (
     <div className="space-y-5">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+      {fileInput}
+
+      {/* Scan count badge */}
+      {scanCount > 0 && (
+        <div className="flex justify-end">
+          <span className="px-2.5 py-1 rounded-full bg-green-mid/20 text-green-light text-xs font-semibold">
+            {scanCount} scann{'é'}{scanCount > 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
 
       {/* Image preview + OCR status bar */}
       <div className="relative">
@@ -303,7 +385,6 @@ export default function Scan() {
           alt="Ticket"
           className="w-full rounded-2xl max-h-52 object-cover"
         />
-        {/* OCR status overlay */}
         <div className={`absolute bottom-2 left-2 right-2 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium backdrop-blur-sm transition-all ${
           ocrState === 'running'
             ? 'bg-amber-900/80 text-amber-200'
@@ -317,19 +398,19 @@ export default function Scan() {
             <>
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 border-2 border-amber-300/40 border-t-amber-200 rounded-full animate-spin shrink-0" />
-                Analyse OCR en cours…
+                Analyse OCR en cours{'…'}
               </span>
               <span className="text-amber-300/70">Saisissez le montant maintenant</span>
             </>
           )}
           {ocrState === 'done' && (
             <span>
-              ✓ OCR terminé
+              {'✓'} OCR termin{'é'}
               {ocrConfidence != null && ` — confiance ${Math.round(ocrConfidence)}%`}
             </span>
           )}
           {ocrState === 'failed' && (
-            <span>OCR non disponible — saisie manuelle</span>
+            <span>OCR non disponible {'—'} saisie manuelle</span>
           )}
         </div>
         <button
@@ -341,10 +422,9 @@ export default function Scan() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Amount — big and first, focused immediately */}
         <div>
           <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-            Montant (€) *
+            Montant ({'€'}) *
           </label>
           <input
             ref={amountRef}
@@ -361,7 +441,6 @@ export default function Scan() {
           />
         </div>
 
-        {/* Date */}
         <div>
           <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
             Date du ticket
@@ -375,15 +454,14 @@ export default function Scan() {
           />
         </div>
 
-        {/* Type pills */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-[10px] uppercase tracking-widest text-text-muted">
-              Type de dépense <span className="text-red-400">*</span>
+              Type de d{'é'}pense <span className="text-red-400">*</span>
             </label>
             {ocrSuggestedType && !type && (
               <span className="text-[10px] text-amber-300/80">
-                OCR suggère :&nbsp;
+                OCR sugg{'è'}re :&nbsp;
                 <button
                   type="button"
                   onClick={() => setType(ocrSuggestedType)}
@@ -426,20 +504,19 @@ export default function Scan() {
               onCreated={(newValue) => {
                 setType(newValue);
                 setShowCreateType(false);
-                setToast({ message: 'Type cr\u00E9\u00E9', type: 'success' });
+                setToast({ message: 'Type créé', type: 'success' });
               }}
               onCancel={() => setShowCreateType(false)}
             />
           )}
           {!type && !showCreateType && (
-            <p className="text-[10px] text-text-dim mt-1.5">S{'\u00E9'}lectionnez le type avant d'envoyer</p>
+            <p className="text-[10px] text-text-dim mt-1.5">S{'é'}lectionnez le type avant d'envoyer</p>
           )}
         </div>
 
-        {/* Merchant + Description (optional, collapsible label) */}
         <div>
           <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
-            Commerçant <span className="normal-case text-text-dim">(optionnel)</span>
+            Commer{'ç'}ant <span className="normal-case text-text-dim">(optionnel)</span>
           </label>
           <input
             type="text"
@@ -465,7 +542,6 @@ export default function Scan() {
           />
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={submitting}
@@ -478,10 +554,10 @@ export default function Scan() {
           {submitting ? (
             <>
               <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Envoi en cours…
+              Envoi en cours{'…'}
             </>
           ) : (
-            <>Enregistrer la d{'\u00E9'}pense</>
+            <>Enregistrer la d{'é'}pense</>
           )}
         </button>
       </form>
