@@ -509,6 +509,7 @@ export default function AdminPennylane() {
                   <span className="w-6 h-6 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" />
                 </div>
               ) : (
+                <>
                 <p className="text-text-dim text-[10px]">{(invoices.items || []).length} factures</p>
                 <div className="space-y-2">
                   {(invoices.items || []).map(inv => (
@@ -549,6 +550,7 @@ export default function AdminPennylane() {
                     <p className="text-text-dim text-center py-8 text-sm">Aucune facture</p>
                   )}
                 </div>
+                </>
               )}
             </div>
           )}
