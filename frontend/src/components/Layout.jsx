@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getPendingExpenses, syncPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
@@ -124,6 +124,18 @@ export default function Layout() {
     item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
   );
 
+  const itemRefs = useRef([]);
+  const [indicatorPos, setIndicatorPos] = useState({ left: 0, opacity: 0 });
+
+  useLayoutEffect(() => {
+    const el = itemRefs.current[activeIndex];
+    if (!el) { setIndicatorPos(p => ({ ...p, opacity: 0 })); return; }
+    setIndicatorPos({
+      left: el.offsetLeft + el.offsetWidth / 2,
+      opacity: 1,
+    });
+  }, [activeIndex]);
+
   return (
     <div className="min-h-screen bg-bg pb-24 app-shell-in">
       {/* Offline banner */}
@@ -167,15 +179,15 @@ export default function Layout() {
             aria-hidden="true"
             className="pointer-events-none absolute top-0 h-[3px] w-7 rounded-full bg-green-light"
             style={{
-              left: `${((activeIndex + 0.5) / items.length) * 100}%`,
+              left: `${indicatorPos.left}px`,
               transform: 'translateX(-50%)',
-              opacity: activeIndex < 0 ? 0 : 1,
+              opacity: indicatorPos.opacity,
               viewTransitionName: 'nav-indicator',
               transition: 'left 0.34s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease',
               boxShadow: '0 0 12px rgba(127, 212, 114, 0.6)',
             }}
           />
-          {items.map(item => {
+          {items.map((item, idx) => {
             const isActive = item.path === '/'
               ? location.pathname === '/'
               : location.pathname.startsWith(item.path);
@@ -184,6 +196,7 @@ export default function Layout() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                ref={el => { itemRefs.current[idx] = el; }}
                 viewTransition
                 className={`flex flex-col items-center gap-1.5 py-2 px-3 transition-all duration-200 ${
                   isActive ? 'text-green-light' : 'text-text-dim'
