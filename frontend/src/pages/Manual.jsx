@@ -6,6 +6,7 @@ import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
 import CreateTypeInline from '../components/CreateTypeInline';
+import { haptic } from '../utils/haptic';
 
 // Compress image client-side before uploading
 function compressImage(file, maxWidth = 1400, quality = 0.75) {
@@ -59,6 +60,7 @@ export default function Manual() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    haptic('medium');
     setPhotoPreview(URL.createObjectURL(file));
     const compressed = await compressImage(file);
     setPhotoFile(compressed);
@@ -75,14 +77,17 @@ export default function Manual() {
     e.preventDefault();
 
     if (!amount || parseFloat(amount) <= 0) {
+      haptic('error');
       setToast({ message: 'Montant requis', type: 'error' });
       return;
     }
     if (!merchant.trim()) {
+      haptic('error');
       setToast({ message: 'Commerçant requis', type: 'error' });
       return;
     }
     if (!description.trim()) {
+      haptic('error');
       setToast({ message: 'Motif / description requis', type: 'error' });
       return;
     }
@@ -122,6 +127,7 @@ export default function Manual() {
 
       const result = await api.submitScan(formData);
 
+      haptic('success');
       if (result.driveUrl) {
         setToast({ message: 'Dépense enregistrée et PDF envoyé sur Drive', type: 'success' });
       } else {
@@ -245,7 +251,7 @@ export default function Manual() {
               <button
                 key={t.value}
                 type="button"
-                onClick={() => { setType(t.value); setShowCreateType(false); }}
+                onClick={() => { haptic('light'); setType(t.value); setShowCreateType(false); }}
                 className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
                   type === t.value
                     ? 'bg-green-mid/20 border border-green-mid text-green-light'

@@ -6,6 +6,7 @@ import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
 import CreateTypeInline from '../components/CreateTypeInline';
+import { haptic } from '../utils/haptic';
 
 // Compress image client-side — 1200px is enough for OCR + PDF
 function compressImage(file, maxWidth = 1200, quality = 0.78) {
@@ -67,6 +68,8 @@ export default function Scan() {
   const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    haptic('medium');
 
     // 1. Show preview + form IMMEDIATELY (no waiting)
     setImagePreview(URL.createObjectURL(file));
@@ -130,10 +133,12 @@ export default function Scan() {
     e.preventDefault();
 
     if (!amount || parseFloat(amount) <= 0) {
+      haptic('error');
       setToast({ message: 'Montant requis', type: 'error' });
       return;
     }
     if (!type) {
+      haptic('error');
       setToast({ message: 'Veuillez sélectionner un type de dépense', type: 'error' });
       return;
     }
@@ -173,6 +178,7 @@ export default function Scan() {
           type: 'warning',
         });
       } else {
+        haptic('success');
         setToast({
           message: result.driveUrl ? 'Ticket envoyé dans Google Drive ✓' : 'Dépense enregistrée',
           type: 'success',
@@ -364,7 +370,7 @@ export default function Scan() {
               <button
                 key={t.value}
                 type="button"
-                onClick={() => { setType(t.value); setShowCreateType(false); }}
+                onClick={() => { haptic('light'); setType(t.value); setShowCreateType(false); }}
                 className={`px-4 py-2.5 rounded-2xl text-sm font-medium transition-all flex items-center gap-1.5 ${
                   type === t.value
                     ? 'bg-green-mid/20 border-2 border-green-mid text-green-light'
