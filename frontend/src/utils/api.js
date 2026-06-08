@@ -126,6 +126,8 @@ export const api = {
     request(`/expense-types/${id}`, { method: 'DELETE' }),
 
   // Admin
+  getDriveStatus: () =>
+    request('/admin/drive-status'),
   getUsers: () =>
     request('/admin/users'),
   createUser: (data) =>

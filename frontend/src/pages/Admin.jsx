@@ -39,6 +39,7 @@ export default function Admin() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [retryingAll, setRetryingAll] = useState(false);
   const [exportingFailed, setExportingFailed] = useState(false);
+  const [driveStatus, setDriveStatus] = useState(null);
   const [zipDownloaded, setZipDownloaded] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -68,6 +69,7 @@ export default function Admin() {
     } finally {
       setLoading(false);
     }
+    api.getDriveStatus().then(setDriveStatus).catch(() => {});
   }
 
   async function loadExpenses() {
@@ -197,6 +199,32 @@ export default function Admin() {
           Admin {user?.name?.split(' ')[0]}
         </span>
       </div>
+
+      {/* Drive status alert */}
+      {driveStatus && !driveStatus.connected && (
+        <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-2">
+          <div className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400 shrink-0"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+            <p className="text-red-400 text-sm font-medium">Google Drive d{'é'}connect{'é'}</p>
+          </div>
+          <p className="text-text-muted text-xs">{driveStatus.error}</p>
+          <div className="text-text-dim text-[10px] space-y-0.5">
+            <p>Client ID : {driveStatus.details?.hasClientId ? 'OK' : 'Manquant'}</p>
+            <p>Client Secret : {driveStatus.details?.hasClientSecret ? 'OK' : 'Manquant'}</p>
+            <p>Refresh Token : {driveStatus.details?.hasRefreshToken ? 'OK' : 'Manquant'}</p>
+            <p>Folder ID : {driveStatus.details?.hasFolderId ? driveStatus.details.folderId : 'Manquant'}</p>
+          </div>
+        </div>
+      )}
+      {driveStatus && driveStatus.connected && !driveStatus.folderAccessible && (
+        <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-1">
+          <div className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 shrink-0"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+            <p className="text-amber-400 text-sm font-medium">Drive connect{'é'} ({driveStatus.details?.driveEmail}) mais dossier inaccessible</p>
+          </div>
+          <p className="text-text-muted text-xs">{driveStatus.error}</p>
+        </div>
+      )}
 
       {/* Stats hero */}
       <div className="relative overflow-hidden rounded-4xl p-7"

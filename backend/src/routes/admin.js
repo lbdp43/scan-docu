@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const { z } = require('zod');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { testConnection: testDriveConnection } = require('../services/drive');
 
 const router = express.Router();
 
@@ -404,6 +405,22 @@ router.post('/acknowledge-zip', async (req, res) => {
   } catch (err) {
     console.error('Acknowledge ZIP error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/admin/drive-status — Check Google Drive connection health
+router.get('/drive-status', async (req, res) => {
+  try {
+    const status = await testDriveConnection();
+    res.json(status);
+  } catch (err) {
+    console.error('Drive status check error:', err);
+    res.json({
+      configured: false,
+      connected: false,
+      folderAccessible: false,
+      error: err.message,
+    });
   }
 });
 

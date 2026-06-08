@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
-const { uploadToDrive, resetDriveClient, updateDriveFile } = require('../services/drive');
+const { uploadToDrive, resetDriveClient, updateDriveFile, isAuthError } = require('../services/drive');
 
 const router = express.Router();
 
@@ -160,11 +160,10 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         console.error('[drive] Upload error:', driveErr.message);
         if (driveErr.response) {
           console.error('[drive] Error details:', JSON.stringify(driveErr.response.data));
-          // Reset cached client on auth errors so next request uses fresh credentials
-          if (driveErr.response.data?.error === 'invalid_grant') {
-            resetDriveClient();
-            console.warn('[drive] Token expired — client cache cleared. Update GOOGLE_REFRESH_TOKEN and restart.');
-          }
+        }
+        if (isAuthError(driveErr)) {
+          resetDriveClient();
+          console.warn('[drive] Auth error — client cache cleared. Token may be expired.');
         }
         uploadStatus = 'error';
       }
@@ -271,9 +270,9 @@ router.post('/retry/:id', async (req, res) => {
     res.json({ success: true, driveUrl: driveResult.webViewLink, uploadStatus: 'uploaded' });
   } catch (err) {
     console.error('Retry error:', err);
-    if (err.response?.data?.error === 'invalid_grant') {
+    if (isAuthError(err)) {
       resetDriveClient();
-      return res.status(502).json({ error: 'Token Google Drive expiré. Veuillez renouveler le refresh token dans la Google Console.' });
+      return res.status(502).json({ error: 'Token Google Drive expiré ou révoqué. Relancez le setup OAuth.' });
     }
     res.status(500).json({ error: 'Erreur lors du renvoi vers Drive: ' + err.message });
   }
@@ -335,7 +334,7 @@ router.post('/retry-all', async (req, res) => {
         console.error(`[retry-all] Expense ${expense.id} failed:`, uploadErr.message);
         results.push({ id: expense.id, status: 'error', reason: uploadErr.message });
         // If token error, stop trying (all subsequent will fail too)
-        if (uploadErr.response?.data?.error === 'invalid_grant') {
+        if (isAuthError(uploadErr)) {
           resetDriveClient();
           results.push({ status: 'stopped', reason: 'Token expiré — arrêt du retry' });
           break;

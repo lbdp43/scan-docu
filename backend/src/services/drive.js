@@ -34,6 +34,72 @@ function getDriveClient() {
   return driveClient;
 }
 
+function isAuthError(err) {
+  if (err.code === 401 || err.code === 403) return true;
+  const msg = (err.message || '').toLowerCase();
+  if (msg.includes('invalid_grant') || msg.includes('token') || msg.includes('unauthorized') || msg.includes('revoked')) return true;
+  const data = err.response?.data;
+  if (data?.error === 'invalid_grant' || data?.error === 'unauthorized_client') return true;
+  if (typeof data?.error === 'object' && (data.error.code === 401 || data.error.code === 403)) return true;
+  return false;
+}
+
+async function testConnection() {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
+  const folderId = (process.env.DRIVE_ROOT_FOLDER_ID || '').trim();
+
+  const status = {
+    configured: false,
+    connected: false,
+    folderAccessible: false,
+    error: null,
+    details: {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      hasRefreshToken: !!refreshToken,
+      hasFolderId: !!folderId,
+      folderId: folderId || null,
+    },
+  };
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    status.error = 'Variables d\'environnement manquantes';
+    return status;
+  }
+
+  status.configured = true;
+
+  try {
+    const drive = getDriveClient();
+    // Test: get Drive storage quota (lightweight call)
+    const about = await drive.about.get({ fields: 'user' });
+    status.connected = true;
+    status.details.driveEmail = about.data.user?.emailAddress;
+
+    if (folderId) {
+      try {
+        await drive.files.get({ fileId: folderId, fields: 'id,name' });
+        status.folderAccessible = true;
+      } catch (folderErr) {
+        status.error = `Dossier ${folderId} inaccessible: ${folderErr.message}`;
+      }
+    } else {
+      status.error = 'DRIVE_ROOT_FOLDER_ID non configuré';
+    }
+  } catch (err) {
+    resetDriveClient();
+    if (isAuthError(err)) {
+      status.error = 'Token expiré ou révoqué — relancez le setup OAuth (/api/drive/setup)';
+    } else {
+      status.error = err.message;
+    }
+  }
+
+  return status;
+}
+
 async function uploadToDrive(pdfBuffer, fileName, folderId) {
   const drive = getDriveClient();
 
@@ -126,4 +192,4 @@ async function downloadDriveFile(fileId) {
   };
 }
 
-module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient };
+module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection };
