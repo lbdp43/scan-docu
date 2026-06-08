@@ -134,6 +134,8 @@ export const api = {
     request('/drive/redirect-uri'),
   setDriveToken: (refreshToken) =>
     request('/drive/set-token', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
+  createDriveFolder: (name) =>
+    request('/drive/create-folder', { method: 'POST', body: JSON.stringify({ name }) }),
   getUsers: () =>
     request('/admin/users'),
   createUser: (data) =>

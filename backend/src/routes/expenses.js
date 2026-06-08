@@ -3,7 +3,7 @@ const { z } = require('zod');
 const { authenticateToken } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { generatePDF } = require('../services/pdf');
-const { updateDriveFile, uploadToDrive, downloadDriveFile } = require('../services/drive');
+const { updateDriveFile, uploadToDrive, downloadDriveFile, getRootFolderId } = require('../services/drive');
 
 const router = express.Router();
 
@@ -511,7 +511,7 @@ router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
         } catch (updateErr) {
           // File may have been deleted on Drive — try creating a new one
           console.error('[drive] Update failed, creating new file:', updateErr.message);
-          const folderId = expense.user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+          const folderId = expense.user.drive_folder_id || await getRootFolderId();
           if (folderId) {
             driveResult = await uploadToDrive(pdfBuffer, fileName, folderId);
           }

@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
-const { uploadToDrive, resetDriveClient, updateDriveFile, isAuthError } = require('../services/drive');
+const { uploadToDrive, resetDriveClient, updateDriveFile, isAuthError, getRootFolderId } = require('../services/drive');
 
 const router = express.Router();
 
@@ -145,8 +145,8 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     let driveFileUrl = null;
     let uploadStatus = 'pending';
 
-    // Use user-specific folder or fall back to global root folder
-    const folderId = user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+    // Use user-specific folder or fall back to global root folder (DB then env)
+    const folderId = user.drive_folder_id || await getRootFolderId();
 
     if (pdfBuffer && folderId) {
       try {
@@ -234,7 +234,7 @@ router.post('/retry/:id', async (req, res) => {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
-    const folderId = user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+    const folderId = user.drive_folder_id || await getRootFolderId();
     if (!folderId) {
       return res.status(400).json({ error: 'Aucun dossier Drive configuré' });
     }
@@ -300,7 +300,7 @@ router.post('/retry-all', async (req, res) => {
 
     for (const expense of failedExpenses) {
       try {
-        const folderId = expense.user.drive_folder_id || process.env.DRIVE_ROOT_FOLDER_ID;
+        const folderId = expense.user.drive_folder_id || await getRootFolderId();
         if (!folderId) {
           results.push({ id: expense.id, status: 'skipped', reason: 'Pas de dossier Drive' });
           continue;

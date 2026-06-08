@@ -4,11 +4,13 @@ const { PrismaClient } = require('@prisma/client');
 
 let driveClient = null;
 let cachedDbToken = null;
+let cachedRootFolderId = null;
 const settingsPrisma = new PrismaClient();
 
 function resetDriveClient() {
   driveClient = null;
   cachedDbToken = null;
+  cachedRootFolderId = null;
 }
 
 async function getRefreshTokenFromDb() {
@@ -50,6 +52,54 @@ async function saveRefreshToken(refreshToken) {
   console.log('[drive] Refresh token validated and saved to DB');
 
   return { email: about.data.user?.emailAddress };
+}
+
+// Resolve the root folder ID: DB setting takes priority over env var.
+// With the drive.file scope, the app can only access folders it created itself,
+// so the recommended path is createRootFolder() which stores the ID in DB.
+async function getRootFolderId() {
+  if (cachedRootFolderId) return cachedRootFolderId;
+  try {
+    const setting = await settingsPrisma.setting.findUnique({ where: { key: 'DRIVE_ROOT_FOLDER_ID' } });
+    if (setting?.value?.trim()) {
+      cachedRootFolderId = setting.value.trim();
+      return cachedRootFolderId;
+    }
+  } catch {
+    // ignore, fall back to env
+  }
+  const envFolder = (process.env.DRIVE_ROOT_FOLDER_ID || '').trim();
+  return envFolder || null;
+}
+
+// Create a folder owned by the app (works with the drive.file scope) and save its ID to DB.
+async function createRootFolder(name = 'LBDP Notes de Frais') {
+  const drive = await getDriveClient();
+
+  const response = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+    },
+    fields: 'id, name, webViewLink',
+  });
+
+  const folderId = response.data.id;
+
+  await settingsPrisma.setting.upsert({
+    where: { key: 'DRIVE_ROOT_FOLDER_ID' },
+    update: { value: folderId },
+    create: { key: 'DRIVE_ROOT_FOLDER_ID', value: folderId },
+  });
+
+  cachedRootFolderId = folderId;
+  console.log(`[drive] Root folder created and saved: ${folderId}`);
+
+  return {
+    folderId,
+    name: response.data.name,
+    webViewLink: response.data.webViewLink,
+  };
 }
 
 async function getDriveClient() {
@@ -95,8 +145,9 @@ function isAuthError(err) {
 async function testConnection() {
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
-  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
-  const folderId = (process.env.DRIVE_ROOT_FOLDER_ID || '').trim();
+  const dbToken = await getRefreshTokenFromDb();
+  const refreshToken = dbToken || (process.env.GOOGLE_REFRESH_TOKEN || '').trim();
+  const folderId = await getRootFolderId();
 
   const status = {
     configured: false,
@@ -131,10 +182,12 @@ async function testConnection() {
         await drive.files.get({ fileId: folderId, fields: 'id,name' });
         status.folderAccessible = true;
       } catch (folderErr) {
-        status.error = `Dossier ${folderId} inaccessible: ${folderErr.message}`;
+        status.error = `Dossier inaccessible. Avec le scope actuel, l'app ne peut utiliser qu'un dossier qu'elle a créé elle-même. Cliquez sur « Créer le dossier ».`;
+        status.details.needsFolderCreation = true;
       }
     } else {
-      status.error = 'DRIVE_ROOT_FOLDER_ID non configuré';
+      status.error = 'Aucun dossier Drive configuré. Cliquez sur « Créer le dossier ».';
+      status.details.needsFolderCreation = true;
     }
   } catch (err) {
     resetDriveClient();
@@ -240,4 +293,4 @@ async function downloadDriveFile(fileId) {
   };
 }
 
-module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection, saveRefreshToken };
+module.exports = { uploadToDrive, updateDriveFile, deleteDriveFile, listDriveFiles, downloadDriveFile, resetDriveClient, isAuthError, testConnection, saveRefreshToken, getRootFolderId, createRootFolder };

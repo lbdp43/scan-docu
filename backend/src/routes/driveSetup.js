@@ -16,7 +16,7 @@ const express = require('express');
 const { google } = require('googleapis');
 const { PrismaClient } = require('@prisma/client');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
-const { resetDriveClient, saveRefreshToken } = require('../services/drive');
+const { resetDriveClient, saveRefreshToken, createRootFolder } = require('../services/drive');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -64,6 +64,18 @@ router.post('/set-token', authenticateToken, checkAdmin, async (req, res) => {
   } catch (err) {
     console.error('[drive-setup] set-token error:', err.message);
     res.status(400).json({ error: `Token invalide ou refusé par Google : ${err.message}` });
+  }
+});
+
+// POST /api/drive/create-folder — Create an app-owned root folder and save its ID (admin only)
+router.post('/create-folder', authenticateToken, checkAdmin, async (req, res) => {
+  const name = (req.body?.name || 'LBDP Notes de Frais').toString().trim() || 'LBDP Notes de Frais';
+  try {
+    const result = await createRootFolder(name);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[drive-setup] create-folder error:', err.message);
+    res.status(400).json({ error: `Impossible de créer le dossier : ${err.message}` });
   }
 });
 
