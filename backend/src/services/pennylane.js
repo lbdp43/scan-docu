@@ -192,14 +192,21 @@ function scoreTransactionMatch(expense, transaction) {
   const expenseAmount = Number(expense.amount);
   const txAmount = Math.abs(Number(transaction.amount || transaction.currency_amount || 0));
 
-  if (Math.abs(expenseAmount - txAmount) < 0.02) score += 20;
-  else if (Math.abs(expenseAmount - txAmount) < 0.10) score += 10;
+  // Amount is the strongest signal for transactions
+  if (Math.abs(expenseAmount - txAmount) < 0.02) score += 30;
+  else if (Math.abs(expenseAmount - txAmount) < 0.10) score += 15;
+  else return 0; // no point matching if amount is way off
 
   const expDate = new Date(expense.date_ticket).getTime();
   const txDate = new Date(transaction.date).getTime();
-  const daysDiff = Math.abs(expDate - txDate) / (1000 * 60 * 60 * 24);
-  if (daysDiff < 1) score += 10;
-  else if (daysDiff < 3) score += 5;
+  const daysDiff = (txDate - expDate) / (1000 * 60 * 60 * 24);
+  // Payment usually comes after the expense, allow up to 20 days
+  if (daysDiff >= -1 && daysDiff <= 20) {
+    if (daysDiff < 2) score += 10;
+    else if (daysDiff < 7) score += 7;
+    else if (daysDiff < 15) score += 4;
+    else score += 2;
+  }
 
   if (expense.merchant && transaction.label) {
     const merchant = expense.merchant.toLowerCase().replace(/[^a-z0-9\s]/g, '');
