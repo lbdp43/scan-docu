@@ -520,7 +520,7 @@ router.get('/missing', async (req, res) => {
         matched,
         matchScore: matched ? bestScore : null,
         card,
-        expense: matched ? {
+        expense: bestExpense ? {
           id: bestExpense.id,
           merchant: bestExpense.merchant,
           amount: Number(bestExpense.amount),

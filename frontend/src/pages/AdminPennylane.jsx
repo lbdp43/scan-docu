@@ -28,6 +28,7 @@ export default function AdminPennylane() {
   const [savingCard, setSavingCard] = useState(false);
   const [openCard, setOpenCard] = useState(null);
   const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState('');
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -224,10 +225,14 @@ export default function AdminPennylane() {
 
   function handleTabChange(tab) {
     setActiveTab(tab);
+    setSearch('');
     if (tab === 'invoices' && !invoices) loadInvoices();
     if (tab === 'transactions' && !transactions) loadTransactions();
     if (tab === 'missing' && !missing) loadMissing();
   }
+
+  const q = search.trim().toLowerCase();
+  const matchText = (...vals) => !q || vals.some((v) => String(v ?? '').toLowerCase().includes(q));
 
   if (loading) {
     return (
@@ -397,6 +402,25 @@ export default function AdminPennylane() {
             ))}
           </div>
 
+          {/* Barre de recherche (filtre l'onglet actif) */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim text-xs">{'🔍'}</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={
+                activeTab === 'missing' ? 'Rechercher : collaborateur, carte, marchand, montant…'
+                : activeTab === 'invoices' ? 'Rechercher : fichier, fournisseur, montant…'
+                : activeTab === 'transactions' ? 'Rechercher : libellé, montant…'
+                : 'Rechercher : marchand, type, montant…'
+              }
+              className="w-full bg-card border border-card-border rounded-xl pl-8 pr-8 py-2 text-text text-xs focus:outline-none focus:border-green-mid"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-xs">{'✕'}</button>
+            )}
+          </div>
+
           {/* Overview tab */}
           {activeTab === 'overview' && (
             <div className="space-y-4">
@@ -497,7 +521,7 @@ export default function AdminPennylane() {
 
                   {/* Detail list */}
                   <div className="space-y-2">
-                    {results.results.map((r, i) => (
+                    {results.results.filter(r => matchText(r.merchant, r.fileName, r.type, r.userName, Number(r.amount).toFixed(2))).map((r, i) => (
                       <div key={i} className={`p-3 rounded-xl border ${
                         r.status === 'matched' || r.status === 'already_reconciled' ? 'bg-green-500/5 border-green-500/20' :
                         r.status === 'error' ? 'bg-red-500/5 border-red-500/20' :
@@ -607,7 +631,12 @@ export default function AdminPennylane() {
                 ) : (
                   <div className="space-y-2">
                     <h4 className="text-text-muted text-[11px] uppercase tracking-widest">Par carte · collaborateur</h4>
-                    {missing.cards.map(card => {
+                    {missing.cards.filter(card => {
+                      const collab = users.find(u => u.id === card.userId);
+                      const cardTxs = (missing.transactions || []).filter(t => (t.card?.masked || null) === card.masked);
+                      return matchText(collab?.name, card.label, card.last4, card.employee)
+                        || cardTxs.some(t => matchText(t.label, Number(t.amount).toFixed(2)));
+                    }).map(card => {
                       const collab = users.find(u => u.id === card.userId);
                       const key = card.masked || 'unknown';
                       const isOpen = openCard === key;
@@ -717,7 +746,7 @@ export default function AdminPennylane() {
                 <>
                 <p className="text-text-dim text-[10px]">{(invoices.items || []).length} factures</p>
                 <div className="space-y-2">
-                  {(invoices.items || []).map(inv => (
+                  {(invoices.items || []).filter(inv => matchText(inv.filename, inv.label, inv.invoice_number, inv.supplier?.name, Number(inv.currency_amount || inv.amount || 0).toFixed(2))).map(inv => (
                     <button
                       key={inv.id}
                       onClick={() => handleViewInvoice(inv.id)}
@@ -779,7 +808,7 @@ export default function AdminPennylane() {
                       {(transactions.items || []).reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)} {'€'}
                     </span>
                   </div>
-                  {(transactions.items || []).map(tx => (
+                  {(transactions.items || []).filter(tx => matchText(tx.label, Number(tx.amount).toFixed(2))).map(tx => (
                     <div key={tx.id} className="p-3 rounded-xl bg-card border border-card-border">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0 mr-3">
