@@ -77,6 +77,8 @@ router.get('/missing', async (req, res) => {
       where: { date_ticket: { gte: new Date(fyStart) } },
       omit: { receipt_image: true },
     });
+    // ... ET aux factures Pennylane (un justificatif présent dans Pennylane compte aussi)
+    const invoices = await pennylane.getFiscalYearSupplierInvoices(year);
 
     const results = [];
     for (const tx of myTx) {
@@ -87,7 +89,7 @@ router.get('/missing', async (req, res) => {
         const s = matchScore(exp, txAmount, txDate);
         if (s > best) best = s;
       }
-      const matched = best >= 25;
+      const matched = best >= 25 || pennylane.justifiedByInvoice(invoices, txAmount, tx.date);
       const ci = pennylane.cardInfo(tx);
       results.push({
         transactionId: tx.id,

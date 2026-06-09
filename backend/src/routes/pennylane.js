@@ -441,6 +441,7 @@ router.get('/missing', async (req, res) => {
       include: { user: { select: { name: true, card_id: true } } },
     });
 
+    const invoices = await pennylane.getFiscalYearSupplierInvoices(year);
     const cardLabels = await pennylane.getCardLabels();
     const cardUsers = await pennylane.getCardUsers();
     const cardsMap = new Map(); // masked -> { masked, last4, employee, label, userId, total, matched, missing, amountMissing }
@@ -476,7 +477,7 @@ router.get('/missing', async (req, res) => {
         }
       }
 
-      const matched = bestScore >= 25;
+      const matched = bestScore >= 25 || pennylane.justifiedByInvoice(invoices, txAmount, tx.date);
 
       // Infos carte (compte pro) + intitulé éventuel
       const ci = pennylane.cardInfo(tx);

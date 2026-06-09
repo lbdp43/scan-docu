@@ -208,6 +208,40 @@ async function saveCardUser(masked, userId) {
   });
 }
 
+// Toutes les factures fournisseur de l'exercice (montant + date), pour savoir si un
+// paiement est justifié dans Pennylane (facture présente), au-delà des scans scan-docu.
+async function getFiscalYearSupplierInvoices(year) {
+  const from = `${year}-01-01`;
+  const to = `${year}-12-31`;
+  const filter = [
+    { field: 'date', operator: 'gteq', value: from },
+    { field: 'date', operator: 'lteq', value: to },
+  ];
+  let all = [];
+  let cursor;
+  do {
+    const b = await getSupplierInvoices({ filter, limit: 100, cursor });
+    all = all.concat(b.items);
+    cursor = b.has_more ? b.next_cursor : null;
+    if (cursor) await sleep(RATE_LIMIT_DELAY);
+  } while (cursor);
+  return all
+    .map((i) => ({ amount: Math.abs(Number(i.currency_amount || i.amount || 0)), date: i.date }))
+    .filter((i) => i.amount > 0 && i.date);
+}
+
+// Un paiement (montant, date) a-t-il une facture Pennylane correspondante ?
+// (montant au centime, facture datée de J-2 à J+25 par rapport au paiement)
+function justifiedByInvoice(invoices, txAmount, txDate) {
+  const td = new Date(txDate).getTime();
+  for (const inv of invoices) {
+    if (Math.abs(inv.amount - txAmount) > 0.01) continue;
+    const dd = (td - new Date(inv.date).getTime()) / 86400000;
+    if (dd >= -2 && dd <= 25) return true;
+  }
+  return false;
+}
+
 async function getMatchedTransactions(invoiceId) {
   return request('GET', `/supplier_invoices/${invoiceId}/matched_transactions`);
 }
@@ -340,6 +374,8 @@ module.exports = {
   saveCardLabel,
   getCardUsers,
   saveCardUser,
+  getFiscalYearSupplierInvoices,
+  justifiedByInvoice,
   getMatchedTransactions,
   matchTransaction,
   unmatchTransaction,

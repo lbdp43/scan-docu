@@ -79,6 +79,7 @@ async function sendMissingPush() {
     where: { date_ticket: { gte: new Date(fyStart) } },
     omit: { receipt_image: true },
   });
+  const invoices = await pennylane.getFiscalYearSupplierInvoices(year);
 
   const results = [];
   for (const uid of userIds) {
@@ -91,7 +92,9 @@ async function sendMissingPush() {
     let amount = 0;
     for (const tx of myTx) {
       const a = Math.abs(Number(tx.amount || tx.currency_amount || 0));
-      if (!isMatched(expenses, a, new Date(tx.date).getTime())) {
+      const justified = isMatched(expenses, a, new Date(tx.date).getTime())
+        || pennylane.justifiedByInvoice(invoices, a, tx.date);
+      if (!justified) {
         missing++;
         amount += a;
       }
