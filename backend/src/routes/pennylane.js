@@ -643,6 +643,7 @@ router.get('/stats', async (req, res) => {
       hasFile: !!(e.drive_file_url || e.file_name),
       fileUrl: e.drive_file_url || null,
       matched: !!e.pennylane_matched,
+      invoiceId: e.pennylane_invoice_id || null,
     }));
 
     const usersRows = await req.prisma.user.findMany({
@@ -674,6 +675,44 @@ router.get('/stats', async (req, res) => {
   } catch (err) {
     console.error('[pennylane] stats error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/pennylane/scan/:id/detail — pour un scan (dépense) : URL du PDF du
+// justificatif + transaction bancaire liée (via la facture Pennylane rapprochée).
+router.get('/scan/:id/detail', async (req, res) => {
+  try {
+    const exp = await req.prisma.expense.findUnique({
+      where: { id: parseInt(req.params.id, 10) },
+      select: { id: true, drive_file_url: true, pennylane_invoice_id: true },
+    });
+    if (!exp) return res.status(404).json({ error: 'Dépense introuvable' });
+
+    let pdfUrl = exp.drive_file_url || null;
+    let transaction = null;
+    const invId = exp.pennylane_invoice_id;
+    if (invId) {
+      try {
+        const inv = await pennylane.getSupplierInvoice(invId);
+        if (!pdfUrl) pdfUrl = inv.file_url || inv.document_url || inv.pdf_url || null;
+      } catch (e) { /* facture introuvable -> on garde le PDF Drive si dispo */ }
+      try {
+        const m = await pennylane.getMatchedTransactions(invId);
+        const t = (m?.items || [])[0];
+        if (t) {
+          transaction = {
+            id: t.id,
+            label: t.label,
+            amount: Math.abs(Number(t.amount || t.currency_amount || 0)),
+            date: t.date,
+          };
+        }
+      } catch (e) { /* pas de transaction liée */ }
+    }
+    res.json({ pdfUrl, invoiceId: invId || null, transaction });
+  } catch (err) {
+    console.error('[pennylane] scan detail error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

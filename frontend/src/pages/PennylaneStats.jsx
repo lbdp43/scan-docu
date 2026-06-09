@@ -18,6 +18,9 @@ export default function PennylaneStats({ toast }) {
   const [fCat, setFCat] = useState('');
   const [fVeh, setFVeh] = useState('');
   const [showScans, setShowScans] = useState(false);
+  const [showTx, setShowTx] = useState(false);
+  const [txLimit, setTxLimit] = useState(30);
+  const [scanDetail, setScanDetail] = useState({}); // { [scanId]: { loading, pdfUrl, transaction } }
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -35,6 +38,26 @@ export default function PennylaneStats({ toast }) {
       toast?.({ message: 'Erreur stats : ' + e.message, type: 'error' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Dès qu'un filtre est actif, on déplie la liste des transactions liées
+  useEffect(() => {
+    if (fUser || fCard || fCat || fVeh) setShowTx(true);
+    setTxLimit(30);
+  }, [fUser, fCard, fCat, fVeh]);
+
+  async function loadScanDetail(id) {
+    if (scanDetail[id]?.loading || scanDetail[id]?.loaded) {
+      setScanDetail(sd => ({ ...sd, [id]: { ...sd[id], open: !sd[id].open } }));
+      return;
+    }
+    setScanDetail(sd => ({ ...sd, [id]: { loading: true, open: true } }));
+    try {
+      const d = await api.getPennylaneScanDetail(id);
+      setScanDetail(sd => ({ ...sd, [id]: { ...d, loaded: true, open: true } }));
+    } catch (e) {
+      setScanDetail(sd => ({ ...sd, [id]: { error: e.message, loaded: true, open: true } }));
     }
   }
 
@@ -194,6 +217,51 @@ export default function PennylaneStats({ toast }) {
         </div>
       </div>
 
+      {/* Transactions liées (selon les filtres) */}
+      <div className="rounded-3xl bg-card border border-card-border overflow-hidden">
+        <button onClick={() => setShowTx(s => !s)} className="w-full flex items-center justify-between p-5">
+          <p className="text-text-muted text-[10px] uppercase tracking-widest">
+            Transactions {(fUser || fCard || fCat || fVeh) ? 'filtrées' : ''} ({txs.length})
+          </p>
+          <span className="text-text-muted text-xs">{showTx ? '▲' : '▼'}</span>
+        </button>
+        {showTx && (
+          <div className="border-t border-card-border divide-y divide-card-border/40">
+            {txs.length === 0 && <p className="text-text-dim text-xs text-center py-6">Aucune transaction</p>}
+            {[...txs]
+              .sort((a, b) => (a.date < b.date ? 1 : -1))
+              .slice(0, txLimit)
+              .map(t => (
+                <div key={t.id} className="px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-text text-xs font-medium truncate">{t.label || 'Transaction'}</p>
+                      <p className="text-text-muted text-[10px]">
+                        {new Date(t.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+                        {t.cardLabel || t.last4 ? ` · ${t.cardLabel || `•••• ${t.last4}`}` : ''}
+                        {t.userId ? ` · ${userName(t.userId)}` : ''}
+                      </p>
+                    </div>
+                    <p className="font-serif text-sm font-semibold text-text shrink-0">-{eur(t.amount)}</p>
+                  </div>
+                  {(t.nature || t.vehicle) && (
+                    <div className="flex gap-1.5 mt-1">
+                      {t.nature && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-mid/15 text-green-light">{t.nature}</span>}
+                      {t.vehicle && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">{'🚐'} {t.vehicle}</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            {txs.length > txLimit && (
+              <button onClick={() => setTxLimit(l => l + 50)}
+                className="w-full py-2.5 text-green-light text-xs font-medium">
+                Afficher plus ({txs.length - txLimit} restantes)
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Par catégorie */}
       <div className="p-5 rounded-3xl bg-card border border-card-border">
         <p className="text-text-muted text-[10px] uppercase tracking-widest mb-4">Par catégorie</p>
@@ -221,28 +289,64 @@ export default function PennylaneStats({ toast }) {
         {showScans && (
           <div className="border-t border-card-border divide-y divide-card-border/40 max-h-[420px] overflow-y-auto">
             {scans.length === 0 && <p className="text-text-dim text-xs text-center py-6">Aucun scan</p>}
-            {scans.map(s => (
-              <div key={s.id} className="px-4 py-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-text text-xs font-medium truncate">{s.merchant || 'Sans marchand'}</p>
-                    <p className="text-text-muted text-[10px]">
-                      {new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
-                      {' · '}{s.type}{' · '}{s.userName || '?'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${s.matched ? 'bg-green-mid/20 text-green-light' : 'bg-white/5 text-text-dim'}`}>
-                      {s.matched ? 'rapproché' : 'non rapproché'}
-                    </span>
-                    <span className="font-serif text-sm font-semibold text-text">{eur(s.amount)}</span>
-                    {s.fileUrl && (
-                      <a href={s.fileUrl} target="_blank" rel="noopener noreferrer" className="text-green-light text-xs">{'📎'}</a>
-                    )}
-                  </div>
+            {scans.map(s => {
+              const det = scanDetail[s.id];
+              return (
+                <div key={s.id} className="px-4 py-2.5">
+                  <button onClick={() => loadScanDetail(s.id)} className="w-full text-left">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-text text-xs font-medium truncate">{s.merchant || 'Sans marchand'}</p>
+                        <p className="text-text-muted text-[10px]">
+                          {new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+                          {' · '}{s.type}{' · '}{s.userName || '?'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${s.matched ? 'bg-green-mid/20 text-green-light' : 'bg-white/5 text-text-dim'}`}>
+                          {s.matched ? 'rapproché' : 'non rapproché'}
+                        </span>
+                        <span className="font-serif text-sm font-semibold text-text">{eur(s.amount)}</span>
+                        <span className="text-text-dim text-[10px]">{det?.open ? '▲' : '▼'}</span>
+                      </div>
+                    </div>
+                  </button>
+                  {det?.open && (
+                    <div className="mt-2 p-2.5 rounded-xl bg-bg border border-card-border/60 space-y-1.5">
+                      {det.loading && <p className="text-text-dim text-[10px]">Chargement…</p>}
+                      {det.error && <p className="text-red-400 text-[10px]">Erreur : {det.error}</p>}
+                      {det.loaded && !det.error && (
+                        <>
+                          {det.transaction ? (
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-text-muted text-[9px] uppercase tracking-widest">Transaction liée</p>
+                                <p className="text-text text-[11px] truncate">{det.transaction.label || 'Transaction'}</p>
+                                <p className="text-text-muted text-[10px]">
+                                  {new Date(det.transaction.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+                                </p>
+                              </div>
+                              <p className="font-serif text-sm font-semibold text-green-light shrink-0">-{eur(det.transaction.amount)}</p>
+                            </div>
+                          ) : (
+                            <p className="text-text-dim text-[10px]">Pas encore de transaction bancaire liée</p>
+                          )}
+                          <div className="flex gap-2 pt-1">
+                            {(det.pdfUrl || s.fileUrl) && (
+                              <a href={det.pdfUrl || s.fileUrl} target="_blank" rel="noopener noreferrer"
+                                className="flex-1 text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">
+                                {'📄'} Voir le justificatif
+                              </a>
+                            )}
+                            {!det.pdfUrl && !s.fileUrl && <p className="text-text-dim text-[10px]">Pas de PDF disponible</p>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

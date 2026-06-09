@@ -213,6 +213,8 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/pennylane/stats${qs ? `?${qs}` : ''}`);
   },
+  getPennylaneScanDetail: (id) =>
+    request(`/pennylane/scan/${id}/detail`),
   savePennylaneCardVehicle: (masked, categoryId) =>
     request('/pennylane/card-vehicle', { method: 'POST', body: JSON.stringify({ masked, categoryId }) }),
 
