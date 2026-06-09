@@ -442,7 +442,8 @@ router.get('/missing', async (req, res) => {
     });
 
     const cardLabels = await pennylane.getCardLabels();
-    const cardsMap = new Map(); // masked -> { masked, last4, employee, label, total, matched, missing, amountMissing }
+    const cardUsers = await pennylane.getCardUsers();
+    const cardsMap = new Map(); // masked -> { masked, last4, employee, label, userId, total, matched, missing, amountMissing }
 
     const results = [];
     for (const tx of expenseTransactions) {
@@ -494,6 +495,7 @@ router.get('/missing', async (req, res) => {
           last4: ci.last4,
           employee: ci.employee,
           label: card.label,
+          userId: ci.masked ? (cardUsers[ci.masked] || null) : null,
           total: 0,
           matched: 0,
           missing: 0,
@@ -621,6 +623,19 @@ router.post('/card-label', async (req, res) => {
     res.json({ success: true, masked: masked.trim(), label: (label || '').trim() || null });
   } catch (err) {
     console.error('[pennylane] card-label error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/pennylane/card-user — Attribuer une carte à un collaborateur ({ masked, userId })
+router.post('/card-user', async (req, res) => {
+  try {
+    const { masked, userId } = req.body;
+    if (!masked?.trim()) return res.status(400).json({ error: 'masked requis' });
+    await pennylane.saveCardUser(masked.trim(), userId || null);
+    res.json({ success: true, masked: masked.trim(), userId: userId ? parseInt(userId, 10) : null });
+  } catch (err) {
+    console.error('[pennylane] card-user error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

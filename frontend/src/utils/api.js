@@ -205,4 +205,10 @@ export const api = {
     request(`/pennylane/unmatch/${id}`, { method: 'POST', body: JSON.stringify({ transactionId }) }),
   savePennylaneCardLabel: (masked, label) =>
     request('/pennylane/card-label', { method: 'POST', body: JSON.stringify({ masked, label }) }),
+  savePennylaneCardUser: (masked, userId) =>
+    request('/pennylane/card-user', { method: 'POST', body: JSON.stringify({ masked, userId }) }),
+
+  // Vue collaborateur — mes paiements à justifier
+  getMyMissingPayments: () =>
+    request('/my-payments/missing'),
 };

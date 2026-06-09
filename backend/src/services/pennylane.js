@@ -172,6 +172,42 @@ async function saveCardLabel(masked, label) {
   });
 }
 
+// --- Attribution carte -> collaborateur (Setting, clé "card_user:<masked>" -> userId) ---
+const CARD_USER_PREFIX = 'card_user:';
+
+// Retourne un map { masked_number: userId(Int) }.
+async function getCardUsers() {
+  try {
+    const rows = await settingsPrisma.setting.findMany({
+      where: { key: { startsWith: CARD_USER_PREFIX } },
+    });
+    const map = {};
+    for (const r of rows) {
+      const uid = parseInt(r.value, 10);
+      if (!Number.isNaN(uid)) map[r.key.slice(CARD_USER_PREFIX.length)] = uid;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// Attribue une carte à un collaborateur (userId falsy => retire l'attribution).
+async function saveCardUser(masked, userId) {
+  if (!masked) throw new Error('masked requis');
+  const key = CARD_USER_PREFIX + masked;
+  if (!userId) {
+    await settingsPrisma.setting.deleteMany({ where: { key } });
+    return;
+  }
+  const value = String(parseInt(userId, 10));
+  await settingsPrisma.setting.upsert({
+    where: { key },
+    update: { value },
+    create: { key, value },
+  });
+}
+
 async function getMatchedTransactions(invoiceId) {
   return request('GET', `/supplier_invoices/${invoiceId}/matched_transactions`);
 }
@@ -302,6 +338,8 @@ module.exports = {
   cardInfo,
   getCardLabels,
   saveCardLabel,
+  getCardUsers,
+  saveCardUser,
   getMatchedTransactions,
   matchTransaction,
   unmatchTransaction,

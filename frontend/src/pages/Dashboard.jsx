@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [toast, setToast] = useState(null);
   const [pendingExpenses, setPendingExpenses] = useState([]);
+  const [myMissing, setMyMissing] = useState(null);
   const loadedRef = useRef(false);
 
   const loadData = useCallback(async () => {
@@ -77,6 +78,8 @@ export default function Dashboard() {
     loadedRef.current = true;
     loadData();
     loadPending();
+    // Paiements carte sans justificatif (chargé à part — appel Pennylane plus lent)
+    api.getMyMissingPayments().then(setMyMissing).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -153,6 +156,40 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Mes paiements à justifier (notification in-app) */}
+      {myMissing?.summary?.missing > 0 && (
+        <div className="rounded-3xl p-5 bg-amber-500/10 border border-amber-500/30 animate-fade-up">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 flex items-center justify-center text-xl shrink-0">{'⚠️'}</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-amber-300 font-semibold text-sm">
+                {myMissing.summary.missing} paiement{myMissing.summary.missing > 1 ? 's' : ''} à justifier
+              </p>
+              <p className="text-text-muted text-xs">
+                {Number(myMissing.summary.amountMissing).toFixed(2)} {'€'} {'·'} scanne le justificatif
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {myMissing.transactions.slice(0, 30).map(tx => (
+              <div key={tx.transactionId} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-bg/40">
+                <div className="min-w-0">
+                  <p className="text-text text-xs font-medium truncate">{tx.label || 'Paiement carte'}</p>
+                  <p className="text-text-muted text-[10px]">
+                    {new Date(tx.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    {tx.card?.label ? ` · ${tx.card.label}` : (tx.card?.last4 ? ` · •••• ${tx.card.last4}` : '')}
+                  </p>
+                </div>
+                <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{Number(tx.amount).toFixed(2)}{'€'}</p>
+              </div>
+            ))}
+          </div>
+          <Link viewTransition to="/" className="mt-3 block text-center py-2.5 rounded-2xl bg-amber-500/20 text-amber-200 font-medium text-xs transition-transform active:scale-[0.97]">
+            Scanner un justificatif
+          </Link>
+        </div>
+      )}
 
       {/* Hero Card — Monthly Total */}
       <div className="relative overflow-hidden rounded-4xl p-7"
