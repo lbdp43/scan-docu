@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
+import PennylaneStats from './PennylaneStats';
 
 export default function AdminPennylane() {
   const [toast, setToast] = useState(null);
@@ -408,10 +409,11 @@ export default function AdminPennylane() {
           {/* Tabs */}
           <div className="flex gap-1 bg-card rounded-2xl p-1">
             {[
-              { id: 'overview', label: 'Rapprochement' },
+              { id: 'overview', label: 'Rappro.' },
               { id: 'missing', label: 'Manquants' },
+              { id: 'stats', label: 'Stats' },
               { id: 'invoices', label: 'Factures' },
-              { id: 'transactions', label: 'Transactions' },
+              { id: 'transactions', label: 'Transac.' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -427,24 +429,29 @@ export default function AdminPennylane() {
             ))}
           </div>
 
-          {/* Barre de recherche (filtre l'onglet actif) */}
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim text-xs">{'🔍'}</span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={
-                activeTab === 'missing' ? 'Rechercher : collaborateur, carte, marchand, montant…'
-                : activeTab === 'invoices' ? 'Rechercher : fichier, fournisseur, montant…'
-                : activeTab === 'transactions' ? 'Rechercher : libellé, montant…'
-                : 'Rechercher : marchand, type, montant…'
-              }
-              className="w-full bg-card border border-card-border rounded-xl pl-8 pr-8 py-2 text-text text-xs focus:outline-none focus:border-green-mid"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-xs">{'✕'}</button>
-            )}
-          </div>
+          {/* Barre de recherche (filtre l'onglet actif) — sauf Stats qui a ses propres filtres */}
+          {activeTab !== 'stats' && (
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim text-xs">{'🔍'}</span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={
+                  activeTab === 'missing' ? 'Rechercher : collaborateur, carte, marchand, montant…'
+                  : activeTab === 'invoices' ? 'Rechercher : fichier, fournisseur, montant…'
+                  : activeTab === 'transactions' ? 'Rechercher : libellé, montant…'
+                  : 'Rechercher : marchand, type, montant…'
+                }
+                className="w-full bg-card border border-card-border rounded-xl pl-8 pr-8 py-2 text-text text-xs focus:outline-none focus:border-green-mid"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-xs">{'✕'}</button>
+              )}
+            </div>
+          )}
+
+          {/* Stats tab */}
+          {activeTab === 'stats' && <PennylaneStats toast={setToast} />}
 
           {/* Overview tab */}
           {activeTab === 'overview' && (

@@ -565,4 +565,116 @@ router.post('/card-vehicle', async (req, res) => {
   }
 });
 
+// GET /api/pennylane/stats — données enrichies de l'exercice pour le tableau de bord analytique.
+// Le front filtre/agrège côté client (collaborateur, carte, catégorie, véhicule).
+// ?year=<annéeDébut> sélectionne l'exercice (défaut = exercice courant, clôture 30 juin).
+router.get('/stats', async (req, res) => {
+  try {
+    const token = await pennylane.getToken();
+    if (!token) return res.json({ connected: false });
+
+    const now = new Date();
+    const curStart = (now.getUTCMonth() + 1) >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+    const startYear = parseInt(req.query.year, 10) || curStart;
+    const from = `${startYear}-07-01`;
+    const to = `${startYear + 1}-06-30`;
+    const availableYears = [curStart, curStart - 1, curStart - 2];
+
+    const filter = [
+      { field: 'date', operator: 'gteq', value: from },
+      { field: 'date', operator: 'lteq', value: to },
+    ];
+    const bankId = await pennylane.getSavedBankAccountId();
+    if (bankId) filter.push({ field: 'bank_account_id', operator: 'eq', value: bankId });
+
+    let allTx = [];
+    let cursor;
+    do {
+      const b = await pennylane.getTransactions({ filter, limit: 100, cursor });
+      allTx = allTx.concat(b.items);
+      cursor = b.has_more ? b.next_cursor : null;
+      if (cursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
+    } while (cursor);
+    const expenseTx = allTx.filter((t) => Number(t.amount || t.currency_amount) < 0);
+
+    const cardLabels = await pennylane.getCardLabels();
+    const cardUsers = await pennylane.getCardUsers();
+    const cardVehicles = await pennylane.getCardVehicles();
+    const vehById = Object.fromEntries(VEHICLE_CATEGORIES.map((v) => [v.id, v.label]));
+    const vehIds = VEHICLE_CATEGORIES.map((v) => v.id);
+
+    const transactions = expenseTx.map((t) => {
+      const ci = pennylane.cardInfo(t);
+      const cats = t.categories || [];
+      const vehFromCat = cats.map((c) => vehById[c.id]).find(Boolean);
+      const vehicle = vehFromCat
+        || (ci.masked && cardVehicles[ci.masked] ? vehById[cardVehicles[ci.masked]] : null)
+        || null;
+      const natureCat = cats.find((c) => !vehIds.includes(c.id));
+      return {
+        id: t.id,
+        amount: Math.abs(Number(t.amount || t.currency_amount || 0)),
+        date: t.date,
+        label: t.label,
+        masked: ci.masked,
+        last4: ci.last4,
+        cardLabel: ci.masked ? (cardLabels[ci.masked] || null) : null,
+        userId: ci.masked ? (cardUsers[ci.masked] || null) : null,
+        vehicle,
+        nature: natureCat ? natureCat.label : null,
+        categories: cats.map((c) => c.label),
+      };
+    });
+
+    const expRows = await req.prisma.expense.findMany({
+      where: { date_ticket: { gte: new Date(from), lte: new Date(to) } },
+      omit: { receipt_image: true },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: { date_ticket: 'desc' },
+    });
+    const scans = expRows.map((e) => ({
+      id: e.id,
+      date: e.date_ticket,
+      amount: Number(e.amount),
+      merchant: e.merchant,
+      type: e.type,
+      userId: e.user_id,
+      userName: e.user?.name || null,
+      hasFile: !!(e.drive_file_url || e.file_name),
+      fileUrl: e.drive_file_url || null,
+      matched: !!e.pennylane_matched,
+    }));
+
+    const usersRows = await req.prisma.user.findMany({
+      where: { is_active: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const cardsMap = new Map();
+    for (const t of transactions) {
+      if (t.masked && !cardsMap.has(t.masked)) {
+        cardsMap.set(t.masked, { masked: t.masked, last4: t.last4, label: t.cardLabel, userId: t.userId, vehicle: t.vehicle });
+      }
+    }
+    const categories = [...new Set(transactions.map((t) => t.nature).filter(Boolean))].sort();
+    const vehicles = [...new Set(transactions.map((t) => t.vehicle).filter(Boolean))].sort();
+
+    res.json({
+      connected: true,
+      fiscalYear: { from, to, label: `${startYear}-${startYear + 1}`, startYear },
+      availableYears,
+      transactions,
+      scans,
+      cards: [...cardsMap.values()],
+      users: usersRows,
+      categories,
+      vehicles,
+    });
+  } catch (err) {
+    console.error('[pennylane] stats error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

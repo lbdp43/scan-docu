@@ -209,6 +209,10 @@ export const api = {
     request('/pennylane/card-user', { method: 'POST', body: JSON.stringify({ masked, userId }) }),
   getPennylaneVehicles: () =>
     request('/pennylane/vehicles'),
+  getPennylaneStats: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/pennylane/stats${qs ? `?${qs}` : ''}`);
+  },
   savePennylaneCardVehicle: (masked, categoryId) =>
     request('/pennylane/card-vehicle', { method: 'POST', body: JSON.stringify({ masked, categoryId }) }),
 
