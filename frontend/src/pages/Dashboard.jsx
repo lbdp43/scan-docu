@@ -171,23 +171,33 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="space-y-1.5 max-h-64 overflow-y-auto">
-            {myMissing.transactions.slice(0, 30).map(tx => (
-              <div key={tx.transactionId} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-bg/40">
-                <div className="min-w-0">
-                  <p className="text-text text-xs font-medium truncate">{tx.label || 'Paiement carte'}</p>
-                  <p className="text-text-muted text-[10px]">
-                    {new Date(tx.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                    {tx.card?.label ? ` · ${tx.card.label}` : (tx.card?.last4 ? ` · •••• ${tx.card.last4}` : '')}
-                  </p>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {myMissing.transactions.slice(0, 30).map(tx => {
+              const manualUrl = `/manual?amount=${encodeURIComponent(Number(tx.amount).toFixed(2))}&date=${encodeURIComponent(tx.date)}&merchant=${encodeURIComponent(tx.label || '')}`;
+              return (
+                <div key={tx.transactionId} className="p-2.5 rounded-xl bg-bg/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-text text-xs font-medium truncate">{tx.label || 'Paiement carte'}</p>
+                      <p className="text-text-muted text-[10px]">
+                        {new Date(tx.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                        {tx.card?.label ? ` · ${tx.card.label}` : (tx.card?.last4 ? ` · •••• ${tx.card.last4}` : '')}
+                      </p>
+                    </div>
+                    <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{Number(tx.amount).toFixed(2)}{'€'}</p>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Link viewTransition to="/" className="flex-1 text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[11px] font-medium transition-transform active:scale-[0.96]">
+                      {'📷'} Scanner
+                    </Link>
+                    <Link viewTransition to={manualUrl} className="flex-1 text-center py-1.5 rounded-lg bg-card border border-card-border text-text-muted text-[11px] font-medium transition-transform active:scale-[0.96]">
+                      {'✍️'} Saisie
+                    </Link>
+                  </div>
                 </div>
-                <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{Number(tx.amount).toFixed(2)}{'€'}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          <Link viewTransition to="/" className="mt-3 block text-center py-2.5 rounded-2xl bg-amber-500/20 text-amber-200 font-medium text-xs transition-transform active:scale-[0.97]">
-            Scanner un justificatif
-          </Link>
         </div>
       )}
 

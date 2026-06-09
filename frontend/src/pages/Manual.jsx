@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
@@ -46,10 +46,17 @@ export default function Manual() {
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [amount, setAmount] = useState('');
-  const [dateTicket, setDateTicket] = useState(new Date().toISOString().slice(0, 10));
+  // Pré-remplissage depuis un paiement à justifier (lien depuis l'accueil / l'admin)
+  const [searchParams] = useSearchParams();
+  const prefillAmount = searchParams.get('amount') || '';
+  const prefillDate = searchParams.get('date') || '';
+  const prefillMerchant = searchParams.get('merchant') || '';
+  const fromMissing = Boolean(prefillAmount || prefillDate || prefillMerchant);
+
+  const [amount, setAmount] = useState(prefillAmount);
+  const [dateTicket, setDateTicket] = useState(prefillDate || new Date().toISOString().slice(0, 10));
   const [type, setType] = useState('autre');
-  const [merchant, setMerchant] = useState('');
+  const [merchant, setMerchant] = useState(prefillMerchant.slice(0, 100));
   const [description, setDescription] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
 
@@ -170,6 +177,8 @@ export default function Manual() {
 
   const today = new Date().toISOString().slice(0, 10);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Si on justifie un paiement plus ancien, on autorise sa date
+  const dateMin = (prefillDate && prefillDate < thirtyDaysAgo) ? prefillDate : thirtyDaysAgo;
 
   return (
     <div className="space-y-6">
@@ -179,6 +188,12 @@ export default function Manual() {
         <h1 className="font-serif text-xl font-semibold">Saisie manuelle</h1>
         <p className="text-text-muted text-sm mt-1">Avec ou sans justificatif photo</p>
       </div>
+
+      {fromMissing && (
+        <div className="p-3 rounded-2xl bg-green-mid/10 border border-green-mid/30 text-xs text-green-light">
+          Justificatif d'un paiement carte{prefillAmount ? ` de ${Number(prefillAmount).toFixed(2)} €` : ''}{prefillDate ? ` du ${new Date(prefillDate).toLocaleDateString('fr-FR')}` : ''}. Vérifie/complète puis enregistre.
+        </div>
+      )}
 
       {!photoFile && (
         <div className="p-3 rounded-2xl bg-amber-900/20 border border-amber-500/20 text-xs text-amber-300">
@@ -252,7 +267,7 @@ export default function Manual() {
             type="date"
             value={dateTicket}
             onChange={(e) => setDateTicket(e.target.value)}
-            min={thirtyDaysAgo}
+            min={dateMin}
             max={today}
             required
             className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid [color-scheme:dark]"
