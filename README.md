@@ -35,6 +35,14 @@ normalement.
 
 ### Note de déploiement
 
-Le projet n'utilise pas de migrations Prisma versionnées : le schéma est synchronisé au
-démarrage via `prisma db push` (additif, non destructif). La table `card_mappings` est
-donc créée automatiquement au prochain déploiement.
+⚠️ La base de production a divergé du `schema.prisma` versionné (colonnes/tables
+supplémentaires : `pennylane_invoice_id`, `pennylane_matched`, `receipt_image`,
+`expense_types`, `settings`…). On **n'utilise donc PAS** `prisma db push`/`migrate`
+au démarrage (ils voudraient supprimer ces données et font échouer le boot).
+
+La seule table ajoutée par cette feature, `card_mappings`, est créée de façon
+**idempotente et non destructive** au démarrage via
+`backend/prisma/ensure-card-mappings.js` (`CREATE TABLE IF NOT EXISTS`).
+
+> TODO (dette technique, hors scope) : resynchroniser `schema.prisma` avec la base
+> réelle (`prisma db pull`) pour retrouver un workflow de migrations propre.

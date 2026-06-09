@@ -1,1 +1,1 @@
-web: cd backend && npx prisma db push --skip-generate && node src/index.js
+web: cd backend && node prisma/ensure-card-mappings.js && node src/index.js
