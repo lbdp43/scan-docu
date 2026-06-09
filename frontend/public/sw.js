@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lbdp-frais-v2';
+const CACHE_NAME = 'lbdp-frais-v3';
 
 // Install: cache the app shell (index + manifest)
 // Vite-built assets will be cached on first fetch (runtime caching)
@@ -97,4 +97,41 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// Push notifications: affiche la notif des paiements à justifier
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'La Brasserie des Plantes';
+  const options = {
+    body: data.body || 'Vous avez des paiements à justifier',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || 'lbdp-missing',
+    renotify: true,
+    data: { url: data.url || '/dashboard' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Clic sur la notif : ouvre / focus l'app sur la page voulue
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/dashboard';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          if (client.navigate) client.navigate(url);
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
 });

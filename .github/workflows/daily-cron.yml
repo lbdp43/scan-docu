@@ -1,0 +1,22 @@
+name: Rapprochement + rappels quotidiens
+
+# Rapprochement Pennylane (compta) + push des paiements à justifier.
+on:
+  schedule:
+    - cron: "0 6 * * *" # 6h UTC (~7-8h Paris) chaque jour
+  workflow_dispatch: {} # déclenchement manuel possible
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déclencher le cron quotidien
+        run: |
+          echo "POST ${APP_URL}/api/cron/daily"
+          curl -fsS -X POST "${APP_URL}/api/cron/daily" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 | head -c 2000
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

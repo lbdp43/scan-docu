@@ -211,4 +211,14 @@ export const api = {
   // Vue collaborateur — mes paiements à justifier
   getMyMissingPayments: () =>
     request('/my-payments/missing'),
+
+  // Push notifications
+  getPushPublicKey: () =>
+    request('/push/public-key'),
+  getPushStatus: () =>
+    request('/push/status'),
+  subscribePush: (subscription) =>
+    request('/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription }) }),
+  unsubscribePush: (endpoint) =>
+    request('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
 };

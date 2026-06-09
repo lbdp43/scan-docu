@@ -16,6 +16,8 @@ const driveSetupRoutes = require('./routes/driveSetup');
 const expenseTypesRoutes = require('./routes/expenseTypes');
 const pennylaneRoutes = require('./routes/pennylane');
 const myPaymentsRoutes = require('./routes/myPayments');
+const pushRoutes = require('./routes/push');
+const cronRoutes = require('./routes/cron');
 const { warmupWorker } = require('./services/ocr');
 
 const prisma = new PrismaClient();
@@ -92,6 +94,8 @@ app.use('/api/drive', driveSetupRoutes);
 app.use('/api/expense-types', expenseTypesRoutes);
 app.use('/api/pennylane', pennylaneRoutes);
 app.use('/api/my-payments', myPaymentsRoutes);
+app.use('/api/push', pushRoutes);
+app.use('/api/cron', cronRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

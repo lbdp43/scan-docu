@@ -8,6 +8,7 @@ import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 import TypeIcon from '../components/TypeIcon';
 import usePullToRefresh from '../hooks/usePullToRefresh.jsx';
+import { getPushState, enablePush } from '../utils/push';
 
 const CACHE_KEY = 'dash_v2';
 const CACHE_TTL = 3 * 60 * 1000;
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const [toast, setToast] = useState(null);
   const [pendingExpenses, setPendingExpenses] = useState([]);
   const [myMissing, setMyMissing] = useState(null);
+  const [pushState, setPushState] = useState(null);
   const loadedRef = useRef(false);
 
   const loadData = useCallback(async () => {
@@ -80,7 +82,18 @@ export default function Dashboard() {
     loadPending();
     // Paiements carte sans justificatif (chargé à part — appel Pennylane plus lent)
     api.getMyMissingPayments().then(setMyMissing).catch(() => {});
+    getPushState().then(setPushState).catch(() => {});
   }, []);
+
+  async function handleEnablePush() {
+    try {
+      await enablePush();
+      setPushState((s) => ({ ...(s || {}), configured: true, subscribed: true }));
+      setToast({ message: 'Rappels activés 🔔', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur', type: 'error' });
+    }
+  }
 
   useEffect(() => {
     loadPending();
@@ -198,6 +211,14 @@ export default function Dashboard() {
               );
             })}
           </div>
+          {pushState?.configured && !pushState?.subscribed && (
+            <button
+              onClick={handleEnablePush}
+              className="mt-3 block w-full text-center py-2.5 rounded-2xl bg-amber-500/20 text-amber-200 font-medium text-xs transition-transform active:scale-[0.97]"
+            >
+              {'🔔'} Activer les rappels sur ce téléphone
+            </button>
+          )}
         </div>
       )}
 
