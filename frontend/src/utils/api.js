@@ -203,4 +203,6 @@ export const api = {
     request('/pennylane/match', { method: 'POST', body: JSON.stringify({ expenseId, invoiceId, transactionId }) }),
   pennylaneUnmatch: (id, transactionId) =>
     request(`/pennylane/unmatch/${id}`, { method: 'POST', body: JSON.stringify({ transactionId }) }),
+  savePennylaneCardLabel: (masked, label) =>
+    request('/pennylane/card-label', { method: 'POST', body: JSON.stringify({ masked, label }) }),
 };

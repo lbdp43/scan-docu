@@ -441,6 +441,9 @@ router.get('/missing', async (req, res) => {
       include: { user: { select: { name: true, card_id: true } } },
     });
 
+    const cardLabels = await pennylane.getCardLabels();
+    const cardsMap = new Map(); // masked -> { masked, last4, employee, label, total, matched, missing, amountMissing }
+
     const results = [];
     for (const tx of expenseTransactions) {
       const txAmount = Math.abs(Number(tx.amount || tx.currency_amount || 0));
@@ -473,6 +476,39 @@ router.get('/missing', async (req, res) => {
       }
 
       const matched = bestScore >= 25;
+
+      // Infos carte (compte pro) + intitulé éventuel
+      const ci = pennylane.cardInfo(tx);
+      const card = {
+        masked: ci.masked,
+        last4: ci.last4,
+        employee: ci.employee,
+        label: ci.masked ? (cardLabels[ci.masked] || null) : null,
+      };
+
+      // Agrégation par carte
+      const key = ci.masked || 'unknown';
+      if (!cardsMap.has(key)) {
+        cardsMap.set(key, {
+          masked: ci.masked,
+          last4: ci.last4,
+          employee: ci.employee,
+          label: card.label,
+          total: 0,
+          matched: 0,
+          missing: 0,
+          amountMissing: 0,
+        });
+      }
+      const bucket = cardsMap.get(key);
+      bucket.total += 1;
+      if (matched) {
+        bucket.matched += 1;
+      } else {
+        bucket.missing += 1;
+        bucket.amountMissing = +(bucket.amountMissing + txAmount).toFixed(2);
+      }
+
       results.push({
         transactionId: tx.id,
         label: tx.label,
@@ -480,6 +516,7 @@ router.get('/missing', async (req, res) => {
         date: tx.date,
         matched,
         matchScore: matched ? bestScore : null,
+        card,
         expense: matched ? {
           id: bestExpense.id,
           merchant: bestExpense.merchant,
@@ -494,9 +531,11 @@ router.get('/missing', async (req, res) => {
 
     const unmatched = results.filter(r => !r.matched);
     const matchedCount = results.filter(r => r.matched).length;
+    const cards = [...cardsMap.values()].sort((a, b) => b.missing - a.missing);
 
     res.json({
       transactions: unmatched,
+      cards,
       summary: {
         totalBankTransactions: expenseTransactions.length,
         matched: matchedCount,
@@ -559,6 +598,30 @@ router.post('/unmatch/:id', async (req, res) => {
   } catch (err) {
     console.error('[pennylane] unmatch error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/pennylane/card-labels — Map des intitulés de cartes enregistrés
+router.get('/card-labels', async (req, res) => {
+  try {
+    const labels = await pennylane.getCardLabels();
+    res.json({ labels });
+  } catch (err) {
+    console.error('[pennylane] card-labels error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/pennylane/card-label — Nommer une carte ({ masked, label })
+router.post('/card-label', async (req, res) => {
+  try {
+    const { masked, label } = req.body;
+    if (!masked?.trim()) return res.status(400).json({ error: 'masked requis' });
+    await pennylane.saveCardLabel(masked.trim(), label);
+    res.json({ success: true, masked: masked.trim(), label: (label || '').trim() || null });
+  } catch (err) {
+    console.error('[pennylane] card-label error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

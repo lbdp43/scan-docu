@@ -130,6 +130,48 @@ async function saveBankAccountId(id) {
   });
 }
 
+// --- Intitulés de cartes (stockés dans la table Setting, clé "card_label:<masked>") ---
+const CARD_LABEL_PREFIX = 'card_label:';
+
+// Extrait les infos carte d'une transaction Pennylane (compte pro).
+function cardInfo(tx) {
+  const pae = tx && tx.pro_account_expense ? tx.pro_account_expense : null;
+  const masked = pae && pae.card_masked_number ? pae.card_masked_number : null;
+  const emp = pae && pae.employee ? pae.employee : null;
+  const employee = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ') : null;
+  return { masked, last4: masked ? masked.slice(-4) : null, employee };
+}
+
+// Retourne un map { masked_number: label }.
+async function getCardLabels() {
+  try {
+    const rows = await settingsPrisma.setting.findMany({
+      where: { key: { startsWith: CARD_LABEL_PREFIX } },
+    });
+    const map = {};
+    for (const r of rows) map[r.key.slice(CARD_LABEL_PREFIX.length)] = r.value;
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// Enregistre (ou efface si label vide) l'intitulé d'une carte.
+async function saveCardLabel(masked, label) {
+  if (!masked) throw new Error('masked requis');
+  const key = CARD_LABEL_PREFIX + masked;
+  const value = (label || '').trim();
+  if (!value) {
+    await settingsPrisma.setting.deleteMany({ where: { key } });
+    return;
+  }
+  await settingsPrisma.setting.upsert({
+    where: { key },
+    update: { value },
+    create: { key, value },
+  });
+}
+
 async function getMatchedTransactions(invoiceId) {
   return request('GET', `/supplier_invoices/${invoiceId}/matched_transactions`);
 }
@@ -257,6 +299,9 @@ module.exports = {
   getBankAccounts,
   getSavedBankAccountId,
   saveBankAccountId,
+  cardInfo,
+  getCardLabels,
+  saveCardLabel,
   getMatchedTransactions,
   matchTransaction,
   unmatchTransaction,
