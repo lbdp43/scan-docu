@@ -364,18 +364,43 @@ router.post('/reconcile', async (req, res) => {
           transactionScore: txMatch.score,
         });
       } catch (matchErr) {
-        console.error(`[pennylane] match error expense ${expense.id}:`, matchErr.message);
-        results.push({
-          ...base,
-          status: 'error',
-          message: matchErr.message,
-          invoiceId: invoiceMatch.invoice.id,
-          invoiceFilename: invoiceMatch.invoice.filename,
-          invoiceStatus: invoiceMatch.invoice.accounting_status,
-          invoiceReconciled: invoiceMatch.invoice.reconciled,
-          transactionId: txMatch.transaction.id,
-          transactionLabel: txMatch.transaction.label,
-        });
+        // Le groupage a échoué. Si la transaction est DÉJÀ reliée à une facture
+        // (rapprochée par le cron horaire), ce n'est pas une vraie erreur : on
+        // classe la dépense "déjà rapprochée" au lieu de "erreur". On ne garde
+        // "erreur" que pour les échecs réels (transaction non groupée).
+        let alreadyGrouped = null;
+        try {
+          const m = await pennylane.getTransactionMatchedInvoices(txMatch.transaction.id);
+          if (m?.items?.length) alreadyGrouped = m.items[0];
+        } catch (_) { /* en cas d'échec de la vérif, on retombe sur "erreur" */ }
+
+        if (alreadyGrouped) {
+          await req.prisma.expense.update({
+            where: { id: expense.id },
+            data: { pennylane_invoice_id: String(alreadyGrouped.id), pennylane_matched: true },
+          });
+          usedTransactionIds.add(txMatch.transaction.id);
+          results.push({
+            ...base,
+            status: 'already_reconciled',
+            message: 'Paiement déjà rapproché dans Pennylane',
+            invoiceId: alreadyGrouped.id,
+            transactionId: txMatch.transaction.id,
+          });
+        } else {
+          console.error(`[pennylane] match error expense ${expense.id}:`, matchErr.message);
+          results.push({
+            ...base,
+            status: 'error',
+            message: matchErr.message,
+            invoiceId: invoiceMatch.invoice.id,
+            invoiceFilename: invoiceMatch.invoice.filename,
+            invoiceStatus: invoiceMatch.invoice.accounting_status,
+            invoiceReconciled: invoiceMatch.invoice.reconciled,
+            transactionId: txMatch.transaction.id,
+            transactionLabel: txMatch.transaction.label,
+          });
+        }
       }
 
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
