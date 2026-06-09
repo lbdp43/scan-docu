@@ -11,7 +11,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const pennylane = require('../services/pennylane');
 const push = require('../services/push');
-const { runReconcile } = require('../services/reconcileRunner');
+const { runCardDirectReconcile } = require('../services/cardReconcile');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -116,8 +116,7 @@ router.post('/daily', async (req, res) => {
   const out = {};
   // 1. Rapprochement (compta) — best effort, ne bloque pas le push
   try {
-    out.reconcile = await runReconcile(prisma);
-    if (out.reconcile?.summary) out.reconcile = { summary: out.reconcile.summary }; // réponse compacte
+    out.reconcile = await runCardDirectReconcile();
   } catch (e) {
     out.reconcile = { error: e.message };
   }
@@ -128,6 +127,16 @@ router.post('/daily', async (req, res) => {
     out.push = { error: e.message };
   }
   res.json({ ok: true, ...out });
+});
+
+// POST /api/cron/reconcile — rapprochement seul (déclenché toutes les heures, après la synchro Drive)
+router.post('/reconcile', async (req, res) => {
+  try {
+    const reconcile = await runCardDirectReconcile();
+    res.json({ ok: true, reconcile });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 module.exports = router;

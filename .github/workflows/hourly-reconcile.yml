@@ -1,0 +1,22 @@
+name: Rapprochement horaire
+
+# Relie les factures importées du Drive aux transactions carte, toutes les heures
+# (Pennylane synchronise le Drive ~toutes les heures).
+on:
+  schedule:
+    - cron: "20 * * * *" # toutes les heures (à HH:20, après la synchro Drive)
+  workflow_dispatch: {}
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déclencher le rapprochement
+        run: |
+          curl -fsS -X POST "${APP_URL}/api/cron/reconcile" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 | head -c 1000
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

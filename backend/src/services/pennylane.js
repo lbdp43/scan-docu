@@ -246,6 +246,11 @@ async function getMatchedTransactions(invoiceId) {
   return request('GET', `/supplier_invoices/${invoiceId}/matched_transactions`);
 }
 
+// Factures déjà liées à une transaction (pour ne pas double-grouper un paiement)
+async function getTransactionMatchedInvoices(txId) {
+  return request('GET', `/transactions/${txId}/matched_invoices`);
+}
+
 async function matchTransaction(invoiceId, transactionId) {
   return request('POST', `/supplier_invoices/${invoiceId}/matched_transactions`, {
     body: { transaction_id: transactionId },
@@ -377,6 +382,7 @@ module.exports = {
   getFiscalYearSupplierInvoices,
   justifiedByInvoice,
   getMatchedTransactions,
+  getTransactionMatchedInvoices,
   matchTransaction,
   unmatchTransaction,
   scoreMatch,
