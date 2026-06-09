@@ -124,6 +124,19 @@ export default function Admin() {
         })}
       </div>
 
+      {/* Rapprochement Pennylane */}
+      <Link
+        to="/admin/reconciliation"
+        className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-card-border transition-transform active:scale-[0.98]"
+      >
+        <div className="w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center text-lg">🧾</div>
+        <div className="flex-1">
+          <p className="text-text text-sm font-medium">Rapprochement Pennylane</p>
+          <p className="text-text-muted text-xs">Paiements carte sans justificatif scanné</p>
+        </div>
+        <span className="text-green-light text-sm">→</span>
+      </Link>
+
       {/* Collaborators */}
       <div>
         <div className="flex items-center justify-between mb-3">

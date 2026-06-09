@@ -8,16 +8,16 @@ datasource db {
 }
 
 model User {
-  id             Int       @id @default(autoincrement())
-  email          String    @unique @db.VarChar(255)
-  password_hash  String
-  name           String    @db.VarChar(100)
-  role           String    @default("user") @db.VarChar(10)
-  card_id        String?   @db.VarChar(50)
+  id              Int       @id @default(autoincrement())
+  email           String    @unique @db.VarChar(255)
+  password_hash   String
+  name            String    @db.VarChar(100)
+  role            String    @default("user") @db.VarChar(10)
+  card_id         String?   @db.VarChar(50)
   drive_folder_id String?
-  is_active      Boolean   @default(true)
-  created_at     DateTime  @default(now())
-  expenses       Expense[]
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  expenses        Expense[]
 
   @@map("users")
 }
@@ -58,4 +58,18 @@ model TokenBlacklist {
   created_at DateTime @default(now())
 
   @@map("token_blacklist")
+}
+
+// Correspondance carte bancaire Pennylane (compte Pro) <-> intitulé éditable
+// + lien optionnel vers la carte scan-docu (User.card_id) pour le rapprochement.
+model CardMapping {
+  id            Int      @id @default(autoincrement())
+  masked_number String   @unique @db.VarChar(30) // ex: 543946XXXXXX6945
+  last4         String   @db.VarChar(4)
+  label         String?  @db.VarChar(100) // intitulé donné par l'admin (ex: "Camion Étienne")
+  scan_card_id  String?  @db.VarChar(50) // lien optionnel vers User.card_id de scan-docu
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now()) @updatedAt
+
+  @@map("card_mappings")
 }

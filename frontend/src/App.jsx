@@ -9,6 +9,7 @@ import Manual from './pages/Manual';
 import History from './pages/History';
 import Admin from './pages/Admin';
 import AdminUsers from './pages/AdminUsers';
+import Reconciliation from './pages/Reconciliation';
 import Profile from './pages/Profile';
 
 function PrivateRoute({ children, adminOnly = false }) {
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<PrivateRoute adminOnly><Admin /></PrivateRoute>} />
             <Route path="/admin/users" element={<PrivateRoute adminOnly><AdminUsers /></PrivateRoute>} />
+            <Route path="/admin/reconciliation" element={<PrivateRoute adminOnly><Reconciliation /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

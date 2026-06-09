@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const expensesRoutes = require('./routes/expenses');
 const adminRoutes = require('./routes/admin');
 const scanRoutes = require('./routes/scan');
+const reconciliationRoutes = require('./routes/reconciliation');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -76,6 +77,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/scan', scanRoutes);
+app.use('/api/reconciliation', reconciliationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

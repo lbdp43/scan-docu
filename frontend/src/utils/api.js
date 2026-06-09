@@ -116,4 +116,16 @@ export const api = {
     request('/admin/drive-config'),
   updateDriveConfig: (data) =>
     request('/admin/drive-config', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Rapprochement Pennylane
+  getReconciliation: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/reconciliation?${qs}`);
+  },
+  getReconciliationStatus: () =>
+    request('/reconciliation/status'),
+  getCardMappings: () =>
+    request('/reconciliation/cards'),
+  updateCardMapping: (id, data) =>
+    request(`/reconciliation/cards/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 };
