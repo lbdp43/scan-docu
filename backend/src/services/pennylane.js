@@ -204,6 +204,42 @@ async function saveCardUser(masked, userId) {
   });
 }
 
+// --- Attribution carte -> véhicule (Setting, clé "card_vehicle:<masked>" -> id catégorie Pennylane) ---
+const CARD_VEHICLE_PREFIX = 'card_vehicle:';
+
+// Retourne un map { masked_number: categoryId(Int) }.
+async function getCardVehicles() {
+  try {
+    const rows = await settingsPrisma.setting.findMany({
+      where: { key: { startsWith: CARD_VEHICLE_PREFIX } },
+    });
+    const map = {};
+    for (const r of rows) {
+      const cid = parseInt(r.value, 10);
+      if (!Number.isNaN(cid)) map[r.key.slice(CARD_VEHICLE_PREFIX.length)] = cid;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// Attribue une carte à un véhicule (categoryId falsy => retire l'attribution).
+async function saveCardVehicle(masked, categoryId) {
+  if (!masked) throw new Error('masked requis');
+  const key = CARD_VEHICLE_PREFIX + masked;
+  if (!categoryId) {
+    await settingsPrisma.setting.deleteMany({ where: { key } });
+    return;
+  }
+  const value = String(parseInt(categoryId, 10));
+  await settingsPrisma.setting.upsert({
+    where: { key },
+    update: { value },
+    create: { key, value },
+  });
+}
+
 // Toutes les factures fournisseur de l'exercice (montant + date), pour savoir si un
 // paiement est justifié dans Pennylane (facture présente), au-delà des scans scan-docu.
 async function getFiscalYearSupplierInvoices() {
@@ -371,6 +407,8 @@ module.exports = {
   saveCardLabel,
   getCardUsers,
   saveCardUser,
+  getCardVehicles,
+  saveCardVehicle,
   getFiscalYearSupplierInvoices,
   justifiedByInvoice,
   getMatchedTransactions,

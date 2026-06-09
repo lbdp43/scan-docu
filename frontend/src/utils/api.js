@@ -207,6 +207,10 @@ export const api = {
     request('/pennylane/card-label', { method: 'POST', body: JSON.stringify({ masked, label }) }),
   savePennylaneCardUser: (masked, userId) =>
     request('/pennylane/card-user', { method: 'POST', body: JSON.stringify({ masked, userId }) }),
+  getPennylaneVehicles: () =>
+    request('/pennylane/vehicles'),
+  savePennylaneCardVehicle: (masked, categoryId) =>
+    request('/pennylane/card-vehicle', { method: 'POST', body: JSON.stringify({ masked, categoryId }) }),
 
   // Vue collaborateur — mes paiements à justifier
   getMyMissingPayments: () =>

@@ -29,6 +29,8 @@ export default function AdminPennylane() {
   const [openCard, setOpenCard] = useState(null);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
+  const [vehicleOptions, setVehicleOptions] = useState([]);
+  const [cardVehicles, setCardVehicles] = useState({});
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -166,6 +168,9 @@ export default function AdminPennylane() {
     try {
       const data = await api.getPennylaneMissing();
       setMissing(data);
+      api.getPennylaneVehicles()
+        .then(v => { setVehicleOptions(v.options || []); setCardVehicles(v.vehicles || {}); })
+        .catch(() => {});
     } catch (err) {
       setToast({ message: 'Erreur: ' + err.message, type: 'error' });
     } finally {
@@ -209,6 +214,21 @@ export default function AdminPennylane() {
           c.masked === masked ? { ...c, userId: userId ? parseInt(userId, 10) : null } : c),
       } : m);
       setToast({ message: userId ? 'Carte attribuée' : 'Attribution retirée', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  }
+
+  async function handleAssignVehicle(masked, categoryId) {
+    try {
+      await api.savePennylaneCardVehicle(masked, categoryId || null);
+      setCardVehicles(cv => {
+        const next = { ...cv };
+        if (categoryId) next[masked] = parseInt(categoryId, 10);
+        else delete next[masked];
+        return next;
+      });
+      setToast({ message: categoryId ? 'Véhicule attribué' : 'Véhicule retiré', type: 'success' });
     } catch (err) {
       setToast({ message: err.message, type: 'error' });
     }
@@ -709,6 +729,20 @@ export default function AdminPennylane() {
                                 >
                                   <option value="">{'— non attribué —'}</option>
                                   {users.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                                </select>
+                              </div>
+                            )}
+
+                            {card.masked && vehicleOptions.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="text-text-muted text-[10px] shrink-0">{'🚐'} Véhicule</span>
+                                <select
+                                  value={cardVehicles[card.masked] || ''}
+                                  onChange={(e) => handleAssignVehicle(card.masked, e.target.value)}
+                                  className="flex-1 min-w-0 bg-bg border border-card-border rounded-lg px-2 py-1 text-text text-xs focus:outline-none focus:border-green-mid"
+                                >
+                                  <option value="">{'— aucun —'}</option>
+                                  {vehicleOptions.map(v => (<option key={v.id} value={v.id}>{v.label}</option>))}
                                 </select>
                               </div>
                             )}

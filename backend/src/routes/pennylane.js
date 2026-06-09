@@ -3,6 +3,7 @@ const { authenticateToken, checkAdmin } = require('../middleware/auth');
 const pennylane = require('../services/pennylane');
 const missing = require('../services/missing');
 const { fiscalYear } = require('../services/fiscalYear');
+const { VEHICLE_CATEGORIES } = require('../services/categorize');
 
 const router = express.Router();
 
@@ -536,6 +537,30 @@ router.post('/card-user', async (req, res) => {
     res.json({ success: true, masked: masked.trim(), userId: userId ? parseInt(userId, 10) : null });
   } catch (err) {
     console.error('[pennylane] card-user error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/pennylane/vehicles — options de véhicules + attribution carte -> véhicule
+router.get('/vehicles', async (req, res) => {
+  try {
+    const vehicles = await pennylane.getCardVehicles();
+    res.json({ options: VEHICLE_CATEGORIES, vehicles });
+  } catch (err) {
+    console.error('[pennylane] vehicles error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/pennylane/card-vehicle — Attribuer une carte à un véhicule ({ masked, categoryId })
+router.post('/card-vehicle', async (req, res) => {
+  try {
+    const { masked, categoryId } = req.body;
+    if (!masked?.trim()) return res.status(400).json({ error: 'masked requis' });
+    await pennylane.saveCardVehicle(masked.trim(), categoryId || null);
+    res.json({ success: true, masked: masked.trim(), categoryId: categoryId ? parseInt(categoryId, 10) : null });
+  } catch (err) {
+    console.error('[pennylane] card-vehicle error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,14 +1,15 @@
 /**
- * Catégorisation analytique automatique (par "nature") des transactions carte.
+ * Catégorisation analytique automatique des transactions carte.
  *
- * Pour chaque paiement carte NON catégorisé qui correspond (montant+date) à un
- * ticket scan-docu, on pose la catégorie analytique Pennylane selon le type :
- *   carburant -> Carburant · repas -> Restauration et Repas · péage -> Péages et Parking
- * ('autre' et types personnalisés : laissés non catégorisés).
+ * 1) NATURE (depuis le ticket scan-docu correspondant) : carburant -> Carburant,
+ *    repas -> Restauration et Repas, péage -> Péages et Parking. Posée uniquement
+ *    sur les transactions SANS aucune catégorie ('autre'/perso : ignoré).
+ * 2) VÉHICULE (depuis la carte) : Berlingot / Ford / Kangoo… selon l'attribution
+ *    carte->véhicule (admin). Ajoutée tant que la transaction n'a pas déjà une
+ *    catégorie du groupe "véhicule".
  *
- * Non destructif : on ne touche PAS les transactions qui ont déjà une catégorie.
- * Idempotent : une fois catégorisée, une transaction est ignorée au run suivant.
- * Réversible : Pennylane PUT /transactions/{id}/categories [] retire les catégories.
+ * Non destructif : on PRÉSERVE les catégories existantes (le PUT remplace toute la
+ * liste, donc on renvoie existant + ajout). Idempotent. Réversible (PUT []).
  */
 const pennylane = require('./pennylane');
 const match = require('./match');
@@ -17,12 +18,26 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// type de dépense scan-docu -> id catégorie analytique Pennylane (LBDP)
+// type de dépense scan-docu -> id catégorie "nature" Pennylane (LBDP)
 const TYPE_TO_CATEGORY = {
   carburant: 190533513216, // Carburant
   repas: 190538297344,     // Restauration et Repas
   peage: 190534152192,     // Péages et Parking
 };
+
+// Groupe "véhicule" Pennylane + options proposées dans l'admin
+const VEHICLE_GROUP_ID = 12745461760;
+const VEHICLE_CATEGORIES = [
+  { id: 190536069120, label: 'Berlingot' },
+  { id: 190536073216, label: 'Berlingot Neuf' },
+  { id: 190535614464, label: 'Ford' },
+  { id: 190535610368, label: 'Kangoo' },
+];
+const VEHICLE_IDS = VEHICLE_CATEGORIES.map((v) => v.id);
+
+// Plafond d'écritures par exécution (évite les timeouts au 1er gros passage ;
+// le reste est traité au run horaire suivant, de façon idempotente).
+const MAX_PER_RUN = 150;
 
 async function categorizeByType(db) {
   const token = await pennylane.getToken();
@@ -56,30 +71,63 @@ async function categorizeByType(db) {
     type: e.type,
   }));
 
-  let categorized = 0;
+  const cardVehicles = await pennylane.getCardVehicles(); // { masked: categoryId }
+
+  let natureSet = 0;
+  let vehicleSet = 0;
   let errors = 0;
+  let writes = 0;
+  let capped = false;
+
   for (const tx of cardTx) {
-    if (tx.categories && tx.categories.length) continue; // déjà catégorisée -> on ne touche pas
-    const a = Math.abs(Number(tx.amount || tx.currency_amount || 0));
-    const tdms = match.dms(tx.date);
-    let type = null;
-    let best = 0;
-    for (const e of expenses) {
-      const s = match.expenseScore(e.amount, e.dateMs, a, tdms);
-      if (s > best) { best = s; type = e.type; }
+    if (writes >= MAX_PER_RUN) { capped = true; break; }
+
+    const ci = pennylane.cardInfo(tx);
+    const existing = tx.categories || [];
+    const final = existing.map((c) => ({ id: c.id, weight: String(c.weight || '1.0') }));
+    let addNature = false;
+    let addVehicle = false;
+
+    // 2) Véhicule (depuis la carte) — seulement si pas déjà une catégorie du groupe véhicule
+    const vehId = ci.masked ? cardVehicles[ci.masked] : null;
+    const hasVehicle = existing.some(
+      (c) => VEHICLE_IDS.includes(c.id) || (c.category_group && c.category_group.id === VEHICLE_GROUP_ID)
+    );
+    if (vehId && !hasVehicle) {
+      final.push({ id: vehId, weight: '1.0' });
+      addVehicle = true;
     }
-    if (best < 25) continue;
-    const catId = TYPE_TO_CATEGORY[type];
-    if (!catId) continue; // 'autre'/type perso -> non catégorisé
+
+    // 1) Nature (depuis le ticket) — seulement si la transaction n'a AUCUNE catégorie
+    if (existing.length === 0) {
+      const a = Math.abs(Number(tx.amount || tx.currency_amount || 0));
+      const tdms = match.dms(tx.date);
+      let type = null;
+      let best = 0;
+      for (const e of expenses) {
+        const s = match.expenseScore(e.amount, e.dateMs, a, tdms);
+        if (s > best) { best = s; type = e.type; }
+      }
+      const catId = best >= 25 ? TYPE_TO_CATEGORY[type] : null;
+      if (catId && !final.some((c) => c.id === catId)) {
+        final.push({ id: catId, weight: '1.0' });
+        addNature = true;
+      }
+    }
+
+    if (!addNature && !addVehicle) continue;
     try {
-      await pennylane.setTransactionCategories(tx.id, [{ id: catId, weight: '1.0' }]);
-      categorized++;
+      await pennylane.setTransactionCategories(tx.id, final);
+      if (addVehicle) vehicleSet++;
+      if (addNature) natureSet++;
+      writes++;
       await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
     } catch (e) {
       errors++;
     }
   }
-  return { considered: cardTx.length, categorized, errors };
+
+  return { considered: cardTx.length, natureSet, vehicleSet, errors, capped };
 }
 
-module.exports = { categorizeByType, TYPE_TO_CATEGORY };
+module.exports = { categorizeByType, TYPE_TO_CATEGORY, VEHICLE_GROUP_ID, VEHICLE_CATEGORIES, VEHICLE_IDS };
