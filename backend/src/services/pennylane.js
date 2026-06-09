@@ -237,6 +237,12 @@ async function getTransactionMatchedInvoices(txId) {
   return request('GET', `/transactions/${txId}/matched_invoices`);
 }
 
+// Définit les catégories analytiques d'une transaction. body = tableau [{ id, weight }].
+// PUT [] pour tout retirer. (format validé par test)
+async function setTransactionCategories(txId, categories) {
+  return request('PUT', `/transactions/${txId}/categories`, { body: categories });
+}
+
 async function matchTransaction(invoiceId, transactionId) {
   return request('POST', `/supplier_invoices/${invoiceId}/matched_transactions`, {
     body: { transaction_id: transactionId },
@@ -369,6 +375,7 @@ module.exports = {
   justifiedByInvoice,
   getMatchedTransactions,
   getTransactionMatchedInvoices,
+  setTransactionCategories,
   matchTransaction,
   unmatchTransaction,
   scoreMatch,

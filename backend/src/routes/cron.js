@@ -11,6 +11,7 @@ const pennylane = require('../services/pennylane');
 const push = require('../services/push');
 const missing = require('../services/missing');
 const { runCardDirectReconcile } = require('../services/cardReconcile');
+const { categorizeByType } = require('../services/categorize');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -59,6 +60,7 @@ async function refreshSnapshot({ notify }) {
 router.post('/daily', async (req, res) => {
   const out = {};
   try { out.reconcile = await runCardDirectReconcile(); } catch (e) { out.reconcile = { error: e.message }; }
+  try { out.categorize = await categorizeByType(prisma); } catch (e) { out.categorize = { error: e.message }; }
   try { out.missing = await refreshSnapshot({ notify: true }); } catch (e) { out.missing = { error: e.message }; }
   res.json({ ok: true, ...out });
 });
@@ -66,6 +68,7 @@ router.post('/daily', async (req, res) => {
 router.post('/reconcile', async (req, res) => {
   const out = {};
   try { out.reconcile = await runCardDirectReconcile(); } catch (e) { out.reconcile = { error: e.message }; }
+  try { out.categorize = await categorizeByType(prisma); } catch (e) { out.categorize = { error: e.message }; }
   try { out.missing = await refreshSnapshot({ notify: false }); } catch (e) { out.missing = { error: e.message }; }
   res.json({ ok: true, ...out });
 });
