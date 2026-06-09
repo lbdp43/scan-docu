@@ -36,11 +36,11 @@ async function computeMissing(db) {
   const fy = fiscalYear();
   const base = { fiscalYear: fy, computedAt: new Date().toISOString() };
 
-  const connection = await pennylane.checkConnection();
+  const token = await pennylane.getToken();
   const cardLabels = await pennylane.getCardLabels();
   const cardUsers = await pennylane.getCardUsers();
-  if (!connection.ok) {
-    return { ...base, connection, cards: [], transactions: [],
+  if (!token) {
+    return { ...base, connection: { ok: false, configured: false }, cards: [], transactions: [],
       summary: { totalBankTransactions: 0, matched: 0, unmatched: 0, totalExpenses: 0 } };
   }
 
@@ -102,7 +102,7 @@ async function computeMissing(db) {
   const cards = [...cardsMap.values()].sort((x, y) => y.missing - x.missing);
   const matched = cards.reduce((n, c) => n + c.matched, 0);
 
-  return { ...base, connection: { ok: true, company: connection.company }, cards, transactions: unmatched,
+  return { ...base, connection: { ok: true }, cards, transactions: unmatched,
     summary: { totalBankTransactions: expenseTx.length, matched, unmatched: unmatched.length, totalExpenses: expRows.length } };
 }
 
