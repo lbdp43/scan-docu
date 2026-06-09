@@ -673,7 +673,9 @@ export default function AdminPennylane() {
                   <div className="space-y-2">
                     <h4 className="text-text-muted text-[11px] uppercase tracking-widest">Paiements sans ticket</h4>
                     {missing.transactions.map(tx => {
-                      const manualUrl = `/manual?amount=${encodeURIComponent(Number(tx.amount).toFixed(2))}&date=${encodeURIComponent(tx.date)}&merchant=${encodeURIComponent(tx.label || '')}`;
+                      const params = `amount=${encodeURIComponent(Number(tx.amount).toFixed(2))}&date=${encodeURIComponent(tx.date)}&merchant=${encodeURIComponent(tx.label || '')}`;
+                      const manualUrl = `/manual?${params}`;
+                      const scanUrl = `/?${params}`;
                       return (
                       <div key={tx.transactionId} className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
                         <div className="flex items-center justify-between">
@@ -688,7 +690,7 @@ export default function AdminPennylane() {
                           </p>
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <Link to="/" className="flex-1 text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[11px] font-medium">
+                          <Link to={scanUrl} className="flex-1 text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[11px] font-medium">
                             {'📷'} Scanner
                           </Link>
                           <Link to={manualUrl} className="flex-1 text-center py-1.5 rounded-lg bg-card border border-card-border text-text-muted text-[11px] font-medium">

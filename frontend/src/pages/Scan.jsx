@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
@@ -43,6 +43,13 @@ export default function Scan() {
   const fileInputRef = useRef(null);
   const amountRef = useRef(null);
 
+  // Justification d'un paiement précis (lien depuis "à justifier") : montant + date imposés
+  const [searchParams] = useSearchParams();
+  const targetAmount = searchParams.get('amount') || '';
+  const targetDate = searchParams.get('date') || '';
+  const targetMerchant = searchParams.get('merchant') || '';
+  const fromMissing = Boolean(targetAmount || targetDate);
+
   const [hasImage, setHasImage] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -51,10 +58,10 @@ export default function Scan() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const [amount, setAmount] = useState('');
-  const [dateTicket, setDateTicket] = useState('');
+  const [amount, setAmount] = useState(targetAmount);
+  const [dateTicket, setDateTicket] = useState(targetDate);
   const [type, setType] = useState('');
-  const [merchant, setMerchant] = useState('');
+  const [merchant, setMerchant] = useState(targetMerchant.slice(0, 255));
   const [description, setDescription] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
   const [ocrSuggestedType, setOcrSuggestedType] = useState(null);
@@ -73,13 +80,14 @@ export default function Scan() {
     setLastResult(null);
     setImagePreview(URL.createObjectURL(file));
     setHasImage(true);
-    setDateTicket(new Date().toISOString().slice(0, 10));
-    setAmount('');
-    setMerchant('');
+    // Si on justifie un paiement précis, on garde son montant + sa date (la photo = le justificatif)
+    setDateTicket(fromMissing && targetDate ? targetDate : new Date().toISOString().slice(0, 10));
+    setAmount(fromMissing ? targetAmount : '');
+    setMerchant(fromMissing ? targetMerchant.slice(0, 255) : '');
     setDescription('');
     setType('');
     setOcrSuggestedType(null);
-    userEdited.current = { amount: false, merchant: false };
+    userEdited.current = { amount: Boolean(fromMissing && targetAmount), merchant: false };
     setOcrState('running');
     setOcrConfidence(null);
 
@@ -104,7 +112,8 @@ export default function Scan() {
         if (result.extracted.amount && !userEdited.current.amount) {
           setAmount(String(result.extracted.amount));
         }
-        if (result.extracted.date) {
+        // Ne PAS écraser la date si on justifie un paiement précis (date imposée par la transaction)
+        if (result.extracted.date && !fromMissing) {
           setDateTicket(result.extracted.date);
         }
         if (result.extracted.type && result.extracted.type !== 'autre') {
@@ -121,7 +130,7 @@ export default function Scan() {
     } catch {
       setOcrState('failed');
     }
-  }, []);
+  }, [fromMissing, targetAmount, targetDate, targetMerchant]);
 
   const doSubmit = async () => {
     setSubmitting(true);
@@ -312,6 +321,12 @@ export default function Scan() {
           )}
         </div>
 
+        {fromMissing && (
+          <div className="mt-3 p-3 rounded-2xl bg-green-mid/10 border border-green-mid/30 text-xs text-green-light">
+            {'📎'} Justificatif d'un paiement carte{targetAmount ? ` de ${Number(targetAmount).toFixed(2)} €` : ''}{targetDate ? ` du ${new Date(targetDate).toLocaleDateString('fr-FR')}` : ''}. Montant et date verrouillés — prends juste la photo.
+          </div>
+        )}
+
         <div className="flex-1 flex items-center justify-center py-8">
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -358,6 +373,12 @@ export default function Scan() {
     <div className="space-y-5">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
       {fileInput}
+
+      {fromMissing && (
+        <div className="p-3 rounded-2xl bg-green-mid/10 border border-green-mid/30 text-xs text-green-light">
+          {'📎'} Justificatif d'un paiement de {targetAmount ? `${Number(targetAmount).toFixed(2)} €` : ''}{targetDate ? ` du ${new Date(targetDate).toLocaleDateString('fr-FR')}` : ''} — vérifie le type puis enregistre.
+        </div>
+      )}
 
       {/* Scan count badge */}
       {scanCount > 0 && (
