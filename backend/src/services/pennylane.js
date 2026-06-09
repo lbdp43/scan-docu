@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const { fiscalYear } = require('./fiscalYear');
+const match = require('./match');
 
 const BASE_URL = 'https://app.pennylane.com/api/external/v2';
 const HEADERS = {
@@ -133,14 +135,8 @@ async function saveBankAccountId(id) {
 // --- Intitulés de cartes (stockés dans la table Setting, clé "card_label:<masked>") ---
 const CARD_LABEL_PREFIX = 'card_label:';
 
-// Extrait les infos carte d'une transaction Pennylane (compte pro).
-function cardInfo(tx) {
-  const pae = tx && tx.pro_account_expense ? tx.pro_account_expense : null;
-  const masked = pae && pae.card_masked_number ? pae.card_masked_number : null;
-  const emp = pae && pae.employee ? pae.employee : null;
-  const employee = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ') : null;
-  return { masked, last4: masked ? masked.slice(-4) : null, employee };
-}
+// Extrait les infos carte d'une transaction Pennylane (compte pro). Voir services/match.js
+const cardInfo = match.cardInfo;
 
 // Retourne un map { masked_number: label }.
 async function getCardLabels() {
@@ -210,9 +206,8 @@ async function saveCardUser(masked, userId) {
 
 // Toutes les factures fournisseur de l'exercice (montant + date), pour savoir si un
 // paiement est justifié dans Pennylane (facture présente), au-delà des scans scan-docu.
-async function getFiscalYearSupplierInvoices(year) {
-  const from = `${year}-01-01`;
-  const to = `${year}-12-31`;
+async function getFiscalYearSupplierInvoices() {
+  const { from, to } = fiscalYear();
   const filter = [
     { field: 'date', operator: 'gteq', value: from },
     { field: 'date', operator: 'lteq', value: to },
@@ -230,17 +225,8 @@ async function getFiscalYearSupplierInvoices(year) {
     .filter((i) => i.amount > 0 && i.date);
 }
 
-// Un paiement (montant, date) a-t-il une facture Pennylane correspondante ?
-// (montant au centime, facture datée de J-2 à J+25 par rapport au paiement)
-function justifiedByInvoice(invoices, txAmount, txDate) {
-  const td = new Date(txDate).getTime();
-  for (const inv of invoices) {
-    if (Math.abs(inv.amount - txAmount) > 0.01) continue;
-    const dd = (td - new Date(inv.date).getTime()) / 86400000;
-    if (dd >= -2 && dd <= 25) return true;
-  }
-  return false;
-}
+// Un paiement a-t-il une facture Pennylane correspondante ? Voir services/match.js
+const justifiedByInvoice = match.justifiedByInvoice;
 
 async function getMatchedTransactions(invoiceId) {
   return request('GET', `/supplier_invoices/${invoiceId}/matched_transactions`);

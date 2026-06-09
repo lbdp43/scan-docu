@@ -12,6 +12,7 @@
  *    (évite de double-justifier un paiement).
  */
 const pennylane = require('./pennylane');
+const { fiscalYear } = require('./fiscalYear');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -54,9 +55,7 @@ async function runCardDirectReconcile() {
   const token = await pennylane.getToken();
   if (!token) return { skipped: 'Pennylane non configuré' };
 
-  const year = new Date().getFullYear();
-  const from = `${year}-01-01`;
-  const to = `${year}-12-31`;
+  const { from, to } = fiscalYear();
   const dateFilter = [
     { field: 'date', operator: 'gteq', value: from },
     { field: 'date', operator: 'lteq', value: to },

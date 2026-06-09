@@ -1,6 +1,8 @@
 const express = require('express');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
 const pennylane = require('../services/pennylane');
+const missing = require('../services/missing');
+const { fiscalYear } = require('../services/fiscalYear');
 
 const router = express.Router();
 
@@ -172,8 +174,7 @@ router.get('/unmatched', async (req, res) => {
 // POST /api/pennylane/reconcile — Auto-reconcile unmatched expenses
 router.post('/reconcile', async (req, res) => {
   try {
-    const year = new Date().getFullYear();
-    const fyStart = `${year}-01-01`;
+    const { from: fyStart, to: fyEnd } = fiscalYear();
 
     const expenses = await req.prisma.expense.findMany({
       where: {
@@ -187,8 +188,6 @@ router.post('/reconcile', async (req, res) => {
     if (expenses.length === 0) {
       return res.json({ message: 'Aucune dépense', results: [], diagnostics: {}, summary: { total: 0, matched: 0, alreadyReconciled: 0, noInvoice: 0, noTransaction: 0, errors: 0 } });
     }
-
-    const fyEnd = `${year}-12-31`;
 
     const invoiceFilter = [
       { field: 'date', operator: 'gteq', value: fyStart },
@@ -408,143 +407,18 @@ router.post('/reconcile', async (req, res) => {
   }
 });
 
-// GET /api/pennylane/missing — Bank transactions without matching expense in our DB
+// GET /api/pennylane/missing — Paiements carte sans justificatif (snapshot, exercice courant)
 router.get('/missing', async (req, res) => {
   try {
-    const year = new Date().getFullYear();
-    const fyStart = `${year}-01-01`;
-    const fyEnd = `${year}-12-31`;
-
-    const filter = [
-      { field: 'date', operator: 'gteq', value: fyStart },
-      { field: 'date', operator: 'lteq', value: fyEnd },
-    ];
-    const savedBankId = await pennylane.getSavedBankAccountId();
-    if (savedBankId) filter.push({ field: 'bank_account_id', operator: 'eq', value: savedBankId });
-
-    let allTransactions = [];
-    let txCursor;
-    do {
-      const batch = await pennylane.getTransactions({ filter, limit: 100, cursor: txCursor });
-      allTransactions = allTransactions.concat(batch.items);
-      txCursor = batch.has_more ? batch.next_cursor : null;
-      if (txCursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
-    } while (txCursor);
-
-    const expenseTransactions = allTransactions.filter(t => Number(t.amount || t.currency_amount) < 0);
-
-    const expenses = await req.prisma.expense.findMany({
-      where: {
-        date_ticket: { gte: new Date(fyStart) },
-      },
-      omit: { receipt_image: true },
-      include: { user: { select: { name: true, card_id: true } } },
-    });
-
-    const invoices = await pennylane.getFiscalYearSupplierInvoices(year);
-    const cardLabels = await pennylane.getCardLabels();
-    const cardUsers = await pennylane.getCardUsers();
-    const cardsMap = new Map(); // masked -> { masked, last4, employee, label, userId, total, matched, missing, amountMissing }
-
-    const results = [];
-    for (const tx of expenseTransactions) {
-      const txAmount = Math.abs(Number(tx.amount || tx.currency_amount || 0));
-      const txDate = new Date(tx.date).getTime();
-
-      let bestExpense = null;
-      let bestScore = 0;
-      for (const exp of expenses) {
-        const expAmount = Number(exp.amount);
-        if (Math.abs(expAmount - txAmount) > 1) continue;
-
-        let score = 0;
-        if (Math.abs(expAmount - txAmount) < 0.02) score += 30;
-        else if (Math.abs(expAmount - txAmount) < 0.10) score += 15;
-        else score += 5;
-
-        const expDate = new Date(exp.date_ticket).getTime();
-        const daysDiff = (txDate - expDate) / (1000 * 60 * 60 * 24);
-        if (daysDiff >= -1 && daysDiff <= 20) {
-          if (daysDiff < 2) score += 10;
-          else if (daysDiff < 7) score += 7;
-          else if (daysDiff < 15) score += 4;
-          else score += 2;
-        }
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestExpense = exp;
-        }
-      }
-
-      const matched = bestScore >= 25 || pennylane.justifiedByInvoice(invoices, txAmount, tx.date);
-
-      // Infos carte (compte pro) + intitulé éventuel
-      const ci = pennylane.cardInfo(tx);
-      const card = {
-        masked: ci.masked,
-        last4: ci.last4,
-        employee: ci.employee,
-        label: ci.masked ? (cardLabels[ci.masked] || null) : null,
-      };
-
-      // Agrégation par carte
-      const key = ci.masked || 'unknown';
-      if (!cardsMap.has(key)) {
-        cardsMap.set(key, {
-          masked: ci.masked,
-          last4: ci.last4,
-          employee: ci.employee,
-          label: card.label,
-          userId: ci.masked ? (cardUsers[ci.masked] || null) : null,
-          total: 0,
-          matched: 0,
-          missing: 0,
-          amountMissing: 0,
-        });
-      }
-      const bucket = cardsMap.get(key);
-      bucket.total += 1;
-      if (matched) {
-        bucket.matched += 1;
-      } else {
-        bucket.missing += 1;
-        bucket.amountMissing = +(bucket.amountMissing + txAmount).toFixed(2);
-      }
-
-      results.push({
-        transactionId: tx.id,
-        label: tx.label,
-        amount: txAmount,
-        date: tx.date,
-        matched,
-        matchScore: matched ? bestScore : null,
-        card,
-        expense: bestExpense ? {
-          id: bestExpense.id,
-          merchant: bestExpense.merchant,
-          amount: Number(bestExpense.amount),
-          date: bestExpense.date_ticket,
-          type: bestExpense.type,
-          userName: bestExpense.user?.name,
-          cardId: bestExpense.card_id || bestExpense.user?.card_id,
-        } : null,
-      });
-    }
-
-    const unmatched = results.filter(r => !r.matched);
-    const matchedCount = results.filter(r => r.matched).length;
-    const cards = [...cardsMap.values()].sort((a, b) => b.missing - a.missing);
-
+    const snap = await missing.getMissing(req.prisma, { refresh: req.query.refresh === '1' });
     res.json({
-      transactions: unmatched,
-      cards,
-      summary: {
-        totalBankTransactions: expenseTransactions.length,
-        matched: matchedCount,
-        unmatched: unmatched.length,
-        totalExpenses: expenses.length,
-      },
+      connection: snap.connection,
+      period: snap.fiscalYear,
+      cards: snap.cards,
+      transactions: snap.transactions,
+      summary: snap.summary,
+      computedAt: snap.computedAt,
+      cached: snap.cached,
     });
   } catch (err) {
     console.error('[pennylane] missing error:', err.message);

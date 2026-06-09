@@ -6,10 +6,10 @@
  * bancaires correspondantes -> la compta se fait. Logique inchangée.
  */
 const pennylane = require('./pennylane');
+const { fiscalYear } = require('./fiscalYear');
 
 async function runReconcile(prisma) {
-  const year = new Date().getFullYear();
-  const fyStart = `${year}-01-01`;
+  const { from: fyStart, to: fyEnd } = fiscalYear();
 
   const expenses = await prisma.expense.findMany({
     where: { date_ticket: { gte: new Date(fyStart) } },
@@ -21,8 +21,6 @@ async function runReconcile(prisma) {
   if (expenses.length === 0) {
     return { message: 'Aucune dépense', results: [], diagnostics: {}, summary: { total: 0, matched: 0, alreadyReconciled: 0, noInvoice: 0, noTransaction: 0, errors: 0 } };
   }
-
-  const fyEnd = `${year}-12-31`;
 
   const invoiceFilter = [
     { field: 'date', operator: 'gteq', value: fyStart },

@@ -96,13 +96,18 @@ export default function AdminPennylane() {
     }
   }
 
+  // Exercice fiscal LBDP : 1er juillet -> 30 juin
   function fiscalYear() {
     const now = new Date();
+    const y = now.getFullYear();
+    const startYear = (now.getMonth() + 1) >= 7 ? y : y - 1;
     return {
-      from: `${now.getFullYear()}-01-01`,
-      to: `${now.getFullYear()}-12-31`,
+      from: `${startYear}-07-01`,
+      to: `${startYear + 1}-06-30`,
+      label: `${startYear}-${startYear + 1}`,
     };
   }
+  const fyLabel = fiscalYear().label;
 
   async function loadInvoices() {
     try {
@@ -605,7 +610,7 @@ export default function AdminPennylane() {
           {activeTab === 'missing' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-text-muted text-xs uppercase tracking-widest">Paiements sans ticket — exercice {new Date().getFullYear()}</h3>
+                <h3 className="text-text-muted text-xs uppercase tracking-widest">Paiements sans ticket — exercice {fyLabel}</h3>
                 <button onClick={loadMissing} className="text-green-light text-xs">Rafra{'î'}chir</button>
               </div>
               {loadingMissing || !missing ? (
@@ -624,6 +629,16 @@ export default function AdminPennylane() {
                     <span className="text-amber-400 text-xs font-medium">{missing.summary.unmatched} sans ticket</span>
                   </div>
                 </div>
+
+                {/* Alerte : cartes détectées non encore attribuées à un collaborateur */}
+                {(() => {
+                  const unassigned = (missing.cards || []).filter(c => c.masked && !c.userId);
+                  return unassigned.length > 0 ? (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+                      {'🆕'} {unassigned.length} carte{unassigned.length > 1 ? 's' : ''} non attribuée{unassigned.length > 1 ? 's' : ''} ({unassigned.map(c => `•••• ${c.last4}`).join(', ')}) — attribue-les à un collaborateur ci-dessous.
+                    </div>
+                  ) : null;
+                })()}
 
                 {/* Tableau de bord par carte : collaborateur + ses paiements sans justificatif */}
                 {(!missing.cards || missing.cards.length === 0) ? (
@@ -735,7 +750,7 @@ export default function AdminPennylane() {
           {activeTab === 'invoices' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-text-muted text-xs uppercase tracking-widest">Factures fournisseur — exercice {new Date().getFullYear()}</h3>
+                <h3 className="text-text-muted text-xs uppercase tracking-widest">Factures fournisseur — exercice {fyLabel}</h3>
                 <button onClick={loadInvoices} className="text-green-light text-xs">Rafra{'î'}chir</button>
               </div>
               {!invoices ? (
@@ -793,7 +808,7 @@ export default function AdminPennylane() {
           {activeTab === 'transactions' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-text-muted text-xs uppercase tracking-widest">D{'é'}penses carte — exercice {new Date().getFullYear()}</h3>
+                <h3 className="text-text-muted text-xs uppercase tracking-widest">D{'é'}penses carte — exercice {fyLabel}</h3>
                 <button onClick={loadTransactions} className="text-green-light text-xs">Rafra{'î'}chir</button>
               </div>
               {!transactions ? (

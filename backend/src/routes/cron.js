@@ -2,15 +2,14 @@
  * Endpoints déclenchés par un cron externe (GitHub Actions), authentifiés par
  * un secret partagé (header x-cron-secret), PAS par JWT.
  *
- * POST /api/cron/daily :
- *   1. (B) Rapprochement Pennylane — relie les factures (import Drive) aux
- *      transactions bancaires => la compta se fait automatiquement.
- *   2. (C) Push à chaque collaborateur de ses paiements carte sans justificatif.
+ * - POST /api/cron/reconcile (horaire) : rapprochement + recalcul du snapshot des manquants.
+ * - POST /api/cron/daily (quotidien)   : idem + push à chaque collaborateur de SES manquants.
  */
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const pennylane = require('../services/pennylane');
 const push = require('../services/push');
+const missing = require('../services/missing');
 const { runCardDirectReconcile } = require('../services/cardReconcile');
 
 const router = express.Router();
@@ -25,118 +24,50 @@ router.use((req, res, next) => {
   next();
 });
 
-function isMatched(expenses, txAmount, txDate) {
-  for (const exp of expenses) {
-    const ea = Number(exp.amount);
-    if (Math.abs(ea - txAmount) > 1) continue;
-    let s = 0;
-    if (Math.abs(ea - txAmount) < 0.02) s += 30;
-    else if (Math.abs(ea - txAmount) < 0.10) s += 15;
-    else s += 5;
-    const dd = (txDate - new Date(exp.date_ticket).getTime()) / 86400000;
-    if (dd >= -1 && dd <= 20) {
-      if (dd < 2) s += 10; else if (dd < 7) s += 7; else if (dd < 15) s += 4; else s += 2;
-    }
-    if (s >= 25) return true;
-  }
-  return false;
-}
-
-async function sendMissingPush() {
-  if (!push.isConfigured()) return { skipped: 'push non configuré' };
-  const token = await pennylane.getToken();
-  if (!token) return { skipped: 'Pennylane non configuré' };
-
-  const cardUsers = await pennylane.getCardUsers();
-  const byUser = {};
-  for (const [masked, uid] of Object.entries(cardUsers)) {
-    (byUser[uid] = byUser[uid] || []).push(masked);
-  }
-  const userIds = Object.keys(byUser);
-  if (userIds.length === 0) return { users: 0, notified: 0 };
-
-  const year = new Date().getFullYear();
-  const fyStart = `${year}-01-01`;
-  const fyEnd = `${year}-12-31`;
-  const filter = [
-    { field: 'date', operator: 'gteq', value: fyStart },
-    { field: 'date', operator: 'lteq', value: fyEnd },
-  ];
-  const bankId = await pennylane.getSavedBankAccountId();
-  if (bankId) filter.push({ field: 'bank_account_id', operator: 'eq', value: bankId });
-
-  let allTx = [];
-  let cursor;
-  do {
-    const batch = await pennylane.getTransactions({ filter, limit: 100, cursor });
-    allTx = allTx.concat(batch.items);
-    cursor = batch.has_more ? batch.next_cursor : null;
-    if (cursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
-  } while (cursor);
-
-  const expenseTx = allTx.filter((t) => Number(t.amount || t.currency_amount) < 0);
-  const expenses = await prisma.expense.findMany({
-    where: { date_ticket: { gte: new Date(fyStart) } },
-    omit: { receipt_image: true },
-  });
-  const invoices = await pennylane.getFiscalYearSupplierInvoices(year);
-
-  const results = [];
-  for (const uid of userIds) {
-    const set = new Set(byUser[uid]);
-    const myTx = expenseTx.filter((t) => {
-      const ci = pennylane.cardInfo(t);
-      return ci.masked && set.has(ci.masked);
-    });
-    let missing = 0;
-    let amount = 0;
-    for (const tx of myTx) {
-      const a = Math.abs(Number(tx.amount || tx.currency_amount || 0));
-      const justified = isMatched(expenses, a, new Date(tx.date).getTime())
-        || pennylane.justifiedByInvoice(invoices, a, tx.date);
-      if (!justified) {
-        missing++;
-        amount += a;
+// Recalcule le snapshot des manquants (et notifie chaque collaborateur si demandé).
+async function refreshSnapshot({ notify }) {
+  const snap = await missing.buildAndStore(prisma);
+  const out = {
+    computedAt: snap.computedAt,
+    fiscalYear: snap.fiscalYear,
+    totalMissing: snap.summary?.unmatched ?? null,
+  };
+  if (notify && push.isConfigured() && snap.connection?.ok) {
+    const byUser = {};
+    for (const c of snap.cards || []) {
+      if (c.userId && c.missing > 0) {
+        const u = (byUser[c.userId] = byUser[c.userId] || { missing: 0, amount: 0 });
+        u.missing += c.missing;
+        u.amount += c.amountMissing;
       }
     }
-    if (missing > 0) {
+    const notes = [];
+    for (const [uid, v] of Object.entries(byUser)) {
       const r = await push.sendToUser(parseInt(uid, 10), {
         title: 'Paiements à justifier',
-        body: `${missing} paiement${missing > 1 ? 's' : ''} (${amount.toFixed(2)} €) sans justificatif. Scanne tes tickets 📷`,
+        body: `${v.missing} paiement${v.missing > 1 ? 's' : ''} (${v.amount.toFixed(2)} €) sans justificatif. Scanne tes tickets 📷`,
         url: '/dashboard',
         tag: 'lbdp-missing',
       });
-      results.push({ userId: uid, missing, sent: r.sent });
+      notes.push({ userId: uid, missing: v.missing, sent: r.sent });
     }
+    out.push = { notified: notes.length, results: notes };
   }
-  return { users: userIds.length, notified: results.length, results };
+  return out;
 }
 
 router.post('/daily', async (req, res) => {
   const out = {};
-  // 1. Rapprochement (compta) — best effort, ne bloque pas le push
-  try {
-    out.reconcile = await runCardDirectReconcile();
-  } catch (e) {
-    out.reconcile = { error: e.message };
-  }
-  // 2. Push des paiements manquants
-  try {
-    out.push = await sendMissingPush();
-  } catch (e) {
-    out.push = { error: e.message };
-  }
+  try { out.reconcile = await runCardDirectReconcile(); } catch (e) { out.reconcile = { error: e.message }; }
+  try { out.missing = await refreshSnapshot({ notify: true }); } catch (e) { out.missing = { error: e.message }; }
   res.json({ ok: true, ...out });
 });
 
-// POST /api/cron/reconcile — rapprochement seul (déclenché toutes les heures, après la synchro Drive)
 router.post('/reconcile', async (req, res) => {
-  try {
-    const reconcile = await runCardDirectReconcile();
-    res.json({ ok: true, reconcile });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
+  const out = {};
+  try { out.reconcile = await runCardDirectReconcile(); } catch (e) { out.reconcile = { error: e.message }; }
+  try { out.missing = await refreshSnapshot({ notify: false }); } catch (e) { out.missing = { error: e.message }; }
+  res.json({ ok: true, ...out });
 });
 
 module.exports = router;
