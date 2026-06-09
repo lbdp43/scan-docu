@@ -48,6 +48,7 @@ export default function Dashboard() {
   const [toast, setToast] = useState(null);
   const [pendingExpenses, setPendingExpenses] = useState([]);
   const [myMissing, setMyMissing] = useState(null);
+  const [myMissingLoading, setMyMissingLoading] = useState(true);
   const [pushState, setPushState] = useState(null);
   const loadedRef = useRef(false);
 
@@ -81,7 +82,8 @@ export default function Dashboard() {
     loadData();
     loadPending();
     // Paiements carte sans justificatif (chargé à part — appel Pennylane plus lent)
-    api.getMyMissingPayments().then(setMyMissing).catch(() => {});
+    setMyMissingLoading(true);
+    api.getMyMissingPayments().then(setMyMissing).catch(() => {}).finally(() => setMyMissingLoading(false));
     getPushState().then(setPushState).catch(() => {});
   }, []);
 
@@ -171,7 +173,12 @@ export default function Dashboard() {
       </div>
 
       {/* Mes paiements à justifier (notification in-app) */}
-      {myMissing?.summary?.missing > 0 && (
+      {myMissingLoading ? (
+        <div className="rounded-3xl p-5 bg-card border border-card-border flex items-center gap-3 animate-fade-up">
+          <span className="w-5 h-5 border-2 border-green-mid/30 border-t-green-light rounded-full animate-spin shrink-0" />
+          <p className="text-text-muted text-sm">Vérification des paiements à justifier{'…'}</p>
+        </div>
+      ) : myMissing?.summary?.missing > 0 ? (
         <div className="rounded-3xl p-5 bg-amber-500/10 border border-amber-500/30 animate-fade-up">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-500/20 flex items-center justify-center text-xl shrink-0">{'⚠️'}</div>
@@ -222,7 +229,7 @@ export default function Dashboard() {
             </button>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Hero Card — Monthly Total */}
       <div className="relative overflow-hidden rounded-4xl p-7"
