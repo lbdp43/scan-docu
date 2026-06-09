@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install && npx prisma generate",
+    "build": "cd frontend && npm install --include=dev && npm run build && cd ../backend && npm install --include=dev && npx prisma generate",
     "start": "cd backend && NODE_ENV=production npm start"
   }
 }
