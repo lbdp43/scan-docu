@@ -26,11 +26,11 @@ Variable d'environnement à définir (côté Railway notamment) :
 
 | Variable | Requis | Description |
 |----------|--------|-------------|
-| `PENNYLANE_TOKEN` | oui | Token API Pennylane. Un scope **lecture seule** suffit (`transactions:readonly`, `bank_accounts:readonly`). Généré dans Pennylane > Paramètres > Connectivité > Développeurs. |
+| `PENNYLANE_API_TOKEN` | oui | Token API Pennylane (alias accepté : `PENNYLANE_TOKEN`). Un scope **lecture seule** suffit (`transactions:readonly`, `bank_accounts:readonly`). Généré dans Pennylane > Paramètres > Connectivité > Développeurs. |
 | `PENNYLANE_API_URL` | non | Défaut `https://app.pennylane.com/api/external/v2`. |
 | `PENNYLANE_PRO_BANK_ACCOUNT_ID` | non | Id du compte bancaire « Compte Pro Pennylane » portant les cartes. Défaut `949694`. |
 
-Sans `PENNYLANE_TOKEN`, l'écran affiche un message d'aide et le reste de l'app fonctionne
+Sans `PENNYLANE_API_TOKEN`, l'écran affiche un message d'aide et le reste de l'app fonctionne
 normalement.
 
 ### Note de déploiement

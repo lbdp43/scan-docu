@@ -173,7 +173,7 @@ export default function Reconciliation() {
             {data.message || data.connection.error}
           </p>
           <p className="text-text-dim text-[11px] mt-2">
-            Ajoutez la variable <span className="font-mono">PENNYLANE_TOKEN</span> dans la configuration Railway.
+            Ajoutez la variable <span className="font-mono">PENNYLANE_API_TOKEN</span> dans la configuration Railway.
           </p>
         </div>
       )}

@@ -4,13 +4,14 @@
  * pour les comparer aux justificatifs scannés dans scan-docu.
  *
  * Variables d'environnement :
- *   PENNYLANE_TOKEN              (requis)  token API Pennylane — un scope `transactions:readonly` suffit
+ *   PENNYLANE_API_TOKEN          (requis)  token API Pennylane — un scope `transactions:readonly` suffit
+ *                                          (alias rétro-compatible : PENNYLANE_TOKEN)
  *   PENNYLANE_API_URL            (option)  défaut https://app.pennylane.com/api/external/v2
  *   PENNYLANE_PRO_BANK_ACCOUNT_ID (option) id du compte bancaire Pro portant les cartes (défaut 949694)
  */
 
 const API_URL = (process.env.PENNYLANE_API_URL || 'https://app.pennylane.com/api/external/v2').replace(/\/$/, '');
-const TOKEN = process.env.PENNYLANE_TOKEN || '';
+const TOKEN = process.env.PENNYLANE_API_TOKEN || process.env.PENNYLANE_TOKEN || '';
 const PRO_BANK_ACCOUNT_ID = parseInt(process.env.PENNYLANE_PRO_BANK_ACCOUNT_ID || '949694', 10);
 
 const RATE_SLEEP_MS = 280; // 25 req / 5s -> ~1 req / 200ms, marge de sécurité
@@ -27,7 +28,7 @@ function isConfigured() {
  */
 async function apiGet(path, { searchParams } = {}) {
   if (!TOKEN) {
-    const err = new Error('PENNYLANE_TOKEN non configuré');
+    const err = new Error('PENNYLANE_API_TOKEN non configuré');
     err.code = 'NO_TOKEN';
     throw err;
   }
@@ -96,7 +97,7 @@ async function apiGet(path, { searchParams } = {}) {
  */
 async function checkConnection() {
   if (!isConfigured()) {
-    return { ok: false, configured: false, error: 'PENNYLANE_TOKEN non configuré' };
+    return { ok: false, configured: false, error: 'PENNYLANE_API_TOKEN non configuré' };
   }
   try {
     const me = await apiGet('/me');

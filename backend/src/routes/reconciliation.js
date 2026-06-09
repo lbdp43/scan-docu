@@ -79,7 +79,7 @@ router.get('/', async (req, res) => {
         orphanScans: [],
         message: connection.configured
           ? 'Connexion Pennylane impossible — vérifiez le token.'
-          : 'Token Pennylane non configuré (variable PENNYLANE_TOKEN).',
+          : 'Token Pennylane non configuré (variable PENNYLANE_API_TOKEN).',
       });
     }
 
