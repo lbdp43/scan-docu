@@ -48,4 +48,60 @@ function expenseScore(expAmount, expDateMs, txAmount, txDateMs) {
   return s;
 }
 
-module.exports = { dms, cardInfo, justifiedByInvoice, expenseScore };
+// 1 justificatif = 1 paiement.
+// Un ticket scanné existe en double : la dépense scan-docu ET la facture Pennylane
+// issue du même PDF Drive. On les fusionne en une seule "unité" (même nom de
+// fichier), puis chaque unité ne peut justifier qu'UNE transaction — fini le ticket
+// unique qui justifie deux paiements de même montant.
+// txs: [{id, amount, dateMs}] · expenses: [{amount, dateMs, fileName}]
+// invoices: [{amount, dateMs, filename}] -> Set des ids de transactions justifiées.
+function assignJustified(txs, expenses, invoices) {
+  const units = [];
+  const claimed = new Set();
+  for (const e of expenses) {
+    const unit = { exp: e, inv: null };
+    if (e.fileName) {
+      const i = invoices.findIndex((inv, idx) => !claimed.has(idx) && inv.filename && inv.filename === e.fileName);
+      if (i !== -1) { unit.inv = invoices[i]; claimed.add(i); }
+    }
+    units.push(unit);
+  }
+  invoices.forEach((inv, idx) => { if (!claimed.has(idx)) units.push({ exp: null, inv }); });
+
+  const justified = new Set();
+  const used = new Set();
+
+  // Phase 1 — côté ticket (scoring riche), meilleures paires servies d'abord
+  const expPairs = [];
+  txs.forEach((t) => units.forEach((u, ui) => {
+    if (!u.exp) return;
+    const s = expenseScore(u.exp.amount, u.exp.dateMs, t.amount, t.dateMs);
+    if (s >= 25) expPairs.push({ t, ui, s });
+  }));
+  expPairs.sort((a, b) => b.s - a.s);
+  for (const p of expPairs) {
+    if (justified.has(p.t.id) || used.has(p.ui)) continue;
+    justified.add(p.t.id);
+    used.add(p.ui);
+  }
+
+  // Phase 2 — côté facture (montant au centime, J-2..J+25), dates les plus proches d'abord
+  const invPairs = [];
+  txs.forEach((t) => units.forEach((u, ui) => {
+    if (!u.inv || used.has(ui)) return;
+    if (Math.abs(u.inv.amount - t.amount) > 0.01) return;
+    if (u.inv.dateMs == null || t.dateMs == null) return;
+    const dd = (t.dateMs - u.inv.dateMs) / 86400000;
+    if (dd >= -2 && dd <= 25) invPairs.push({ t, ui, d: Math.abs(dd) });
+  }));
+  invPairs.sort((a, b) => a.d - b.d);
+  for (const p of invPairs) {
+    if (justified.has(p.t.id) || used.has(p.ui)) continue;
+    justified.add(p.t.id);
+    used.add(p.ui);
+  }
+
+  return justified;
+}
+
+module.exports = { dms, cardInfo, justifiedByInvoice, expenseScore, assignJustified };

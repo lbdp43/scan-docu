@@ -55,30 +55,41 @@ async function computeMissing(db) {
   const allTx = await paginate(pennylane.getTransactions, txFilter);
   const expenseTx = allTx.filter((t) => Number(t.amount || t.currency_amount) < 0);
 
+  // Factures actives uniquement : les doublons archivés (2-PDF) ne doivent pas
+  // servir de justificatifs fantômes.
   const allInv = await paginate(pennylane.getSupplierInvoices, dateRange);
   const invoices = allInv
-    .map((i) => ({ amount: Math.abs(Number(i.currency_amount || i.amount || 0)), date: i.date }))
-    .filter((i) => i.amount > 0 && i.date);
+    .filter((i) => !i.archived_at)
+    .map((i) => ({
+      amount: Math.abs(Number(i.currency_amount || i.amount || 0)),
+      dateMs: dms(i.date),
+      filename: i.filename || null,
+    }))
+    .filter((i) => i.amount > 0 && i.dateMs != null);
 
   const expRows = await db.expense.findMany({
     where: { date_ticket: { gte: new Date(fy.from) } },
     omit: { receipt_image: true },
   });
-  const expenses = expRows.map((e) => ({ amount: Number(e.amount), dateMs: dms(e.date_ticket) }));
+  const expenses = expRows.map((e) => ({
+    amount: Number(e.amount),
+    dateMs: dms(e.date_ticket),
+    fileName: e.file_name || null,
+  }));
 
-  function hasExpense(a, tdms) {
-    for (const e of expenses) {
-      if (match.expenseScore(e.amount, e.dateMs, a, tdms) >= 25) return true;
-    }
-    return false;
-  }
+  // 1 justificatif = 1 paiement (ticket et facture du même document fusionnés)
+  const txList = expenseTx.map((tx) => ({
+    id: tx.id,
+    amount: Math.abs(Number(tx.amount || tx.currency_amount || 0)),
+    dateMs: dms(tx.date),
+  }));
+  const justifiedSet = match.assignJustified(txList, expenses, invoices);
 
   const cardsMap = new Map();
   const unmatched = [];
   for (const tx of expenseTx) {
     const a = Math.abs(Number(tx.amount || tx.currency_amount || 0));
-    const tdms = dms(tx.date);
-    const matched = hasExpense(a, tdms) || pennylane.justifiedByInvoice(invoices, a, tx.date);
+    const matched = justifiedSet.has(tx.id);
     const ci = pennylane.cardInfo(tx);
     const key = ci.masked || 'unknown';
     if (!cardsMap.has(key)) {

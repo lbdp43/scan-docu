@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { cardInfo, justifiedByInvoice, expenseScore } = require('../src/services/match');
+const { cardInfo, justifiedByInvoice, expenseScore, assignJustified } = require('../src/services/match');
 
 const ms = (d) => Date.parse(d);
 
@@ -41,6 +41,57 @@ test('expenseScore: montant exact + lendemain >= 25 (match)', () => {
 
 test('expenseScore: montant très différent = 0', () => {
   assert.strictEqual(expenseScore(20.0, ms('2026-03-10'), 99.0, ms('2026-03-11')), 0);
+});
+
+// --- assignJustified : 1 justificatif = 1 paiement ---
+
+test('1 ticket ne justifie qu\'UN des 2 paiements identiques (2 pleins à 80€)', () => {
+  const txs = [
+    { id: 1, amount: 80, dateMs: ms('2026-03-10') },
+    { id: 2, amount: 80, dateMs: ms('2026-03-10') },
+  ];
+  const expenses = [{ amount: 80, dateMs: ms('2026-03-10'), fileName: 't.pdf' }];
+  const j = assignJustified(txs, expenses, []);
+  assert.strictEqual(j.size, 1);
+});
+
+test('ticket + facture du MÊME document (même fichier) = 1 seule unité -> 1 paiement', () => {
+  const txs = [
+    { id: 1, amount: 80, dateMs: ms('2026-03-10') },
+    { id: 2, amount: 80, dateMs: ms('2026-03-10') },
+  ];
+  const expenses = [{ amount: 80, dateMs: ms('2026-03-10'), fileName: 't.pdf' }];
+  const invoices = [{ amount: 80, dateMs: ms('2026-03-10'), filename: 't.pdf' }];
+  const j = assignJustified(txs, expenses, invoices);
+  assert.strictEqual(j.size, 1); // la facture issue du même PDF ne compte pas double
+});
+
+test('2 justificatifs distincts justifient bien 2 paiements', () => {
+  const txs = [
+    { id: 1, amount: 80, dateMs: ms('2026-03-10') },
+    { id: 2, amount: 80, dateMs: ms('2026-03-11') },
+  ];
+  const expenses = [{ amount: 80, dateMs: ms('2026-03-10'), fileName: 'a.pdf' }];
+  const invoices = [{ amount: 80, dateMs: ms('2026-03-11'), filename: 'b.pdf' }];
+  const j = assignJustified(txs, expenses, invoices);
+  assert.strictEqual(j.size, 2);
+});
+
+test('le meilleur match (date la plus proche) est servi en premier', () => {
+  const txs = [
+    { id: 1, amount: 20, dateMs: ms('2026-03-10') },  // lendemain du ticket
+    { id: 2, amount: 20, dateMs: ms('2026-03-25') },  // 16 jours après
+  ];
+  const expenses = [{ amount: 20, dateMs: ms('2026-03-09'), fileName: null }];
+  const j = assignJustified(txs, expenses, []);
+  assert.ok(j.has(1));
+  assert.ok(!j.has(2));
+});
+
+test('facture seule (fournisseur, sans ticket scan-docu) justifie un paiement', () => {
+  const txs = [{ id: 1, amount: 12.9, dateMs: ms('2026-05-08') }];
+  const j = assignJustified(txs, [], [{ amount: 12.9, dateMs: ms('2026-05-07'), filename: 'f.pdf' }]);
+  assert.ok(j.has(1));
 });
 
 // Régression du bug "Cannot read properties of null (reading id)" :
