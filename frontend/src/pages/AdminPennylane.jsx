@@ -26,6 +26,7 @@ export default function AdminPennylane() {
   const [editingCard, setEditingCard] = useState(null);
   const [cardLabelInput, setCardLabelInput] = useState('');
   const [savingCard, setSavingCard] = useState(false);
+  const [openCard, setOpenCard] = useState(null);
   const [users, setUsers] = useState([]);
   const loadedRef = useRef(false);
 
@@ -600,104 +601,98 @@ export default function AdminPennylane() {
                   </div>
                 </div>
 
-                {/* Par carte — intitulés éditables */}
-                {missing.cards && missing.cards.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-text-muted text-[11px] uppercase tracking-widest">Par carte</h4>
-                    {missing.cards.map(card => (
-                      <div key={card.masked || 'unknown'} className="p-3 rounded-xl bg-card border border-card-border">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            {editingCard === card.masked ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  autoFocus
-                                  value={cardLabelInput}
-                                  onChange={(e) => setCardLabelInput(e.target.value)}
-                                  onKeyDown={(e) => e.key === 'Enter' && handleSaveCardLabel(card.masked)}
-                                  placeholder="Nom de la carte"
-                                  className="flex-1 min-w-0 bg-bg border border-card-border rounded-lg px-2 py-1 text-text text-xs focus:outline-none focus:border-green-mid"
-                                />
-                                <button onClick={() => handleSaveCardLabel(card.masked)} disabled={savingCard} className="text-green-light text-xs font-medium shrink-0">
-                                  {savingCard ? '…' : 'OK'}
-                                </button>
-                                <button onClick={() => { setEditingCard(null); setCardLabelInput(''); }} className="text-text-muted text-xs shrink-0">{'✕'}</button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => { if (card.masked) { setEditingCard(card.masked); setCardLabelInput(card.label || ''); } }}
-                                className="text-left w-full"
-                                disabled={!card.masked}
-                              >
-                                <p className="text-text text-sm font-medium truncate">
-                                  {cardName(card)} {card.masked && <span className="text-text-dim">{'✏️'}</span>}
-                                </p>
-                                <p className="text-text-muted text-[10px]">
-                                  {card.last4 ? `•••• ${card.last4}` : 'sans carte'}{card.employee ? ` · ${card.employee}` : ''}
-                                </p>
-                              </button>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className={`font-serif text-sm font-semibold ${card.missing > 0 ? 'text-amber-400' : 'text-green-400'}`}>
-                              {card.missing}/{card.total}
-                            </p>
-                            <p className="text-text-muted text-[10px]">sans ticket{card.amountMissing > 0 ? ` · ${Number(card.amountMissing).toFixed(2)}€` : ''}</p>
-                          </div>
-                        </div>
-
-                        {/* Attribution à un collaborateur */}
-                        {card.masked && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-text-muted text-[10px] shrink-0">Collaborateur</span>
-                            <select
-                              value={card.userId || ''}
-                              onChange={(e) => handleAssignCard(card.masked, e.target.value)}
-                              className="flex-1 min-w-0 bg-bg border border-card-border rounded-lg px-2 py-1 text-text text-xs focus:outline-none focus:border-green-mid"
-                            >
-                              <option value="">{'— non attribué —'}</option>
-                              {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {missing.transactions.length === 0 ? (
-                  <p className="text-green-400 text-center py-8 text-sm">Tous les paiements ont un ticket correspondant</p>
+                {/* Tableau de bord par carte : collaborateur + ses paiements sans justificatif */}
+                {(!missing.cards || missing.cards.length === 0) ? (
+                  <p className="text-green-400 text-center py-8 text-sm">Aucune transaction carte sur la période</p>
                 ) : (
                   <div className="space-y-2">
-                    <h4 className="text-text-muted text-[11px] uppercase tracking-widest">Paiements sans ticket</h4>
-                    {missing.transactions.map(tx => {
-                      const params = `amount=${encodeURIComponent(Number(tx.amount).toFixed(2))}&date=${encodeURIComponent(tx.date)}&merchant=${encodeURIComponent(tx.label || '')}`;
-                      const manualUrl = `/manual?${params}`;
-                      const scanUrl = `/?${params}`;
+                    <h4 className="text-text-muted text-[11px] uppercase tracking-widest">Par carte · collaborateur</h4>
+                    {missing.cards.map(card => {
+                      const collab = users.find(u => u.id === card.userId);
+                      const key = card.masked || 'unknown';
+                      const isOpen = openCard === key;
+                      const cardTxs = (missing.transactions || []).filter(t => (t.card?.masked || null) === card.masked);
                       return (
-                      <div key={tx.transactionId} className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0 mr-2">
-                            <p className="text-text text-sm font-medium truncate">{tx.label || 'Transaction inconnue'}</p>
-                            <p className="text-text-muted text-xs">
-                              {tx.date}{tx.card ? ` · ${cardName(tx.card)}` : ''}
-                            </p>
+                        <div key={key} className="rounded-xl bg-card border border-card-border overflow-hidden">
+                          <div className="p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                {editingCard === card.masked ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      autoFocus
+                                      value={cardLabelInput}
+                                      onChange={(e) => setCardLabelInput(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleSaveCardLabel(card.masked)}
+                                      placeholder="Nom de la carte"
+                                      className="flex-1 min-w-0 bg-bg border border-card-border rounded-lg px-2 py-1 text-text text-xs focus:outline-none focus:border-green-mid"
+                                    />
+                                    <button onClick={() => handleSaveCardLabel(card.masked)} disabled={savingCard} className="text-green-light text-xs font-medium shrink-0">{savingCard ? '…' : 'OK'}</button>
+                                    <button onClick={() => { setEditingCard(null); setCardLabelInput(''); }} className="text-text-muted text-xs shrink-0">{'✕'}</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => { if (card.masked) { setEditingCard(card.masked); setCardLabelInput(card.label || ''); } }}
+                                    className="text-left w-full"
+                                    disabled={!card.masked}
+                                  >
+                                    <p className="text-text text-sm font-medium truncate">
+                                      {'👤'} {collab ? collab.name : 'Non attribué'}
+                                    </p>
+                                    <p className="text-text-muted text-[10px]">
+                                      {cardName(card)} {card.masked && <span className="text-text-dim">{'✏️'}</span>} · {card.last4 ? `•••• ${card.last4}` : 'sans carte'}
+                                    </p>
+                                  </button>
+                                )}
+                              </div>
+                              <button onClick={() => setOpenCard(isOpen ? null : key)} className="text-right shrink-0">
+                                <p className={`font-serif text-lg font-semibold ${card.missing > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                                  {card.missing}
+                                </p>
+                                <p className="text-text-muted text-[10px]">
+                                  {card.missing > 0 ? `${Number(card.amountMissing).toFixed(2)}€ ${isOpen ? '▲' : '▼'}` : 'à jour'}
+                                </p>
+                              </button>
+                            </div>
+
+                            {card.masked && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="text-text-muted text-[10px] shrink-0">Attribuer à</span>
+                                <select
+                                  value={card.userId || ''}
+                                  onChange={(e) => handleAssignCard(card.masked, e.target.value)}
+                                  className="flex-1 min-w-0 bg-bg border border-card-border rounded-lg px-2 py-1 text-text text-xs focus:outline-none focus:border-green-mid"
+                                >
+                                  <option value="">{'— non attribué —'}</option>
+                                  {users.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                                </select>
+                              </div>
+                            )}
                           </div>
-                          <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">
-                            -{Number(tx.amount).toFixed(2)} {'€'}
-                          </p>
+
+                          {isOpen && card.missing > 0 && (
+                            <div className="border-t border-card-border divide-y divide-card-border/40">
+                              {cardTxs.map(tx => {
+                                const params = `amount=${encodeURIComponent(Number(tx.amount).toFixed(2))}&date=${encodeURIComponent(tx.date)}&merchant=${encodeURIComponent(tx.label || '')}`;
+                                return (
+                                  <div key={tx.transactionId} className="px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="text-text text-xs font-medium truncate">{tx.label || 'Transaction'}</p>
+                                        <p className="text-text-muted text-[10px]">{new Date(tx.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
+                                      </div>
+                                      <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">-{Number(tx.amount).toFixed(2)}{'€'}</p>
+                                    </div>
+                                    <div className="flex gap-2 mt-1.5">
+                                      <Link to={`/?${params}`} className="flex-1 text-center py-1 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">{'📷'} Scanner</Link>
+                                      <Link to={`/manual?${params}`} className="flex-1 text-center py-1 rounded-lg bg-bg border border-card-border text-text-muted text-[10px] font-medium">{'✍️'} Saisie</Link>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-2 mt-2">
-                          <Link to={scanUrl} className="flex-1 text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[11px] font-medium">
-                            {'📷'} Scanner
-                          </Link>
-                          <Link to={manualUrl} className="flex-1 text-center py-1.5 rounded-lg bg-card border border-card-border text-text-muted text-[11px] font-medium">
-                            {'✍️'} Saisie
-                          </Link>
-                        </div>
-                      </div>
                       );
                     })}
                   </div>
