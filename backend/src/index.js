@@ -4,16 +4,27 @@ const helmet = require('helmet');
 const hpp = require('hpp');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 
 const authRoutes = require('./routes/auth');
 const expensesRoutes = require('./routes/expenses');
 const adminRoutes = require('./routes/admin');
 const scanRoutes = require('./routes/scan');
+const driveSetupRoutes = require('./routes/driveSetup');
+const expenseTypesRoutes = require('./routes/expenseTypes');
+const pennylaneRoutes = require('./routes/pennylane');
+const { warmupWorker } = require('./services/ocr');
 
 const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy (Railway, Heroku, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Security middleware
 app.use(helmet({
@@ -76,6 +87,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/scan', scanRoutes);
+app.use('/api/drive', driveSetupRoutes);
+app.use('/api/expense-types', expenseTypesRoutes);
+app.use('/api/pennylane', pennylaneRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -104,14 +118,91 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Prevent unhandled errors from crashing the server (e.g. Tesseract worker errors)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[process] Unhandled rejection:', reason);
+});
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
 
-app.listen(PORT, () => {
+async function ensureAdminExists() {
+  try {
+    const count = await prisma.user.count();
+    console.log(`[startup] Users in DB: ${count}`);
+    if (count === 0) {
+      console.log('[startup] No users found, creating default admin...');
+      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || crypto.randomBytes(16).toString('hex');
+      const hash = await bcrypt.hash(defaultPassword, 12);
+      await prisma.user.create({
+        data: {
+          email: 'guillaume@lbdp.fr',
+          password_hash: hash,
+          name: 'Guillaume Darinot',
+          role: 'admin',
+          card_id: 'CARTE-001',
+        },
+      });
+      if (process.env.DEFAULT_ADMIN_PASSWORD) {
+        console.log('[startup] Admin user created: guillaume@lbdp.fr — change password after first login');
+      } else {
+        console.log(`[startup] Admin user created: guillaume@lbdp.fr — generated password: ${defaultPassword}`);
+        console.log('[startup] Set DEFAULT_ADMIN_PASSWORD env var to control this');
+      }
+    } else {
+      console.log('[startup] Users already exist, skipping admin creation');
+    }
+  } catch (err) {
+    console.error('[startup] Error checking/creating admin:', err.message);
+  }
+}
+
+// Cleanup expired blacklisted tokens periodically
+async function cleanupExpiredTokens() {
+  try {
+    const result = await prisma.tokenBlacklist.deleteMany({
+      where: { expires_at: { lt: new Date() } },
+    });
+    if (result.count > 0) {
+      console.log(`[cleanup] Removed ${result.count} expired blacklisted tokens`);
+    }
+  } catch (err) {
+    console.error('[cleanup] Token cleanup error:', err.message);
+  }
+}
+
+async function ensureDefaultExpenseTypes() {
+  try {
+    const count = await prisma.expenseType.count();
+    if (count === 0) {
+      console.log('[startup] No expense types found, seeding defaults...');
+      await prisma.expenseType.createMany({
+        data: [
+          { value: 'carburant', label: 'Carburant', icon: '⛽', color: '#4A9E40', position: 0 },
+          { value: 'repas', label: 'Repas', icon: '🍽️', color: '#F97316', position: 1 },
+          { value: 'peage', label: 'Péage', icon: '🛣️', color: '#3B82F6', position: 2 },
+          { value: 'autre', label: 'Autre', icon: '📄', color: '#6B7280', position: 3 },
+        ],
+        skipDuplicates: true,
+      });
+      console.log('[startup] Default expense types seeded');
+    }
+  } catch (err) {
+    console.error('[startup] Error seeding expense types:', err.message);
+  }
+}
+
+app.listen(PORT, async () => {
   console.log(`LBDP API running on port ${PORT}`);
+  await ensureAdminExists();
+  await ensureDefaultExpenseTypes();
+  await cleanupExpiredTokens();
+  setInterval(cleanupExpiredTokens, 60 * 60 * 1000); // Cleanup every hour
+  // Pre-warm Tesseract so the first scan request is instant
+  warmupWorker().catch(() => {});
 });
 
 module.exports = app;

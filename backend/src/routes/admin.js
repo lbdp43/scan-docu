@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const { z } = require('zod');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { testConnection: testDriveConnection } = require('../services/drive');
 
 const router = express.Router();
 
@@ -99,7 +100,8 @@ router.post('/users', validate(createUserSchema), async (req, res) => {
 // PUT /api/admin/users/:id — Update user
 router.put('/users/:id', validate(updateUserSchema), async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) return res.status(400).json({ error: 'ID invalide' });
     const data = req.validatedBody;
 
     const user = await req.prisma.user.update({
@@ -130,11 +132,12 @@ router.put('/users/:id', validate(updateUserSchema), async (req, res) => {
 // PUT /api/admin/users/:id/reset-password
 router.put('/users/:id/reset-password', async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) return res.status(400).json({ error: 'ID invalide' });
     const { newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Mot de passe minimum 8 caractères' });
+    if (!newPassword || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe entre 8 et 128 caractères requis' });
     }
 
     const password_hash = await bcrypt.hash(newPassword, 12);
@@ -228,11 +231,16 @@ router.get('/stats', async (req, res) => {
 // GET /api/admin/expenses — all expenses with user filter
 router.get('/expenses', async (req, res) => {
   try {
-    const { user_id, type, month, year, page = 1, limit = 50 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { user_id, type, month, year } = req.query;
+    const rawPage = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const rawLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const skip = (rawPage - 1) * rawLimit;
     const where = {};
 
-    if (user_id) where.user_id = parseInt(user_id);
+    if (user_id) {
+      const uid = parseInt(user_id, 10);
+      if (!isNaN(uid)) where.user_id = uid;
+    }
     if (type) where.type = type;
     if (month && year) {
       where.date_ticket = {
@@ -244,12 +252,13 @@ router.get('/expenses', async (req, res) => {
     const [expenses, total] = await Promise.all([
       req.prisma.expense.findMany({
         where,
+        omit: { receipt_image: true },
         include: {
           user: { select: { id: true, name: true, card_id: true } },
         },
         orderBy: { date_ticket: 'desc' },
         skip,
-        take: parseInt(limit),
+        take: rawLimit,
       }),
       req.prisma.expense.count({ where }),
     ]);
@@ -258,9 +267,9 @@ router.get('/expenses', async (req, res) => {
       expenses,
       pagination: {
         total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit)),
+        page: rawPage,
+        limit: rawLimit,
+        totalPages: Math.ceil(total / rawLimit),
       },
     });
   } catch (err) {
@@ -303,6 +312,115 @@ router.put('/drive-config', async (req, res) => {
   } catch (err) {
     console.error('Update drive config error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/admin/export-failed — Download all failed receipts as ZIP
+router.get('/export-failed', async (req, res) => {
+  try {
+    const archiver = require('archiver');
+    const { generatePDF } = require('../services/pdf');
+
+    const failedExpenses = await req.prisma.expense.findMany({
+      where: {
+        upload_status: 'error',
+        has_receipt: true,
+      },
+      include: {
+        user: { select: { name: true, card_id: true } },
+      },
+      orderBy: { date_ticket: 'desc' },
+    });
+
+    if (failedExpenses.length === 0) {
+      return res.status(404).json({ error: 'Aucune dépense en erreur avec justificatif' });
+    }
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=justificatifs-echec-drive-${new Date().toISOString().slice(0, 10)}.zip`);
+
+    const archive = archiver('zip', { zlib: { level: 5 } });
+    archive.pipe(res);
+
+    for (const expense of failedExpenses) {
+      const dateStr = new Date(expense.date_ticket).toISOString().slice(0, 10);
+      const userName = expense.user.name.split(' ')[0];
+      const imgBuffer = expense.receipt_image ? Buffer.from(expense.receipt_image) : null;
+
+      // Add the raw image
+      if (imgBuffer && imgBuffer.length > 0) {
+        archive.append(imgBuffer, {
+          name: `${dateStr}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}_photo.jpg`,
+        });
+      }
+
+      // Also generate and add the PDF
+      try {
+        const pdfBuffer = await generatePDF({
+          imageBuffer: imgBuffer,
+          imageMime: imgBuffer ? 'image/jpeg' : null,
+          date: expense.date_ticket,
+          amount: Number(expense.amount),
+          type: expense.type,
+          merchant: expense.merchant || '',
+          description: expense.description || '',
+          userName: expense.user.name,
+          cardId: expense.user.card_id,
+        });
+        archive.append(pdfBuffer, {
+          name: expense.file_name || `${dateStr}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}.pdf`,
+        });
+      } catch (pdfErr) {
+        console.error(`[export-failed] PDF generation error for expense ${expense.id}:`, pdfErr.message);
+      }
+    }
+
+    await archive.finalize();
+  } catch (err) {
+    console.error('Export failed receipts error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  }
+});
+
+// POST /api/admin/acknowledge-zip — Mark all failed receipts as exported (ZIP downloaded)
+router.post('/acknowledge-zip', async (req, res) => {
+  try {
+    const result = await req.prisma.expense.updateMany({
+      where: {
+        upload_status: 'error',
+        has_receipt: true,
+      },
+      data: {
+        upload_status: 'exported',
+      },
+    });
+
+    res.json({
+      success: true,
+      count: result.count,
+      message: `${result.count} justificatif(s) marqué(s) comme exporté(s)`,
+    });
+  } catch (err) {
+    console.error('Acknowledge ZIP error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/admin/drive-status — Check Google Drive connection health
+router.get('/drive-status', async (req, res) => {
+  try {
+    const status = await testDriveConnection();
+    res.json(status);
+  } catch (err) {
+    console.error('Drive status check error:', err);
+    res.json({
+      configured: false,
+      connected: false,
+      folderAccessible: false,
+      error: err.message,
+    });
   }
 });
 

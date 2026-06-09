@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
-const { uploadToDrive } = require('../services/drive');
+const { uploadToDrive, uploadPhotoToDrive, resetDriveClient, updateDriveFile, isAuthError, getRootFolderId } = require('../services/drive');
 
 const router = express.Router();
 
@@ -46,16 +46,26 @@ router.post('/', upload.single('image'), async (req, res) => {
       }
     }
 
-    // Preprocess image with Sharp for better OCR
+    // PDFs cannot be processed by Tesseract OCR — only images are supported
+    if (req.file.mimetype === 'application/pdf') {
+      return res.status(400).json({
+        error: 'Les fichiers PDF ne sont pas supportés pour le scan OCR. Veuillez prendre une photo du ticket (JPG, PNG ou WebP).',
+      });
+    }
+
+    // Preprocess image with Sharp for better OCR — 1000px is sufficient for text recognition
     let processedBuffer = req.file.buffer;
     if (req.file.mimetype.startsWith('image/')) {
       processedBuffer = await sharp(req.file.buffer)
+        .rotate() // Auto-orient from EXIF (critical for mobile photos)
+        .resize(1000, null, { withoutEnlargement: true, fit: 'inside' })
         .grayscale()
-        .normalize()
-        .sharpen()
-        .resize(2000, null, { withoutEnlargement: true, fit: 'inside' })
-        .jpeg({ quality: 90 })
+        .normalize() // Auto contrast stretching
+        .linear(1.3, -(255 * 0.15)) // Boost contrast for faded thermal receipts
+        .sharpen({ sigma: 1.5, m1: 1.5, m2: 0.7 })
+        .png() // PNG lossless for better OCR
         .toBuffer();
+      console.log(`[scan] Image preprocessed: ${req.file.buffer.length} -> ${processedBuffer.length} bytes`);
     }
 
     // Perform OCR
@@ -66,6 +76,7 @@ router.post('/', upload.single('image'), async (req, res) => {
       rawText: ocrResult.rawText,
       extracted: ocrResult.extracted,
       confidence: ocrResult.confidence,
+      typeDetection: ocrResult.typeDetection,
     });
   } catch (err) {
     console.error('Scan error:', err);
@@ -95,42 +106,84 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     const expenseType = type || 'autre';
     const userName = user.name.split(' ')[0];
 
-    // Generate PDF
-    let pdfBuffer = null;
-    let fileName = null;
-    if (req.file) {
-      fileName = `ticket_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.pdf`;
-      pdfBuffer = await generatePDF({
-        imageBuffer: req.file.buffer,
-        imageMime: req.file.mimetype,
-        date: ticketDate,
-        amount: parsedAmount,
-        type: expenseType,
-        merchant: merchant || '',
-        description: description || '',
-        userName: user.name,
-        cardId: user.card_id,
-      });
+    // Generate PDF (with image or "TICKET NON DISPONIBLE" banner)
+    const hasImage = !!req.file;
+    const prefix = hasImage ? 'ticket' : 'sans-ticket';
+    const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.pdf`;
+
+    // Compress image for PDF (much smaller than raw mobile photo)
+    let pdfImageBuffer = null;
+    let pdfImageMime = null;
+    if (hasImage && req.file.mimetype.startsWith('image/')) {
+      pdfImageBuffer = await sharp(req.file.buffer)
+        .rotate()
+        .resize(1400, null, { withoutEnlargement: true, fit: 'inside' })
+        .jpeg({ quality: 75, mozjpeg: true })
+        .toBuffer();
+      pdfImageMime = 'image/jpeg';
+      console.log(`[pdf] Image compressed: ${req.file.buffer.length} -> ${pdfImageBuffer.length} bytes (${Math.round(pdfImageBuffer.length / 1024)}KB)`);
+    } else if (hasImage) {
+      // PDF file passed directly
+      pdfImageBuffer = req.file.buffer;
+      pdfImageMime = req.file.mimetype;
     }
+
+    const pdfBuffer = await generatePDF({
+      imageBuffer: pdfImageBuffer,
+      imageMime: pdfImageMime,
+      date: ticketDate,
+      amount: parsedAmount,
+      type: expenseType,
+      merchant: merchant || '',
+      description: description || '',
+      userName: user.name,
+      cardId: user.card_id,
+    });
 
     // Upload to Google Drive
     let driveFileId = null;
     let driveFileUrl = null;
     let uploadStatus = 'pending';
 
-    if (pdfBuffer && user.drive_folder_id) {
+    // Use user-specific folder or fall back to global root folder (DB then env)
+    const folderId = user.drive_folder_id || await getRootFolderId();
+
+    if (pdfBuffer && folderId) {
       try {
-        const driveResult = await uploadToDrive(pdfBuffer, fileName, user.drive_folder_id);
+        console.log(`[drive] Uploading ${fileName} to folder ${folderId}`);
+        const driveResult = await uploadToDrive(pdfBuffer, fileName, folderId);
         driveFileId = driveResult.fileId;
         driveFileUrl = driveResult.webViewLink;
         uploadStatus = 'uploaded';
+        console.log(`[drive] Upload OK: ${driveFileUrl}`);
       } catch (driveErr) {
-        console.error('Drive upload error:', driveErr);
+        console.error('[drive] Upload error:', driveErr.message);
+        if (driveErr.response) {
+          console.error('[drive] Error details:', JSON.stringify(driveErr.response.data));
+        }
+        if (isAuthError(driveErr)) {
+          resetDriveClient();
+          console.warn('[drive] Auth error — client cache cleared. Token may be expired.');
+        }
         uploadStatus = 'error';
+      }
+    } else {
+      console.warn('[drive] Skipped upload — no folder ID configured (set DRIVE_ROOT_FOLDER_ID or user.drive_folder_id)');
+    }
+
+    // Archive the raw photo to a SEPARATE Drive folder (renamed differently) so the
+    // main justificatifs folder stays PDF-only. Best-effort — never blocks the expense.
+    if (uploadStatus === 'uploaded' && hasImage && pdfImageBuffer && pdfImageMime?.startsWith('image/')) {
+      try {
+        const photoName = `photo_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.jpg`;
+        await uploadPhotoToDrive(pdfImageBuffer, photoName, pdfImageMime);
+        console.log(`[drive] Photo archived to photos folder: ${photoName}`);
+      } catch (photoErr) {
+        console.warn('[drive] Photo archive failed (non-blocking):', photoErr.message);
       }
     }
 
-    // Save expense to database
+    // Save expense to database (store compressed image for PDF regeneration on updates)
     const expense = await req.prisma.expense.create({
       data: {
         user_id: user.id,
@@ -141,6 +194,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         merchant: merchant || null,
         description: description || null,
         has_receipt: !!req.file,
+        receipt_image: pdfImageBuffer || null,
         drive_file_id: driveFileId,
         drive_file_url: driveFileUrl,
         file_name: fileName,
@@ -148,9 +202,12 @@ router.post('/submit', upload.single('image'), async (req, res) => {
       },
     });
 
+    // Exclude receipt_image blob from response
+    const { receipt_image: _img, ...expenseResponse } = expense;
+
     res.status(201).json({
       success: true,
-      expense,
+      expense: expenseResponse,
       driveUrl: driveFileUrl,
       uploadStatus,
     });
@@ -163,7 +220,10 @@ router.post('/submit', upload.single('image'), async (req, res) => {
 // POST /api/scan/retry/:id — Retry Drive upload for failed expense
 router.post('/retry/:id', async (req, res) => {
   try {
-    const expenseId = parseInt(req.params.id);
+    const expenseId = parseInt(req.params.id, 10);
+    if (isNaN(expenseId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
     const expense = await req.prisma.expense.findUnique({
       where: { id: expenseId },
     });
@@ -177,12 +237,130 @@ router.post('/retry/:id', async (req, res) => {
     }
 
     if (expense.upload_status === 'uploaded') {
-      return res.json({ message: 'Déjà uploadé', driveUrl: expense.drive_file_url });
+      return res.json({ success: true, message: 'Déjà uploadé', driveUrl: expense.drive_file_url });
     }
 
-    res.json({ message: 'Réessai en cours — fonctionnalité à compléter avec les credentials Drive' });
+    // Get user for folder and PDF info
+    const user = await req.prisma.user.findUnique({ where: { id: expense.user_id } });
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    const folderId = user.drive_folder_id || await getRootFolderId();
+    if (!folderId) {
+      return res.status(400).json({ error: 'Aucun dossier Drive configuré' });
+    }
+
+    // Regenerate PDF from stored image
+    const { generatePDF } = require('../services/pdf');
+    const pdfBuffer = await generatePDF({
+      imageBuffer: expense.receipt_image,
+      imageMime: expense.receipt_image ? 'image/jpeg' : null,
+      date: expense.date_ticket,
+      amount: Number(expense.amount),
+      type: expense.type,
+      merchant: expense.merchant || '',
+      description: expense.description || '',
+      userName: user.name,
+      cardId: user.card_id,
+    });
+
+    // Upload to Drive
+    const driveResult = await uploadToDrive(pdfBuffer, expense.file_name, folderId);
+
+    // Update expense record
+    await req.prisma.expense.update({
+      where: { id: expenseId },
+      data: {
+        drive_file_id: driveResult.fileId,
+        drive_file_url: driveResult.webViewLink,
+        upload_status: 'uploaded',
+      },
+    });
+
+    console.log(`[retry] Expense ${expenseId} uploaded to Drive: ${driveResult.webViewLink}`);
+    res.json({ success: true, driveUrl: driveResult.webViewLink, uploadStatus: 'uploaded' });
   } catch (err) {
     console.error('Retry error:', err);
+    if (isAuthError(err)) {
+      resetDriveClient();
+      return res.status(502).json({ error: 'Token Google Drive expiré ou révoqué. Relancez le setup OAuth.' });
+    }
+    res.status(500).json({ error: 'Erreur lors du renvoi vers Drive: ' + err.message });
+  }
+});
+
+// POST /api/scan/retry-all — Admin: retry all failed Drive uploads
+router.post('/retry-all', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Réservé aux administrateurs' });
+    }
+
+    const failedExpenses = await req.prisma.expense.findMany({
+      where: { upload_status: 'error' },
+      include: { user: { select: { id: true, name: true, card_id: true, drive_folder_id: true } } },
+      orderBy: { created_at: 'asc' },
+    });
+
+    if (failedExpenses.length === 0) {
+      return res.json({ success: true, message: 'Aucune dépense en erreur', results: [] });
+    }
+
+    const { generatePDF } = require('../services/pdf');
+    const results = [];
+
+    for (const expense of failedExpenses) {
+      try {
+        const folderId = expense.user.drive_folder_id || await getRootFolderId();
+        if (!folderId) {
+          results.push({ id: expense.id, status: 'skipped', reason: 'Pas de dossier Drive' });
+          continue;
+        }
+
+        const pdfBuffer = await generatePDF({
+          imageBuffer: expense.receipt_image,
+          imageMime: expense.receipt_image ? 'image/jpeg' : null,
+          date: expense.date_ticket,
+          amount: Number(expense.amount),
+          type: expense.type,
+          merchant: expense.merchant || '',
+          description: expense.description || '',
+          userName: expense.user.name,
+          cardId: expense.user.card_id,
+        });
+
+        const driveResult = await uploadToDrive(pdfBuffer, expense.file_name, folderId);
+
+        await req.prisma.expense.update({
+          where: { id: expense.id },
+          data: {
+            drive_file_id: driveResult.fileId,
+            drive_file_url: driveResult.webViewLink,
+            upload_status: 'uploaded',
+          },
+        });
+
+        results.push({ id: expense.id, status: 'uploaded', driveUrl: driveResult.webViewLink });
+      } catch (uploadErr) {
+        console.error(`[retry-all] Expense ${expense.id} failed:`, uploadErr.message);
+        results.push({ id: expense.id, status: 'error', reason: uploadErr.message });
+        // If token error, stop trying (all subsequent will fail too)
+        if (isAuthError(uploadErr)) {
+          resetDriveClient();
+          results.push({ status: 'stopped', reason: 'Token expiré — arrêt du retry' });
+          break;
+        }
+      }
+    }
+
+    const uploaded = results.filter(r => r.status === 'uploaded').length;
+    const failed = results.filter(r => r.status === 'error').length;
+    console.log(`[retry-all] Done: ${uploaded} uploaded, ${failed} failed, ${results.length} total`);
+
+    res.json({ success: true, results, summary: { total: failedExpenses.length, uploaded, failed } });
+  } catch (err) {
+    console.error('Retry-all error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

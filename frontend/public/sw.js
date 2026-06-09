@@ -1,20 +1,16 @@
-const CACHE_NAME = 'lbdp-frais-v1';
-const OFFLINE_QUEUE_NAME = 'lbdp-pending-uploads';
+const CACHE_NAME = 'lbdp-frais-v2';
 
-// Assets to cache for offline use
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-];
-
-// Install: cache static assets
+// Install: cache the app shell (index + manifest)
+// Vite-built assets will be cached on first fetch (runtime caching)
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll([
+        '/',
+        '/manifest.json',
+      ]);
     })
   );
-  self.skipWaiting();
 });
 
 // Activate: clean old caches
@@ -29,44 +25,67 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: network first, fallback to cache
+// Fetch strategy:
+// - App shell & static assets: network-first, cache fallback
+// - API requests: network-only (handled by IndexedDB offline layer)
+// - Google Fonts: cache-first (they rarely change)
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
   // Skip non-GET and API requests
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+  if (request.method !== 'GET' || request.url.includes('/api/')) {
     return;
   }
 
+  // Google Fonts: cache-first (immutable assets)
+  if (request.url.includes('fonts.googleapis.com') || request.url.includes('fonts.gstatic.com')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        }).catch(() => cached);
+      })
+    );
+    return;
+  }
+
+  // All other assets (HTML, JS, CSS, images): network-first with cache fallback
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
-        // Cache successful responses
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
+            cache.put(request, clone);
           });
         }
         return response;
       })
       .catch(() => {
-        // Fallback to cache
-        return caches.match(event.request).then((cached) => {
-          return cached || caches.match('/');
+        return caches.match(request).then((cached) => {
+          // For navigation requests, serve the cached index (SPA)
+          if (!cached && request.mode === 'navigate') {
+            return caches.match('/');
+          }
+          return cached;
         });
       })
   );
 });
 
-// Background Sync: retry pending uploads
+// Background Sync: retry pending uploads when connectivity returns
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-expenses') {
-    event.waitUntil(syncPendingExpenses());
+    event.waitUntil(notifyClientsToSync());
   }
 });
 
-async function syncPendingExpenses() {
-  // This will be handled by IndexedDB in the frontend
-  // The service worker triggers the sync, and the main thread processes it
+async function notifyClientsToSync() {
   const clients = await self.clients.matchAll();
   for (const client of clients) {
     client.postMessage({ type: 'SYNC_PENDING' });

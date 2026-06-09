@@ -1,11 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import Toast from '../components/Toast';
 
+const CACHE_KEY = 'admin_users_v1';
+const CACHE_TTL = 2 * 60 * 1000;
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts < CACHE_TTL ? data : null;
+  } catch { return null; }
+}
+
+function writeCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export default function AdminUsers() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readCache();
+  const [users, setUsers] = useState(cached?.users ?? []);
+  const [loading, setLoading] = useState(!cached);
+  const loadedRef = useRef(false);
   const [toast, setToast] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -19,6 +39,8 @@ export default function AdminUsers() {
   const [newRole, setNewRole] = useState('user');
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     loadUsers();
   }, []);
 
@@ -26,6 +48,7 @@ export default function AdminUsers() {
     try {
       const data = await api.getUsers();
       setUsers(data.users);
+      writeCache({ users: data.users });
     } catch (err) {
       console.error(err);
     } finally {
@@ -107,19 +130,23 @@ export default function AdminUsers() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-2 border-green-mid border-t-transparent rounded-full" />
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="h-7 bg-card rounded-xl w-48" />
+          <div className="h-9 bg-card rounded-xl w-20" />
+        </div>
+        {[1,2,3].map(i => <div key={i} className="h-32 bg-card rounded-2xl" />)}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <div className="space-y-6">
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/admin" className="text-green-light text-xs mb-1 inline-block">← Administration</Link>
+          <Link viewTransition to="/admin" className="text-green-light text-xs mb-1 inline-block">← Administration</Link>
           <h1 className="font-serif text-xl font-semibold">Gestion utilisateurs</h1>
         </div>
         <button

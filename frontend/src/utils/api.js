@@ -86,6 +86,22 @@ export const api = {
     request('/expenses/stats'),
   createExpense: (data) =>
     request('/expenses', { method: 'POST', body: JSON.stringify(data) }),
+  updateExpense: (id, data) =>
+    request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExpense: (id) =>
+    request(`/expenses/${id}`, { method: 'DELETE' }),
+  getAdvancedStats: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/expenses/stats/advanced${qs ? `?${qs}` : ''}`);
+  },
+  getReceiptUrl: (id) => {
+    const token = localStorage.getItem('token');
+    return `${API_BASE}/expenses/${id}/receipt?token=${encodeURIComponent(token)}`;
+  },
+  checkDuplicate: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/expenses/check-duplicate?${qs}`);
+  },
   exportCSV: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/expenses/export/csv?${qs}`);
@@ -96,8 +112,34 @@ export const api = {
     request('/scan', { method: 'POST', body: formData }),
   submitScan: (formData) =>
     request('/scan/submit', { method: 'POST', body: formData }),
+  retryDriveUpload: (id) =>
+    request(`/scan/retry/${id}`, { method: 'POST' }),
+  retryAllDriveUploads: () =>
+    request('/scan/retry-all', { method: 'POST' }),
+
+  // Expense Types
+  getExpenseTypes: () =>
+    request('/expense-types'),
+  getAllExpenseTypes: () =>
+    request('/expense-types/all'),
+  createExpenseType: (data) =>
+    request('/expense-types', { method: 'POST', body: JSON.stringify(data) }),
+  updateExpenseType: (id, data) =>
+    request(`/expense-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExpenseType: (id) =>
+    request(`/expense-types/${id}`, { method: 'DELETE' }),
 
   // Admin
+  getDriveStatus: () =>
+    request('/admin/drive-status'),
+  getDriveAuthUrl: () =>
+    request('/drive/auth-url'),
+  getDriveRedirectUri: () =>
+    request('/drive/redirect-uri'),
+  setDriveToken: (refreshToken) =>
+    request('/drive/set-token', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
+  createDriveFolder: (name) =>
+    request('/drive/create-folder', { method: 'POST', body: JSON.stringify({ name }) }),
   getUsers: () =>
     request('/admin/users'),
   createUser: (data) =>
@@ -116,4 +158,49 @@ export const api = {
     request('/admin/drive-config'),
   updateDriveConfig: (data) =>
     request('/admin/drive-config', { method: 'PUT', body: JSON.stringify(data) }),
+  acknowledgeZipDownload: () =>
+    request('/admin/acknowledge-zip', { method: 'POST' }),
+  exportFailedReceipts: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_BASE}/admin/export-failed`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Erreur ${res.status}`);
+    }
+    return res.blob();
+  },
+
+  // Pennylane
+  getPennylaneStatus: () =>
+    request('/pennylane/status'),
+  getPennylaneDebug: () =>
+    request('/pennylane/debug'),
+  savePennylaneToken: (token) =>
+    request('/pennylane/config', { method: 'POST', body: JSON.stringify({ token }) }),
+  getPennylaneInvoices: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/pennylane/invoices?${qs}`);
+  },
+  getPennylaneInvoice: (id) =>
+    request(`/pennylane/invoices/${id}`),
+  getPennylaneTransactions: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/pennylane/transactions?${qs}`);
+  },
+  getPennylaneBankAccounts: () =>
+    request('/pennylane/bank-accounts'),
+  savePennylaneBankAccount: (accountId) =>
+    request('/pennylane/bank-accounts', { method: 'POST', body: JSON.stringify({ accountId }) }),
+  getPennylaneUnmatched: () =>
+    request('/pennylane/unmatched'),
+  pennylaneReconcile: () =>
+    request('/pennylane/reconcile', { method: 'POST' }),
+  getPennylaneMissing: () =>
+    request('/pennylane/missing'),
+  pennylaneMatch: (expenseId, invoiceId, transactionId) =>
+    request('/pennylane/match', { method: 'POST', body: JSON.stringify({ expenseId, invoiceId, transactionId }) }),
+  pennylaneUnmatch: (id, transactionId) =>
+    request(`/pennylane/unmatch/${id}`, { method: 'POST', body: JSON.stringify({ transactionId }) }),
 };
