@@ -678,6 +678,54 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// GET /api/pennylane/transaction/:id/detail — justificatif lié à une transaction :
+// facture Pennylane groupée + URL du PDF + dépense scan-docu correspondante.
+router.get('/transaction/:id/detail', async (req, res) => {
+  try {
+    const txId = req.params.id;
+    let invoice = null;
+    let pdfUrl = null;
+    let scan = null;
+
+    const m = await pennylane.getTransactionMatchedInvoices(txId);
+    const inv = (m?.items || [])[0];
+    if (inv) {
+      invoice = {
+        id: inv.id,
+        label: inv.label || null,
+        filename: inv.filename || null,
+        amount: Math.abs(Number(inv.currency_amount || inv.amount || 0)),
+        date: inv.date || null,
+      };
+      try {
+        const full = await pennylane.getSupplierInvoice(inv.id);
+        pdfUrl = full.file_url || full.document_url || full.pdf_url || null;
+      } catch (e) { /* pas de détail facture -> on tentera le Drive */ }
+      try {
+        const exp = await req.prisma.expense.findFirst({
+          where: { pennylane_invoice_id: String(inv.id) },
+          select: {
+            id: true, merchant: true, type: true, date_ticket: true, amount: true,
+            drive_file_url: true, user: { select: { name: true } },
+          },
+        });
+        if (exp) {
+          scan = {
+            id: exp.id, merchant: exp.merchant, type: exp.type,
+            date: exp.date_ticket, amount: Number(exp.amount),
+            userName: exp.user?.name || null,
+          };
+          if (!pdfUrl) pdfUrl = exp.drive_file_url || null;
+        }
+      } catch (e) { /* pas de scan correspondant */ }
+    }
+    res.json({ invoice, pdfUrl, scan });
+  } catch (err) {
+    console.error('[pennylane] transaction detail error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // GET /api/pennylane/scan/:id/detail — pour un scan (dépense) : URL du PDF du
 // justificatif + transaction bancaire liée (via la facture Pennylane rapprochée).
 router.get('/scan/:id/detail', async (req, res) => {

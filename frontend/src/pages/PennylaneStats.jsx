@@ -21,6 +21,7 @@ export default function PennylaneStats({ toast }) {
   const [showTx, setShowTx] = useState(false);
   const [txLimit, setTxLimit] = useState(30);
   const [scanDetail, setScanDetail] = useState({}); // { [scanId]: { loading, pdfUrl, transaction } }
+  const [txDetail, setTxDetail] = useState({}); // { [txId]: { loading, invoice, pdfUrl, scan, open } }
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -46,6 +47,20 @@ export default function PennylaneStats({ toast }) {
     if (fUser || fCard || fCat || fVeh) setShowTx(true);
     setTxLimit(30);
   }, [fUser, fCard, fCat, fVeh]);
+
+  async function loadTxDetail(id) {
+    if (txDetail[id]?.loading || txDetail[id]?.loaded) {
+      setTxDetail(td => ({ ...td, [id]: { ...td[id], open: !td[id].open } }));
+      return;
+    }
+    setTxDetail(td => ({ ...td, [id]: { loading: true, open: true } }));
+    try {
+      const d = await api.getPennylaneTransactionDetail(id);
+      setTxDetail(td => ({ ...td, [id]: { ...d, loaded: true, open: true } }));
+    } catch (e) {
+      setTxDetail(td => ({ ...td, [id]: { error: e.message, loaded: true, open: true } }));
+    }
+  }
 
   async function loadScanDetail(id) {
     if (scanDetail[id]?.loading || scanDetail[id]?.loaded) {
@@ -243,27 +258,68 @@ export default function PennylaneStats({ toast }) {
             {[...txs]
               .sort((a, b) => (a.date < b.date ? 1 : -1))
               .slice(0, txLimit)
-              .map(t => (
-                <div key={t.id} className="px-4 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-text text-xs font-medium truncate">{t.label || 'Transaction'}</p>
-                      <p className="text-text-muted text-[10px]">
-                        {new Date(t.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
-                        {t.cardLabel || t.last4 ? ` · ${t.cardLabel || `•••• ${t.last4}`}` : ''}
-                        {t.userId ? ` · ${userName(t.userId)}` : ''}
-                      </p>
-                    </div>
-                    <p className="font-serif text-sm font-semibold text-text shrink-0">-{eur(t.amount)}</p>
+              .map(t => {
+                const det = txDetail[t.id];
+                return (
+                  <div key={t.id} className="px-4 py-2.5">
+                    <button onClick={() => loadTxDetail(t.id)} className="w-full text-left">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-text text-xs font-medium truncate">{t.label || 'Transaction'}</p>
+                          <p className="text-text-muted text-[10px]">
+                            {new Date(t.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+                            {t.cardLabel || t.last4 ? ` · ${t.cardLabel || `•••• ${t.last4}`}` : ''}
+                            {t.userId ? ` · ${userName(t.userId)}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <p className="font-serif text-sm font-semibold text-text">-{eur(t.amount)}</p>
+                          <span className="text-text-dim text-[10px]">{det?.open ? '▲' : '▼'}</span>
+                        </div>
+                      </div>
+                      {(t.nature || t.vehicle) && (
+                        <div className="flex gap-1.5 mt-1">
+                          {t.nature && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-mid/15 text-green-light">{t.nature}</span>}
+                          {t.vehicle && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">{'🚐'} {t.vehicle}</span>}
+                        </div>
+                      )}
+                    </button>
+                    {det?.open && (
+                      <div className="mt-2 p-2.5 rounded-xl bg-bg border border-card-border/60 space-y-1.5">
+                        {det.loading && <p className="text-text-dim text-[10px]">Chargement…</p>}
+                        {det.error && <p className="text-red-400 text-[10px]">Erreur : {det.error}</p>}
+                        {det.loaded && !det.error && (
+                          det.invoice ? (
+                            <>
+                              <div>
+                                <p className="text-text-muted text-[9px] uppercase tracking-widest">Justificatif</p>
+                                <p className="text-text text-[11px] truncate">
+                                  {det.scan?.merchant || det.invoice.label || det.invoice.filename || `Facture #${det.invoice.id}`}
+                                </p>
+                                <p className="text-text-muted text-[10px]">
+                                  {det.invoice.date ? new Date(det.invoice.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' }) : ''}
+                                  {det.invoice.amount ? ` · ${eur(det.invoice.amount)}` : ''}
+                                  {det.scan ? ` · scanné par ${det.scan.userName || '?'} (${det.scan.type})` : ''}
+                                </p>
+                              </div>
+                              {det.pdfUrl ? (
+                                <a href={det.pdfUrl} target="_blank" rel="noopener noreferrer"
+                                  className="block text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">
+                                  {'📄'} Voir le justificatif
+                                </a>
+                              ) : (
+                                <p className="text-text-dim text-[10px]">PDF non disponible</p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-amber-400 text-[10px]">Aucun justificatif lié à ce paiement pour l'instant</p>
+                          )
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {(t.nature || t.vehicle) && (
-                    <div className="flex gap-1.5 mt-1">
-                      {t.nature && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-mid/15 text-green-light">{t.nature}</span>}
-                      {t.vehicle && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">{'🚐'} {t.vehicle}</span>}
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             {txs.length > txLimit && (
               <button onClick={() => setTxLimit(l => l + 50)}
                 className="w-full py-2.5 text-green-light text-xs font-medium">

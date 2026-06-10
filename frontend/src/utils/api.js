@@ -215,6 +215,8 @@ export const api = {
   },
   getPennylaneScanDetail: (id) =>
     request(`/pennylane/scan/${id}/detail`),
+  getPennylaneTransactionDetail: (id) =>
+    request(`/pennylane/transaction/${id}/detail`),
   savePennylaneCardVehicle: (masked, categoryId) =>
     request('/pennylane/card-vehicle', { method: 'POST', body: JSON.stringify({ masked, categoryId }) }),
 
