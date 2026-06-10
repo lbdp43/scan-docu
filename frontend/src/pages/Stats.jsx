@@ -250,23 +250,26 @@ export default function Stats() {
             <p className="text-text-muted text-[10px] uppercase tracking-widest">Tendance mensuelle</p>
             <p className="text-text-dim text-[10px]">{monthly.length} mois</p>
           </div>
-          <div className="flex items-end gap-1.5" style={{ height: monthly.length <= 6 ? '180px' : '160px' }}>
+          <div className="flex items-end gap-1.5">
             {monthly.map((m) => {
               const monthKey = m.month.split('-')[1];
               const year = m.month.split('-')[0];
-              const height = maxMonthTotal > 0 ? (m.total / maxMonthTotal) * 100 : 0;
+              // hauteur en px : le % ne s'applique pas dans une colonne à hauteur auto
+              const BAR_MAX = monthly.length <= 6 ? 130 : 110;
+              const px = m.total > 0 ? Math.max((m.total / maxMonthTotal) * BAR_MAX, 8) : 3;
+              const isMax = m.total > 0 && m.total === maxMonthTotal;
               const isExpanded = expandedMonth === m.month;
               return (
                 <div
                   key={m.month}
-                  className="flex-1 flex flex-col items-center gap-0.5 cursor-pointer"
+                  className="flex-1 flex flex-col items-center gap-1 cursor-pointer"
                   onClick={() => setExpandedMonth(isExpanded ? null : m.month)}
                 >
                   {/* Amount label */}
                   <span className={`font-mono font-medium leading-none ${
                     monthly.length <= 6 ? 'text-[11px]' : 'text-[9px]'
-                  } ${m.total > 0 ? 'text-green-light' : 'text-text-dim'}`}>
-                    {m.total > 0 ? `${Math.round(m.total)}` : ''}
+                  } ${isMax ? 'text-green-light font-bold' : m.total > 0 ? 'text-text-muted' : 'text-transparent'}`}>
+                    {m.total > 0 ? `${Math.round(m.total)}` : '·'}
                   </span>
                   {/* Bar */}
                   <div
@@ -274,15 +277,15 @@ export default function Stats() {
                       isExpanded ? 'ring-2 ring-green-light/50' : ''
                     }`}
                     style={{
-                      height: `${Math.max(height, 4)}%`,
-                      minHeight: m.total > 0 ? '8px' : '3px',
+                      height: `${px}px`,
                       background: m.total > 0
-                        ? 'linear-gradient(180deg, #5ABF50, #2D6A27)'
-                        : 'rgba(255,255,255,0.04)',
+                        ? (isMax ? 'linear-gradient(180deg, #7BDF70, #3D8A37)' : 'linear-gradient(180deg, #5ABF50, #2D6A27)')
+                        : 'rgba(255,255,255,0.06)',
+                      boxShadow: isMax ? '0 0 12px rgba(90,191,80,0.35)' : 'none',
                     }}
                   />
                   {/* Month label */}
-                  <span className={`font-medium leading-none mt-0.5 ${
+                  <span className={`font-medium leading-none ${
                     monthly.length <= 6 ? 'text-[11px]' : 'text-[9px]'
                   } ${m.total > 0 ? 'text-text' : 'text-text-dim'}`}>
                     {MONTH_LABELS[monthKey] || monthKey}

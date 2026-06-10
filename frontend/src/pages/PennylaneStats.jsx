@@ -199,18 +199,30 @@ export default function PennylaneStats({ toast }) {
       {/* Graphique mensuel (exercice juil -> juin) */}
       <div className="p-5 rounded-3xl bg-card border border-card-border">
         <p className="text-text-muted text-[10px] uppercase tracking-widest mb-4">Dépenses par mois — exercice {fy.label}</p>
-        <div className="flex items-end gap-1" style={{ height: '160px' }}>
+        <div className="flex items-end gap-1">
           {byMonth.map(m => {
-            const h = (m.total / maxMonth) * 100;
+            // hauteur en px (le % ne marche pas dans une colonne à hauteur auto)
+            const BAR_MAX = 110;
+            const px = m.total > 0 ? Math.max((m.total / maxMonth) * BAR_MAX, 8) : 3;
+            const isMax = m.total > 0 && m.total === maxMonth;
             return (
-              <div key={m.mm} className="flex-1 flex flex-col items-center gap-0.5">
-                <span className={`font-mono leading-none text-[9px] ${m.total > 0 ? 'text-green-light' : 'text-text-dim'}`}>
-                  {m.total > 0 ? Math.round(m.total) : ''}
+              <div key={m.mm} className="flex-1 flex flex-col items-center gap-1">
+                <span className={`font-mono leading-none text-[9px] ${
+                  isMax ? 'text-green-light font-bold' : m.total > 0 ? 'text-text-muted' : 'text-transparent'
+                }`}>
+                  {m.total > 0 ? Math.round(m.total) : '·'}
                 </span>
                 <div className="w-full rounded-t-md transition-all duration-500"
-                  style={{ height: `${Math.max(h, 3)}%`, minHeight: m.total > 0 ? '6px' : '2px',
-                    background: m.total > 0 ? 'linear-gradient(180deg,#5ABF50,#2D6A27)' : 'rgba(255,255,255,0.04)' }} />
-                <span className="text-[9px] text-text-muted leading-none mt-0.5">{MONTH_LABELS[m.mm]}</span>
+                  style={{
+                    height: `${px}px`,
+                    background: m.total > 0
+                      ? (isMax ? 'linear-gradient(180deg,#7BDF70,#3D8A37)' : 'linear-gradient(180deg,#5ABF50,#2D6A27)')
+                      : 'rgba(255,255,255,0.06)',
+                    boxShadow: isMax ? '0 0 12px rgba(90,191,80,0.35)' : 'none',
+                  }} />
+                <span className={`text-[9px] leading-none ${m.total > 0 ? 'text-text' : 'text-text-dim'}`}>
+                  {MONTH_LABELS[m.mm]}
+                </span>
               </div>
             );
           })}
