@@ -164,10 +164,10 @@ export default function AdminPennylane() {
     }
   }
 
-  async function loadMissing() {
+  async function loadMissing({ refresh = false } = {}) {
     setLoadingMissing(true);
     try {
-      const data = await api.getPennylaneMissing();
+      const data = await api.getPennylaneMissing({ refresh });
       setMissing(data);
       api.getPennylaneVehicles()
         .then(v => { setVehicleOptions(v.options || []); setCardVehicles(v.vehicles || {}); })
@@ -638,7 +638,7 @@ export default function AdminPennylane() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-text-muted text-xs uppercase tracking-widest">Paiements sans ticket — exercice {fyLabel}</h3>
-                <button onClick={loadMissing} className="text-green-light text-xs">Rafra{'î'}chir</button>
+                <button onClick={() => loadMissing({ refresh: true })} className="text-green-light text-xs">Rafra{'î'}chir</button>
               </div>
               {loadingMissing || !missing ? (
                 <div className="flex justify-center py-8">

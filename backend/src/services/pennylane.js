@@ -273,6 +273,18 @@ async function getTransactionMatchedInvoices(txId) {
   return request('GET', `/transactions/${txId}/matched_invoices`);
 }
 
+// Pennylane fait foi : une transaction est justifiée si Pennylane l'a déjà liée à
+// au moins une facture (rapprochement fait manuellement ou automatiquement là-bas).
+async function isTransactionJustifiedInPennylane(txId) {
+  try {
+    const r = await getTransactionMatchedInvoices(txId);
+    const items = Array.isArray(r) ? r : (r?.items || r?.matched_invoices || r?.data || []);
+    return Array.isArray(items) && items.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // Définit les catégories analytiques d'une transaction. body = tableau [{ id, weight }].
 // PUT [] pour tout retirer. (format validé par test)
 async function setTransactionCategories(txId, categories) {
@@ -413,6 +425,7 @@ module.exports = {
   justifiedByInvoice,
   getMatchedTransactions,
   getTransactionMatchedInvoices,
+  isTransactionJustifiedInPennylane,
   setTransactionCategories,
   matchTransaction,
   unmatchTransaction,
