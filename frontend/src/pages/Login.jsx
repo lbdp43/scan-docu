@@ -32,9 +32,8 @@ export default function Login() {
       <div className="w-full max-w-sm animate-fade-up">
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 rounded-[28px] flex items-center justify-center animate-logo-pulse mb-5 text-white/90"
-            style={{ background: 'linear-gradient(135deg, #2D6A27, #4A9E40)' }}>
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.71c.75.75 1.6 1.34 2.51 1.76C13.18 23.14 19 22 22 18c.91-1.22 1.38-2.66 1-4-.38-1.34-2.07-2-4-2-1.59 0-3.19.5-4.53 1.4-.52-.98-.84-2.09-.97-3.4z"/></svg>
+          <div className="w-24 h-24 rounded-[28px] bg-white flex items-center justify-center animate-logo-pulse mb-5 shadow-lg overflow-hidden">
+            <img src="/icon-512.png" alt="La Brasserie des Plantes" className="w-full h-full object-contain" />
           </div>
           <h1 className="font-serif text-[26px] font-semibold text-text text-center">
             La Brasserie des Plantes

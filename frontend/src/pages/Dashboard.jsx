@@ -156,11 +156,16 @@ export default function Dashboard() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-[22px] font-semibold">
-            Bonjour {firstName}
-          </h1>
-          <p className="text-text-muted text-sm mt-1">Vos notes de frais</p>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+            <img src="/icon-512.png" alt="La Brasserie des Plantes" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h1 className="font-serif text-[22px] font-semibold">
+              Bonjour {firstName}
+            </h1>
+            <p className="text-text-muted text-sm mt-1">Vos notes de frais</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {(refreshing || isPullRefreshing) && (
