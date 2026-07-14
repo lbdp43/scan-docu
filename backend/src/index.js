@@ -16,6 +16,7 @@ const driveSetupRoutes = require('./routes/driveSetup');
 const expenseTypesRoutes = require('./routes/expenseTypes');
 const pennylaneRoutes = require('./routes/pennylane');
 const myPaymentsRoutes = require('./routes/myPayments');
+const reimbursementRoutes = require('./routes/reimbursements');
 const pushRoutes = require('./routes/push');
 const cronRoutes = require('./routes/cron');
 const { warmupWorker } = require('./services/ocr');
@@ -94,6 +95,7 @@ app.use('/api/drive', driveSetupRoutes);
 app.use('/api/expense-types', expenseTypesRoutes);
 app.use('/api/pennylane', pennylaneRoutes);
 app.use('/api/my-payments', myPaymentsRoutes);
+app.use('/api/reimbursements', reimbursementRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/cron', cronRoutes);
 

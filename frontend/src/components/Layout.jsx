@@ -119,6 +119,7 @@ export default function Layout() {
         formData.append('amount', expense.amount);
         formData.append('date_ticket', expense.date_ticket);
         formData.append('type', expense.type);
+        if (expense.payment_method) formData.append('payment_method', expense.payment_method);
         if (expense.merchant) formData.append('merchant', expense.merchant);
         if (expense.description) formData.append('description', expense.description);
         // Reconstruct image file from IndexedDB stored data

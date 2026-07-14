@@ -91,6 +91,23 @@ async function sendToUser(userId, payload) {
   return { sent, failed };
 }
 
+// Envoie une notif à tous les administrateurs actifs (ex. nouvelle demande de remboursement).
+async function sendToAdmins(payload) {
+  if (!configured) return { sent: 0, failed: 0 };
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin', is_active: true },
+    select: { id: true },
+  });
+  let sent = 0;
+  let failed = 0;
+  for (const a of admins) {
+    const r = await sendToUser(a.id, payload);
+    sent += r.sent;
+    failed += r.failed;
+  }
+  return { sent, failed };
+}
+
 module.exports = {
   isConfigured,
   publicKey,
@@ -98,4 +115,5 @@ module.exports = {
   saveSubscription,
   removeSubscription,
   sendToUser,
+  sendToAdmins,
 };

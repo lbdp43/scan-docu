@@ -224,6 +224,16 @@ export const api = {
   getMyMissingPayments: () =>
     request('/my-payments/missing'),
 
+  // Remboursements (notes de frais / espèces perso)
+  getReimbursements: (status) =>
+    request(`/reimbursements${status ? `?status=${status}` : ''}`),
+  getReimbursementCount: () =>
+    request('/reimbursements/count'),
+  getMyReimbursements: () =>
+    request('/reimbursements/mine'),
+  updateReimbursement: (id, status) =>
+    request(`/reimbursements/${id}`, { method: 'PUT', body: JSON.stringify({ status }) }),
+
   // Push notifications
   getPushPublicKey: () =>
     request('/push/public-key'),

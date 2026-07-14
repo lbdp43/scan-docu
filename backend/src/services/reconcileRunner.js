@@ -11,8 +11,10 @@ const { fiscalYear } = require('./fiscalYear');
 async function runReconcile(prisma) {
   const { from: fyStart, to: fyEnd } = fiscalYear();
 
+  // Seules les dépenses carte pro se rapprochent d'une transaction bancaire ;
+  // espèces / notes de frais ne transitent pas par le compte pro.
   const expenses = await prisma.expense.findMany({
-    where: { date_ticket: { gte: new Date(fyStart) } },
+    where: { date_ticket: { gte: new Date(fyStart) }, payment_method: 'carte' },
     omit: { receipt_image: true },
     include: { user: { select: { name: true, card_id: true } } },
     orderBy: { date_ticket: 'desc' },

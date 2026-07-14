@@ -51,6 +51,11 @@ export default function Admin() {
   const [showSetup, setShowSetup] = useState(false);
   const [redirectUri, setRedirectUri] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [reimbCount, setReimbCount] = useState(0);
+
+  useEffect(() => {
+    api.getReimbursementCount().then(d => setReimbCount(d.pending || 0)).catch(() => {});
+  }, []);
 
   // Handle OAuth redirect params
   useEffect(() => {
@@ -523,6 +528,31 @@ export default function Admin() {
             <p className="text-text text-sm font-medium">Rapprochement Pennylane</p>
             <p className="text-text-muted text-xs">Lier justificatifs et transactions bancaires</p>
           </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted"><path d="M9 18l6-6-6-6" /></svg>
+        </div>
+      </Link>
+
+      {/* Remboursements (notes de frais / espèces perso) */}
+      <Link viewTransition
+        to="/admin/remboursements"
+        className="block p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 transition-transform active:scale-[0.98]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <line x1="2" y1="10" x2="22" y2="10" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="text-text text-sm font-medium">Remboursements</p>
+            <p className="text-text-muted text-xs">Notes de frais et esp{'è'}ces perso {'à'} rembourser</p>
+          </div>
+          {reimbCount > 0 && (
+            <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">
+              {reimbCount}
+            </span>
+          )}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted"><path d="M9 18l6-6-6-6" /></svg>
         </div>
       </Link>

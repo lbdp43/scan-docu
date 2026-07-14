@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
+import { PAYMENT_OPTIONS, REIMBURSABLE_METHODS } from '../utils/payment';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
@@ -56,6 +57,7 @@ export default function Manual() {
   const [amount, setAmount] = useState(prefillAmount);
   const [dateTicket, setDateTicket] = useState(prefillDate || new Date().toISOString().slice(0, 10));
   const [type, setType] = useState('autre');
+  const [paymentMethod, setPaymentMethod] = useState('carte');
   const [merchant, setMerchant] = useState(prefillMerchant.slice(0, 100));
   const [description, setDescription] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
@@ -91,6 +93,7 @@ export default function Manual() {
       amount,
       date_ticket: dateTicket,
       type,
+      payment_method: paymentMethod,
       merchant: merchant.trim(),
       description: description.trim(),
     };
@@ -114,6 +117,7 @@ export default function Manual() {
       formData.append('amount', amount);
       formData.append('date_ticket', dateTicket);
       formData.append('type', type);
+      formData.append('payment_method', paymentMethod);
       formData.append('merchant', merchant.trim());
       formData.append('description', description.trim());
 
@@ -312,6 +316,34 @@ export default function Manual() {
               }}
               onCancel={() => setShowCreateType(false)}
             />
+          )}
+        </div>
+
+        {/* Payment method */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Mode de paiement
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PAYMENT_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { haptic('light'); setPaymentMethod(opt.value); }}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-medium transition-all ${
+                  paymentMethod === opt.value
+                    ? 'bg-green-mid/20 border-2 border-green-mid text-green-light'
+                    : 'bg-card border border-card-border text-text-muted'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {REIMBURSABLE_METHODS.includes(paymentMethod) && (
+            <p className="text-[10px] text-amber-300/90 mt-1.5">
+              Une demande de remboursement sera envoy{'é'}e aux administrateurs
+            </p>
           )}
         </div>
 
