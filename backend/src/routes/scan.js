@@ -5,6 +5,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { performOCR } = require('../services/ocr');
 const { generatePDF } = require('../services/pdf');
 const { uploadToDrive, uploadPhotoToDrive, resetDriveClient, updateDriveFile, isAuthError, getRootFolderId } = require('../services/drive');
+const { normalizeMethod, isReimbursable, PAYMENT_LABELS } = require('../services/payment');
+const push = require('../services/push');
 
 const router = express.Router();
 
@@ -88,6 +90,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 router.post('/submit', upload.single('image'), async (req, res) => {
   try {
     const { date_ticket, amount, type, merchant, description } = req.body;
+    const paymentMethod = normalizeMethod(req.body.payment_method);
 
     if (!amount || !type) {
       return res.status(400).json({ error: 'Montant et type requis' });
@@ -184,6 +187,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     }
 
     // Save expense to database (store compressed image for PDF regeneration on updates)
+    const reimbursementStatus = isReimbursable(paymentMethod) ? 'pending' : null;
     const expense = await req.prisma.expense.create({
       data: {
         user_id: user.id,
@@ -199,8 +203,20 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         drive_file_url: driveFileUrl,
         file_name: fileName,
         upload_status: uploadStatus,
+        payment_method: paymentMethod,
+        reimbursement_status: reimbursementStatus,
       },
     });
+
+    // Nouvelle demande de remboursement -> notifier les admins (non bloquant)
+    if (reimbursementStatus === 'pending') {
+      push.sendToAdmins({
+        title: 'Nouvelle demande de remboursement',
+        body: `${user.name} — ${parsedAmount.toFixed(2)}€ (${PAYMENT_LABELS[paymentMethod] || paymentMethod})`,
+        url: '/admin/remboursements',
+        tag: 'reimbursement',
+      }).catch((e) => console.warn('[push] admin reimbursement notify failed:', e.message));
+    }
 
     // Exclude receipt_image blob from response
     const { receipt_image: _img, ...expenseResponse } = expense;

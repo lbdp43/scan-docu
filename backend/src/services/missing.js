@@ -67,8 +67,13 @@ async function computeMissing(db) {
     }))
     .filter((i) => i.amount > 0 && i.dateMs != null);
 
+  // Seules les dépenses payées par carte pro correspondent à un débit du compte pro :
+  // les espèces / notes de frais ne doivent pas justifier une transaction bancaire.
   const expRows = await db.expense.findMany({
-    where: { date_ticket: { gte: new Date(fy.from) } },
+    where: {
+      date_ticket: { gte: new Date(fy.from) },
+      payment_method: 'carte',
+    },
     omit: { receipt_image: true },
   });
   const expenses = expRows.map((e) => ({

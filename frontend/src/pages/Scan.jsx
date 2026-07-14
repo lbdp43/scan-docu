@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
+import { PAYMENT_OPTIONS, REIMBURSABLE_METHODS } from '../utils/payment';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
 import TypeIcon from '../components/TypeIcon';
@@ -61,6 +62,7 @@ export default function Scan() {
   const [amount, setAmount] = useState(targetAmount);
   const [dateTicket, setDateTicket] = useState(targetDate);
   const [type, setType] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('carte');
   const [merchant, setMerchant] = useState(targetMerchant.slice(0, 255));
   const [description, setDescription] = useState('');
   const [showCreateType, setShowCreateType] = useState(false);
@@ -157,6 +159,7 @@ export default function Scan() {
       formData.append('amount', amount);
       formData.append('date_ticket', date);
       formData.append('type', type);
+      formData.append('payment_method', paymentMethod);
       formData.append('merchant', merchant);
       formData.append('description', description);
 
@@ -177,7 +180,7 @@ export default function Scan() {
     } catch (err) {
       if (!navigator.onLine || err.message?.includes('fetch')) {
         try {
-          await savePendingExpense({ amount, date_ticket: date, type, merchant, description }, imageFile);
+          await savePendingExpense({ amount, date_ticket: date, type, payment_method: paymentMethod, merchant, description }, imageFile);
           refreshPendingCount?.();
           haptic('success');
           setScanCount(c => c + 1);
@@ -522,6 +525,33 @@ export default function Scan() {
           )}
           {!type && !showCreateType && (
             <p className="text-[10px] text-text-dim mt-1.5">S{'é'}lectionnez le type avant d'envoyer</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Mode de paiement
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PAYMENT_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { haptic('light'); setPaymentMethod(opt.value); }}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-medium transition-all ${
+                  paymentMethod === opt.value
+                    ? 'bg-green-mid/20 border-2 border-green-mid text-green-light'
+                    : 'bg-card border border-card-border text-text-muted'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {REIMBURSABLE_METHODS.includes(paymentMethod) && (
+            <p className="text-[10px] text-amber-300/90 mt-1.5">
+              Une demande de remboursement sera envoy{'é'}e aux administrateurs
+            </p>
           )}
         </div>
 

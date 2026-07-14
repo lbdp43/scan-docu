@@ -14,6 +14,7 @@ const Admin = lazy(() => import('./pages/Admin'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminTypes = lazy(() => import('./pages/AdminTypes'));
 const AdminPennylane = lazy(() => import('./pages/AdminPennylane'));
+const AdminReimbursements = lazy(() => import('./pages/AdminReimbursements'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Stats = lazy(() => import('./pages/Stats'));
 
@@ -88,6 +89,7 @@ const router = createBrowserRouter([
       { path: 'admin/users', element: <PrivateRoute adminOnly>{page(AdminUsers)}</PrivateRoute> },
       { path: 'admin/types', element: <PrivateRoute adminOnly>{page(AdminTypes)}</PrivateRoute> },
       { path: 'admin/pennylane', element: <PrivateRoute adminOnly>{page(AdminPennylane)}</PrivateRoute> },
+      { path: 'admin/remboursements', element: <PrivateRoute adminOnly>{page(AdminReimbursements)}</PrivateRoute> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

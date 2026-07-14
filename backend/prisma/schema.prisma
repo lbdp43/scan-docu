@@ -39,9 +39,14 @@ model Expense {
   upload_status       String   @default("pending") @db.VarChar(20)
   pennylane_invoice_id String?  @db.VarChar(100)
   pennylane_matched    Boolean  @default(false)
+  payment_method       String   @default("carte") @db.VarChar(20)
+  reimbursement_status String?  @db.VarChar(20)
+  reimbursed_at        DateTime?
+  reimbursed_by        Int?
   created_at           DateTime @default(now())
   user                 User     @relation(fields: [user_id], references: [id])
 
+  @@index([reimbursement_status])
   @@map("expenses")
 }
 
