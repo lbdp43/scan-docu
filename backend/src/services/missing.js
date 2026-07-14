@@ -85,6 +85,17 @@ async function computeMissing(db) {
   }));
   const justifiedSet = match.assignJustified(txList, expenses, invoices);
 
+  // Pennylane fait foi : pour les paiements que l'heuristique montant+date classe
+  // "non justifiés", on vérifie leur vrai statut dans Pennylane. Si Pennylane les a
+  // déjà liés à une facture (rapprochement manuel/auto là-bas), ils sont justifiés
+  // même si l'heuristique les a ratés (facture archivée, date hors fenêtre, etc.).
+  const toVerify = expenseTx.filter((tx) => !justifiedSet.has(tx.id));
+  for (const tx of toVerify) {
+    const ok = await pennylane.isTransactionJustifiedInPennylane(tx.id);
+    if (ok) justifiedSet.add(tx.id);
+    await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
+  }
+
   const cardsMap = new Map();
   const unmatched = [];
   for (const tx of expenseTx) {
