@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { savePendingExpense } from '../utils/offline';
 import { PAYMENT_OPTIONS, REIMBURSABLE_METHODS } from '../utils/payment';
@@ -352,6 +352,20 @@ export default function Scan() {
         </div>
 
         {fileInput}
+
+        <Link viewTransition
+          to="/manual"
+          className="flex items-center gap-4 w-full p-4 rounded-3xl border border-green-mid/30 bg-card transition-transform active:scale-[0.97] mb-3"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-green-mid/10 flex items-center justify-center text-green-light shrink-0">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </div>
+          <div className="flex-1">
+            <p className="text-text font-semibold text-base">Saisie sans ticket</p>
+            <p className="text-text-muted text-xs mt-0.5">Saisie manuelle rapide</p>
+          </div>
+          <span className="text-text-dim text-xl">{'›'}</span>
+        </Link>
 
         {scanCount === 0 ? (
           <div className="p-4 rounded-2xl bg-card border border-card-border">
