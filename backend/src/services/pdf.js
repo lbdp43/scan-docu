@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
+const { PAYMENT_LABELS, normalizeMethod, isReimbursable } = require('./payment');
 
-async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId, isUpdate = false }) {
+async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId, paymentMethod, isUpdate = false }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -35,9 +36,14 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
 
       doc.fontSize(10).fillColor('#333333');
 
+      const method = normalizeMethod(paymentMethod);
+      const methodLabel = PAYMENT_LABELS[method] || 'Carte pro';
+      const reimbursable = isReimbursable(method);
+
       const rows = [
         ['Collaborateur', userName],
-        ['Carte société', cardId || 'N/A'],
+        ['Carte société', method === 'carte' ? (cardId || 'N/A') : '—'],
+        ['Mode de règlement', reimbursable ? `${methodLabel} (à rembourser)` : methodLabel],
         ['Date du ticket', date instanceof Date ? date.toLocaleDateString('fr-FR') : date],
         ['Montant', `${parseFloat(amount).toFixed(2)} €`],
         ['Type', type],
@@ -49,16 +55,35 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
       let y = tableTop;
       for (const [label, value] of rows) {
         // Label
-        doc.font('Helvetica-Bold').text(label, tableLeft, y, { width: 150 });
-        // Value
-        doc.font('Helvetica').text(value, col2, y, { width: 340 });
+        doc.font('Helvetica-Bold').fillColor('#333333').text(label, tableLeft, y, { width: 150 });
+        // Value — highlight payment method row
+        const highlight = label === 'Mode de règlement';
+        doc.font(highlight ? 'Helvetica-Bold' : 'Helvetica')
+          .fillColor(highlight ? (reimbursable ? '#B45309' : '#1A3A1C') : '#333333')
+          .text(value, col2, y, { width: 340 });
         y += 22;
       }
+      doc.fillColor('#333333');
 
       // Separator
       y += 10;
       doc.moveTo(40, y).lineTo(555, y).strokeColor('#E0E0E0').lineWidth(0.5).stroke();
       y += 15;
+
+      // Reimbursement request banner
+      if (reimbursable) {
+        const bh = 40;
+        doc.save();
+        doc.roundedRect(40, y, 515, bh, 8)
+          .fillColor('#FFF7ED').fill()
+          .strokeColor('#F59E0B').lineWidth(1.5).stroke();
+        doc.fontSize(11).fillColor('#B45309').font('Helvetica-Bold')
+          .text(`DEMANDE DE REMBOURSEMENT — ${methodLabel}`, 40, y + 9, { width: 515, align: 'center' });
+        doc.fontSize(8).fillColor('#92400E').font('Helvetica')
+          .text('Payé par le collaborateur — à rembourser', 40, y + 24, { width: 515, align: 'center' });
+        doc.restore();
+        y += bh + 15;
+      }
 
       // Ticket image or "no receipt" banner
       if (imageBuffer && imageMime && imageMime.startsWith('image/')) {

@@ -141,6 +141,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
       description: description || '',
       userName: user.name,
       cardId: user.card_id,
+      paymentMethod,
     });
 
     // Upload to Google Drive
@@ -279,6 +280,7 @@ router.post('/retry/:id', async (req, res) => {
       description: expense.description || '',
       userName: user.name,
       cardId: user.card_id,
+      paymentMethod: expense.payment_method,
     });
 
     // Upload to Drive
@@ -344,6 +346,7 @@ router.post('/retry-all', async (req, res) => {
           description: expense.description || '',
           userName: expense.user.name,
           cardId: expense.user.card_id,
+          paymentMethod: expense.payment_method,
         });
 
         const driveResult = await uploadToDrive(pdfBuffer, expense.file_name, folderId);
