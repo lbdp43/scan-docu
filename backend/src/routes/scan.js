@@ -7,6 +7,7 @@ const { generatePDF } = require('../services/pdf');
 const { uploadToDrive, uploadPhotoToDrive, resetDriveClient, updateDriveFile, isAuthError, getRootFolderId } = require('../services/drive');
 const { normalizeMethod, isReimbursable, PAYMENT_LABELS } = require('../services/payment');
 const push = require('../services/push');
+const driveAlert = require('../services/driveAlert');
 
 const router = express.Router();
 
@@ -160,6 +161,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         driveFileUrl = driveResult.webViewLink;
         uploadStatus = 'uploaded';
         console.log(`[drive] Upload OK: ${driveFileUrl}`);
+        driveAlert.clearDriveDown().catch(() => {}); // Drive OK — réarme l'alerte
       } catch (driveErr) {
         console.error('[drive] Upload error:', driveErr.message);
         if (driveErr.response) {
@@ -168,6 +170,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         if (isAuthError(driveErr)) {
           resetDriveClient();
           console.warn('[drive] Auth error — client cache cleared. Token may be expired.');
+          driveAlert.notifyDriveDown().catch(() => {}); // alerte push aux admins
         }
         uploadStatus = 'error';
       }
