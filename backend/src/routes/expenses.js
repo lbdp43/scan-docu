@@ -544,6 +544,7 @@ router.put('/:id', validate(updateExpenseSchema), async (req, res) => {
           description: expense.description || '',
           userName: expense.user.name,
           cardId: expense.user.card_id,
+          paymentMethod: expense.payment_method,
           isUpdate: !hasStoredImage && existing.has_receipt,
         });
 

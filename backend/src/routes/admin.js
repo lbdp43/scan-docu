@@ -366,6 +366,7 @@ router.get('/export-failed', async (req, res) => {
           description: expense.description || '',
           userName: expense.user.name,
           cardId: expense.user.card_id,
+          paymentMethod: expense.payment_method,
         });
         archive.append(pdfBuffer, {
           name: expense.file_name || `${dateStr}_${expense.type}_${Number(expense.amount).toFixed(2)}EUR_${userName}.pdf`,
