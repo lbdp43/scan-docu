@@ -5,11 +5,59 @@
 const express = require('express');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
 const { PAYMENT_LABELS } = require('../services/payment');
+const { generatePDF } = require('../services/pdf');
+const { updateDriveFile, uploadToDrive, getRootFolderId } = require('../services/drive');
 
 const router = express.Router();
 router.use(authenticateToken);
 
 const STATUSES = ['pending', 'reimbursed', 'rejected'];
+
+// Régénère le justificatif PDF avec le statut de remboursement à jour et
+// met à jour le fichier sur le Drive (best-effort — ne bloque pas la clôture).
+async function syncReimbursementPdf(prisma, expenseId) {
+  try {
+    const e = await prisma.expense.findUnique({
+      where: { id: expenseId },
+      include: { user: { select: { name: true, card_id: true, drive_folder_id: true } } },
+    });
+    if (!e || !e.drive_file_id) return;
+
+    const img = e.receipt_image ? Buffer.from(e.receipt_image) : null;
+    const hasImg = img && img.length > 0;
+    const pdfBuffer = await generatePDF({
+      imageBuffer: hasImg ? img : null,
+      imageMime: hasImg ? 'image/jpeg' : null,
+      date: e.date_ticket,
+      amount: Number(e.amount),
+      type: e.type,
+      merchant: e.merchant || '',
+      description: e.description || '',
+      userName: e.user.name,
+      cardId: e.user.card_id,
+      paymentMethod: e.payment_method,
+      reimbursementStatus: e.reimbursement_status,
+      reimbursedAt: e.reimbursed_at,
+      isUpdate: !hasImg && e.has_receipt,
+    });
+
+    try {
+      await updateDriveFile(e.drive_file_id, pdfBuffer, e.file_name);
+    } catch (updateErr) {
+      console.error('[reimbursements] drive update failed, recreating:', updateErr.message);
+      const folderId = e.user.drive_folder_id || await getRootFolderId();
+      if (folderId) {
+        const r = await uploadToDrive(pdfBuffer, e.file_name, folderId);
+        await prisma.expense.update({
+          where: { id: expenseId },
+          data: { drive_file_id: r.fileId, drive_file_url: r.webViewLink },
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[reimbursements] pdf sync error:', err.message);
+  }
+}
 
 // GET /api/reimbursements/mine — les demandes du collaborateur connecté
 router.get('/mine', async (req, res) => {
@@ -97,6 +145,9 @@ router.put('/:id', async (req, res) => {
       omit: { receipt_image: true },
       include: { user: { select: { id: true, name: true } } },
     });
+
+    // Met à jour le justificatif PDF sur le Drive avec le nouveau statut
+    await syncReimbursementPdf(req.prisma, id);
 
     res.json({ request: fmt(updated) });
   } catch (err) {
