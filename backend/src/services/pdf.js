@@ -1,7 +1,7 @@
 const PDFDocument = require('pdfkit');
 const { PAYMENT_LABELS, normalizeMethod, isReimbursable } = require('./payment');
 
-async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId, paymentMethod, isUpdate = false }) {
+async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId, paymentMethod, reimbursementStatus, reimbursedAt, isUpdate = false }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -39,11 +39,21 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
       const method = normalizeMethod(paymentMethod);
       const methodLabel = PAYMENT_LABELS[method] || 'Carte pro';
       const reimbursable = isReimbursable(method);
+      const reimbDate = reimbursedAt ? (reimbursedAt instanceof Date ? reimbursedAt : new Date(reimbursedAt)) : null;
+      const isReimbursed = reimbursable && reimbursementStatus === 'reimbursed';
+      const isRejected = reimbursable && reimbursementStatus === 'rejected';
+
+      let methodSuffix = '';
+      if (reimbursable) {
+        if (isReimbursed) methodSuffix = reimbDate ? ` (remboursé le ${reimbDate.toLocaleDateString('fr-FR')})` : ' (remboursé)';
+        else if (isRejected) methodSuffix = ' (remboursement refusé)';
+        else methodSuffix = ' (à rembourser)';
+      }
 
       const rows = [
         ['Collaborateur', userName],
         ['Carte société', method === 'carte' ? (cardId || 'N/A') : '—'],
-        ['Mode de règlement', reimbursable ? `${methodLabel} (à rembourser)` : methodLabel],
+        ['Mode de règlement', `${methodLabel}${methodSuffix}`],
         ['Date du ticket', date instanceof Date ? date.toLocaleDateString('fr-FR') : date],
         ['Montant', `${parseFloat(amount).toFixed(2)} €`],
         ['Type', type],
@@ -58,8 +68,10 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
         doc.font('Helvetica-Bold').fillColor('#333333').text(label, tableLeft, y, { width: 150 });
         // Value — highlight payment method row
         const highlight = label === 'Mode de règlement';
+        let hlColor = '#1A3A1C';
+        if (highlight && reimbursable) hlColor = isReimbursed ? '#15803D' : isRejected ? '#6B7280' : '#B45309';
         doc.font(highlight ? 'Helvetica-Bold' : 'Helvetica')
-          .fillColor(highlight ? (reimbursable ? '#B45309' : '#1A3A1C') : '#333333')
+          .fillColor(highlight ? hlColor : '#333333')
           .text(value, col2, y, { width: 340 });
         y += 22;
       }
@@ -70,17 +82,28 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
       doc.moveTo(40, y).lineTo(555, y).strokeColor('#E0E0E0').lineWidth(0.5).stroke();
       y += 15;
 
-      // Reimbursement request banner
+      // Reimbursement banner — reflects the current request status
       if (reimbursable) {
         const bh = 40;
+        let bg = '#FFF7ED', border = '#F59E0B', titleColor = '#B45309', subColor = '#92400E';
+        let title = `DEMANDE DE REMBOURSEMENT — ${methodLabel}`;
+        let sub = 'Payé par le collaborateur — à rembourser';
+        if (isReimbursed) {
+          bg = '#F0FDF4'; border = '#22C55E'; titleColor = '#15803D'; subColor = '#166534';
+          title = 'REMBOURSÉ';
+          sub = reimbDate ? `Remboursement effectué le ${reimbDate.toLocaleDateString('fr-FR')}` : 'Remboursement effectué';
+        } else if (isRejected) {
+          bg = '#F3F4F6'; border = '#9CA3AF'; titleColor = '#4B5563'; subColor = '#6B7280';
+          title = 'REMBOURSEMENT REFUSÉ';
+          sub = 'Demande de remboursement refusée';
+        }
         doc.save();
-        doc.roundedRect(40, y, 515, bh, 8)
-          .fillColor('#FFF7ED').fill()
-          .strokeColor('#F59E0B').lineWidth(1.5).stroke();
-        doc.fontSize(11).fillColor('#B45309').font('Helvetica-Bold')
-          .text(`DEMANDE DE REMBOURSEMENT — ${methodLabel}`, 40, y + 9, { width: 515, align: 'center' });
-        doc.fontSize(8).fillColor('#92400E').font('Helvetica')
-          .text('Payé par le collaborateur — à rembourser', 40, y + 24, { width: 515, align: 'center' });
+        doc.roundedRect(40, y, 515, bh, 8).fillColor(bg).fill()
+          .strokeColor(border).lineWidth(1.5).stroke();
+        doc.fontSize(11).fillColor(titleColor).font('Helvetica-Bold')
+          .text(title, 40, y + 9, { width: 515, align: 'center' });
+        doc.fontSize(8).fillColor(subColor).font('Helvetica')
+          .text(sub, 40, y + 24, { width: 515, align: 'center' });
         doc.restore();
         y += bh + 15;
       }
