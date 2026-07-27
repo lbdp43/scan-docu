@@ -1,7 +1,7 @@
 const PDFDocument = require('pdfkit');
 const { PAYMENT_LABELS, normalizeMethod, isReimbursable } = require('./payment');
 
-async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchant, description, userName, cardId, paymentMethod, reimbursementStatus, reimbursedAt, isUpdate = false }) {
+async function generatePDF({ imageBuffer, imageMime, extraImages = [], date, amount, type, merchant, description, userName, cardId, paymentMethod, reimbursementStatus, reimbursedAt, isUpdate = false }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -110,20 +110,32 @@ async function generatePDF({ imageBuffer, imageMime, date, amount, type, merchan
 
       // Ticket image or "no receipt" banner
       if (imageBuffer && imageMime && imageMime.startsWith('image/')) {
-        doc.fontSize(12).fillColor('#1A3A1C').text('Image du ticket', 40, y);
+        const totalPages = 1 + (Array.isArray(extraImages) ? extraImages.length : 0);
+        doc.fontSize(12).fillColor('#1A3A1C')
+          .text(totalPages > 1 ? `Image du ticket (page 1/${totalPages})` : 'Image du ticket', 40, y);
         y += 25;
 
         try {
           // Ensure we have a proper Node.js Buffer (Prisma Bytes may return Uint8Array)
           const imgBuf = Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer);
-          const imgOptions = {
-            fit: [475, 500],
-            align: 'center',
-          };
-          doc.image(imgBuf, 40, y, imgOptions);
+          doc.image(imgBuf, 40, y, { fit: [475, 500], align: 'center' });
         } catch (imgErr) {
           console.error('[pdf] Image embed error:', imgErr.message);
           doc.fontSize(9).fillColor('#999').text('(Image non disponible)', 40, y);
+        }
+
+        // Pages supplémentaires : une page PDF par photo additionnelle
+        if (Array.isArray(extraImages) && extraImages.length) {
+          extraImages.forEach((extra, i) => {
+            try {
+              const buf = Buffer.isBuffer(extra) ? extra : Buffer.from(extra);
+              doc.addPage();
+              doc.fontSize(12).fillColor('#1A3A1C').text(`Image du ticket (page ${i + 2}/${totalPages})`, 40, 40);
+              doc.image(buf, 40, 75, { fit: [515, 680], align: 'center' });
+            } catch (e) {
+              console.error('[pdf] extra image embed error:', e.message);
+            }
+          });
         }
       } else if (isUpdate) {
         // Updated document banner (blue/green)

@@ -88,10 +88,14 @@ router.post('/', upload.single('image'), async (req, res) => {
 });
 
 // POST /api/scan/submit — Submit scanned expense with Drive upload
-router.post('/submit', upload.single('image'), async (req, res) => {
+// Accepte plusieurs images ('image' répété) : la 1ʳᵉ = page 1, les suivantes =
+// pages supplémentaires d'un même justificatif (PDF multi-pages).
+router.post('/submit', upload.array('image', 10), async (req, res) => {
   try {
     const { date_ticket, amount, type, merchant, description } = req.body;
     const paymentMethod = normalizeMethod(req.body.payment_method);
+    const files = req.files || [];
+    const primaryFile = files[0] || null;
 
     if (!amount || !type) {
       return res.status(400).json({ error: 'Montant et type requis' });
@@ -111,29 +115,38 @@ router.post('/submit', upload.single('image'), async (req, res) => {
     const userName = user.name.split(' ')[0];
 
     // Generate PDF (with image or "TICKET NON DISPONIBLE" banner)
-    const hasImage = !!req.file;
+    const hasImage = !!primaryFile;
     const prefix = hasImage ? 'ticket' : 'sans-ticket';
     const fileName = `${prefix}_${ticketDate.toISOString().slice(0, 10)}_${expenseType}_${parsedAmount.toFixed(2)}EUR_${userName}.pdf`;
 
-    // Compress image for PDF (much smaller than raw mobile photo)
+    // Compresse chaque photo (bien plus léger que la photo mobile brute)
+    const compressImg = async (buf) => sharp(buf)
+      .rotate()
+      .resize(1400, null, { withoutEnlargement: true, fit: 'inside' })
+      .jpeg({ quality: 75, mozjpeg: true })
+      .toBuffer();
+
     let pdfImageBuffer = null;
     let pdfImageMime = null;
-    if (hasImage && req.file.mimetype.startsWith('image/')) {
-      pdfImageBuffer = await sharp(req.file.buffer)
-        .rotate()
-        .resize(1400, null, { withoutEnlargement: true, fit: 'inside' })
-        .jpeg({ quality: 75, mozjpeg: true })
-        .toBuffer();
+    const extraImages = [];
+    if (hasImage && primaryFile.mimetype.startsWith('image/')) {
+      pdfImageBuffer = await compressImg(primaryFile.buffer);
       pdfImageMime = 'image/jpeg';
-      console.log(`[pdf] Image compressed: ${req.file.buffer.length} -> ${pdfImageBuffer.length} bytes (${Math.round(pdfImageBuffer.length / 1024)}KB)`);
+      console.log(`[pdf] Page 1 compressed: ${primaryFile.buffer.length} -> ${pdfImageBuffer.length} bytes`);
+      // Pages supplémentaires (images uniquement)
+      for (const f of files.slice(1)) {
+        if (f.mimetype.startsWith('image/')) extraImages.push(await compressImg(f.buffer));
+      }
+      if (extraImages.length) console.log(`[pdf] ${extraImages.length} page(s) supplémentaire(s)`);
     } else if (hasImage) {
       // PDF file passed directly
-      pdfImageBuffer = req.file.buffer;
-      pdfImageMime = req.file.mimetype;
+      pdfImageBuffer = primaryFile.buffer;
+      pdfImageMime = primaryFile.mimetype;
     }
 
     const pdfBuffer = await generatePDF({
       imageBuffer: pdfImageBuffer,
+      extraImages,
       imageMime: pdfImageMime,
       date: ticketDate,
       amount: parsedAmount,
@@ -201,7 +214,7 @@ router.post('/submit', upload.single('image'), async (req, res) => {
         type: expenseType,
         merchant: merchant || null,
         description: description || null,
-        has_receipt: !!req.file,
+        has_receipt: hasImage,
         receipt_image: pdfImageBuffer || null,
         drive_file_id: driveFileId,
         drive_file_url: driveFileUrl,
