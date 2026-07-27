@@ -42,6 +42,7 @@ export default function Scan() {
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
   const { types: EXPENSE_TYPES } = useExpenseTypes();
   const fileInputRef = useRef(null);
+  const addPhotoInputRef = useRef(null);
   const amountRef = useRef(null);
 
   // Justification d'un paiement précis (lien depuis "à justifier") : montant + date imposés
@@ -54,6 +55,8 @@ export default function Scan() {
   const [hasImage, setHasImage] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  // Pages supplémentaires (2ᵉ, 3ᵉ photo…) pour un même justificatif -> PDF multi-pages
+  const [extraPhotos, setExtraPhotos] = useState([]);
   const [ocrState, setOcrState] = useState('idle');
   const [ocrConfidence, setOcrConfidence] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -134,6 +137,25 @@ export default function Scan() {
     }
   }, [fromMissing, targetAmount, targetDate, targetMerchant]);
 
+  // Ajoute une page supplémentaire au justificatif en cours (pas d'OCR, champs conservés)
+  const handleAddPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';
+    if (!file) return;
+    haptic('light');
+    const compressed = await compressImage(file);
+    setExtraPhotos((prev) => [...prev, { file: compressed, url: URL.createObjectURL(compressed) }]);
+  };
+
+  const removeExtraPhoto = (idx) => {
+    setExtraPhotos((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(idx, 1);
+      if (removed?.url) URL.revokeObjectURL(removed.url);
+      return next;
+    });
+  };
+
   const doSubmit = async () => {
     setSubmitting(true);
     const date = dateTicket || new Date().toISOString().slice(0, 10);
@@ -155,7 +177,9 @@ export default function Scan() {
 
     try {
       const formData = new FormData();
+      // Page 1 puis pages supplémentaires -> justificatif PDF multi-pages
       if (imageFile) formData.append('image', imageFile);
+      for (const p of extraPhotos) formData.append('image', p.file);
       formData.append('amount', amount);
       formData.append('date_ticket', date);
       formData.append('type', type);
@@ -229,6 +253,8 @@ export default function Scan() {
     setImageFile(null);
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
+    extraPhotos.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+    setExtraPhotos([]);
     setOcrState('idle');
     setOcrConfidence(null);
     setAmount('');
@@ -255,6 +281,18 @@ export default function Scan() {
       accept="image/jpeg,image/png,image/webp,application/pdf"
       capture="environment"
       onChange={handleCapture}
+      className="hidden"
+    />
+  );
+
+  // Input dédié à l'ajout d'une page supplémentaire (ne réinitialise pas le formulaire)
+  const addPhotoInput = (
+    <input
+      ref={addPhotoInputRef}
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      capture="environment"
+      onChange={handleAddPhoto}
       className="hidden"
     />
   );
@@ -597,6 +635,46 @@ export default function Scan() {
           />
         </div>
 
+        {/* Pages du justificatif (photos multiples pour une seule facture) */}
+        <div>
+          <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-2">
+            Pages du justificatif
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {imagePreview && (
+              <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-card-border">
+                <img src={imagePreview} alt="Page 1" className="w-full h-full object-cover" />
+                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center">1</span>
+              </div>
+            )}
+            {extraPhotos.map((p, i) => (
+              <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-card-border">
+                <img src={p.url} alt={`Page ${i + 2}`} className="w-full h-full object-cover" />
+                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center">{i + 2}</span>
+                <button
+                  type="button"
+                  onClick={() => removeExtraPhoto(i)}
+                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 text-white text-xs leading-none flex items-center justify-center"
+                  aria-label="Retirer"
+                >
+                  {'×'}
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addPhotoInputRef.current?.click()}
+              className="w-16 h-16 rounded-xl border border-dashed border-green-mid/40 flex flex-col items-center justify-center text-green-light gap-1 active:scale-95 transition-transform"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+              <span className="text-[9px] leading-none">Photo</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-text-dim mt-1.5">
+            Ajoute d'autres photos pour regrouper plusieurs pages dans un seul justificatif.
+          </p>
+        </div>
+
         <button
           type="submit"
           disabled={submitting}
@@ -612,9 +690,10 @@ export default function Scan() {
               Envoi en cours{'…'}
             </>
           ) : (
-            <>Enregistrer la d{'é'}pense</>
+            <>Enregistrer la d{'é'}pense{extraPhotos.length > 0 ? ` (${extraPhotos.length + 1} pages)` : ''}</>
           )}
         </button>
+        {addPhotoInput}
       </form>
 
       <DuplicateWarning
