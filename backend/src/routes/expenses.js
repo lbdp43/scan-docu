@@ -344,7 +344,7 @@ router.get('/stats/advanced', async (req, res) => {
     }
     // Filtre optionnel par mode de paiement (défaut : toutes les dépenses)
     const pm = req.query.payment_method;
-    if (pm && ['carte', 'caisse', 'especes', 'note_frais'].includes(pm)) {
+    if (pm && ['carte', 'cheque', 'virement', 'caisse', 'especes', 'note_frais'].includes(pm)) {
       where.payment_method = pm;
     }
 

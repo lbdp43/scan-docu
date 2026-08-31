@@ -3,6 +3,9 @@
  *
  * - carte           : carte pro (débit sur le compte pro Pennylane) — à rapprocher
  *                     avec une transaction bancaire. C'est le défaut historique.
+ * - cheque          : réglé par chèque de la société (caisse générale) — justificatif,
+ *                     PAS de remboursement, PAS de débit carte.
+ * - virement        : réglé par virement / compte société (caisse générale) — idem.
  * - caisse          : espèces de la caisse de l'entreprise — justificatif comptable,
  *                     PAS de remboursement, PAS de débit carte.
  * - especes         : espèces payées par le collaborateur (argent perso) — génère
@@ -12,10 +15,12 @@
  * Seules les dépenses "carte" correspondent à un débit du compte pro : les autres
  * ne doivent jamais servir à justifier une transaction bancaire.
  */
-const PAYMENT_METHODS = ['carte', 'caisse', 'especes', 'note_frais'];
+const PAYMENT_METHODS = ['carte', 'cheque', 'virement', 'caisse', 'especes', 'note_frais'];
 
 const PAYMENT_LABELS = {
   carte: 'Carte pro',
+  cheque: 'Chèque',
+  virement: 'Virement (société)',
   caisse: 'Espèces (caisse)',
   especes: 'Espèces (perso)',
   note_frais: 'Note de frais',
