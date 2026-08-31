@@ -254,8 +254,11 @@ export default function Dashboard() {
             return (
               <div key={t.type} className={`flex-1 text-center flex flex-col items-center ${i > 0 ? 'border-l border-white/10' : ''}`}>
                 <span className="text-green-light/70"><TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={20} /></span>
-                <p className="text-green-light font-semibold text-lg mt-1">{t.count}</p>
-                <p className="text-text-muted text-[10px] uppercase tracking-wider">{t.type}</p>
+                <p className="text-green-light font-semibold text-lg mt-1 leading-none">{t.count}</p>
+                <p className="text-text-muted text-[10px] uppercase tracking-wider mt-1">{t.type}</p>
+                <p className="text-green-light/50 text-[10px] font-light mt-0.5">
+                  ({Number(t.total).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'})
+                </p>
               </div>
             );
           })}
