@@ -139,8 +139,7 @@ async function computeMissing(db) {
     summary: { totalBankTransactions: expenseTx.length, matched, unmatched: unmatched.length, totalExpenses: expRows.length, ignored: ignoredList.length } };
 }
 
-async function buildAndStore(db) {
-  const snap = await computeMissing(db);
+async function saveSnapshot(snap) {
   try {
     await prisma.setting.upsert({
       where: { key: SNAP_KEY },
@@ -148,6 +147,11 @@ async function buildAndStore(db) {
       create: { key: SNAP_KEY, value: JSON.stringify(snap) },
     });
   } catch (e) { console.error('[missing] store snapshot error:', e.message); }
+}
+
+async function buildAndStore(db) {
+  const snap = await computeMissing(db);
+  await saveSnapshot(snap);
   return snap;
 }
 
@@ -156,6 +160,46 @@ async function readSnapshot() {
     const r = await prisma.setting.findUnique({ where: { key: SNAP_KEY } });
     return r?.value ? JSON.parse(r.value) : null;
   } catch { return null; }
+}
+
+// Ignore un paiement — 100% app-side : met à jour le Setting des ignorés et
+// PATCHE le snapshot en cache (retire la transaction + ajuste les compteurs).
+// AUCUN appel à Pennylane (pas de recalcul lourd).
+async function ignoreMissing(entry) {
+  await pennylane.addIgnoredMissing(entry);
+  const snap = await readSnapshot();
+  if (!snap) return null;
+  const idStr = String(entry.id);
+  const tx = (snap.transactions || []).find((t) => String(t.transactionId) === idStr);
+  snap.transactions = (snap.transactions || []).filter((t) => String(t.transactionId) !== idStr);
+  if (tx && Array.isArray(snap.cards)) {
+    const c = snap.cards.find((c) => (c.masked || null) === (tx.card?.masked || null));
+    if (c) {
+      c.missing = Math.max(0, (c.missing || 0) - 1);
+      c.total = Math.max(0, (c.total || 0) - 1);
+      c.amountMissing = +Math.max(0, (c.amountMissing || 0) - Number(tx.amount || 0)).toFixed(2);
+    }
+  }
+  if (snap.summary) {
+    snap.summary.unmatched = Math.max(0, (snap.summary.unmatched || 0) - 1);
+    snap.summary.totalBankTransactions = Math.max(0, (snap.summary.totalBankTransactions || 0) - 1);
+    snap.summary.ignored = (snap.summary.ignored || 0) + 1;
+  }
+  snap.ignored = await pennylane.getIgnoredMissing();
+  await saveSnapshot(snap);
+  return snap;
+}
+
+// Réaffiche un paiement ignoré — app-side. Le paiement reviendra dans les
+// manquants au prochain recalcul complet (cron horaire ou bouton Rafraîchir).
+async function unignoreMissing(id) {
+  await pennylane.removeIgnoredMissing(id);
+  const snap = await readSnapshot();
+  if (!snap) return null;
+  if (snap.summary) snap.summary.ignored = Math.max(0, (snap.summary.ignored || 0) - 1);
+  snap.ignored = await pennylane.getIgnoredMissing();
+  await saveSnapshot(snap);
+  return snap;
 }
 
 // Lecture rapide : snapshot récent si dispo, sinon (re)calcul + stockage.
@@ -169,4 +213,4 @@ async function getMissing(db, { refresh = false } = {}) {
   return { ...(await buildAndStore(db)), cached: false };
 }
 
-module.exports = { computeMissing, buildAndStore, readSnapshot, getMissing };
+module.exports = { computeMissing, buildAndStore, readSnapshot, getMissing, ignoreMissing, unignoreMissing };
