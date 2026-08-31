@@ -191,9 +191,9 @@ export default function AdminPennylane() {
 
   async function handleUnignoreMissing(id) {
     try {
-      await api.unignoreMissing(id);
-      setToast({ message: 'Paiement réaffiché', type: 'success' });
-      loadMissing({ refresh: true });
+      const data = await api.unignoreMissing(id);
+      setMissing(m => m ? { ...m, ignored: data.ignored || (m.ignored || []).filter(e => String(e.id) !== String(id)), summary: data.summary || m.summary } : m);
+      setToast({ message: 'Réaffiché — réapparaîtra au prochain rafraîchissement', type: 'success' });
     } catch (err) {
       setToast({ message: err.message, type: 'error' });
     }

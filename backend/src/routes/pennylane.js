@@ -458,9 +458,9 @@ router.post('/missing/ignore', async (req, res) => {
   try {
     const { transactionId, label, amount, date } = req.body;
     if (!transactionId) return res.status(400).json({ error: 'transactionId requis' });
-    await pennylane.addIgnoredMissing({ id: transactionId, label, amount, date });
-    const snap = await missing.buildAndStore(req.prisma); // recalcul immédiat
-    res.json({ success: true, summary: snap.summary, ignored: snap.ignored });
+    // 100% app-side : patch du snapshot, aucun appel Pennylane
+    const snap = await missing.ignoreMissing({ id: transactionId, label, amount, date });
+    res.json({ success: true, summary: snap?.summary, ignored: snap?.ignored || [] });
   } catch (err) {
     console.error('[pennylane] missing ignore error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -472,9 +472,9 @@ router.post('/missing/unignore', async (req, res) => {
   try {
     const { transactionId } = req.body;
     if (!transactionId) return res.status(400).json({ error: 'transactionId requis' });
-    await pennylane.removeIgnoredMissing(transactionId);
-    const snap = await missing.buildAndStore(req.prisma);
-    res.json({ success: true, summary: snap.summary, ignored: snap.ignored });
+    // app-side : le paiement reviendra au prochain recalcul (cron / Rafraîchir)
+    const snap = await missing.unignoreMissing(transactionId);
+    res.json({ success: true, summary: snap?.summary, ignored: snap?.ignored || [] });
   } catch (err) {
     console.error('[pennylane] missing unignore error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
