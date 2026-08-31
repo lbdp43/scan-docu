@@ -238,13 +238,20 @@ router.get('/stats', async (req, res) => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // Mois précédent
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     const monthWhere = {
       ...where,
       date_ticket: { gte: startOfMonth, lte: endOfMonth },
     };
+    const prevMonthWhere = {
+      ...where,
+      date_ticket: { gte: startOfPrevMonth, lte: endOfPrevMonth },
+    };
 
-    const [monthExpenses, totalCount, typeStats] = await Promise.all([
+    const [monthExpenses, totalCount, typeStats, prevMonthExpenses, prevTypeStats] = await Promise.all([
       req.prisma.expense.aggregate({
         where: monthWhere,
         _sum: { amount: true },
@@ -257,15 +264,39 @@ router.get('/stats', async (req, res) => {
         _sum: { amount: true },
         _count: true,
       }),
+      req.prisma.expense.aggregate({
+        where: prevMonthWhere,
+        _sum: { amount: true },
+        _count: true,
+      }),
+      req.prisma.expense.groupBy({
+        by: ['type'],
+        where: prevMonthWhere,
+        _sum: { amount: true },
+        _count: true,
+      }),
     ]);
+
+    // Libellé du mois précédent (ex. "juillet")
+    const prevMonthLabel = startOfPrevMonth.toLocaleDateString('fr-FR', { month: 'long' });
 
     res.json({
       month: {
         total: monthExpenses._sum.amount || 0,
         count: monthExpenses._count,
       },
+      prevMonth: {
+        total: prevMonthExpenses._sum.amount || 0,
+        count: prevMonthExpenses._count,
+        label: prevMonthLabel,
+      },
       allTime: { count: totalCount },
       byType: typeStats.map(t => ({
+        type: t.type,
+        total: t._sum.amount || 0,
+        count: t._count,
+      })),
+      prevByType: prevTypeStats.map(t => ({
         type: t.type,
         total: t._sum.amount || 0,
         count: t._count,
