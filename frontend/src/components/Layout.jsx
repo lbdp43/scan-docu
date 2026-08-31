@@ -272,7 +272,7 @@ export default function Layout() {
       </main>
 
       {/* Bottom Navigation — named so it stays fixed during page transitions */}
-      <nav className="fixed bottom-0 left-0 right-0 h-[84px] bg-black/95 backdrop-blur-xl border-t border-white/[0.08] z-50 [view-transition-name:bottom-nav]">
+      <nav className="fixed bottom-0 left-0 right-0 h-[84px] bg-bg2/95 backdrop-blur-xl border-t border-card-border z-50 [view-transition-name:bottom-nav]">
         <div className="relative max-w-lg mx-auto h-full flex items-center justify-around px-2">
           {/* Sliding active indicator (shared element via View Transitions) */}
           <span

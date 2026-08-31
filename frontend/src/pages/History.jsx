@@ -291,12 +291,12 @@ export default function History() {
         <div className="space-y-3 animate-pulse">
           {[1,2,3,4,5].map(i => (
             <div key={i} className="flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border">
-              <div className="w-[46px] h-[46px] rounded-2xl bg-white/5" />
+              <div className="w-[46px] h-[46px] rounded-2xl bg-card" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-white/5 rounded w-3/4" />
-                <div className="h-3 bg-white/5 rounded w-1/2" />
+                <div className="h-4 bg-card rounded w-3/4" />
+                <div className="h-3 bg-card rounded w-1/2" />
               </div>
-              <div className="h-5 bg-white/5 rounded w-16" />
+              <div className="h-5 bg-card rounded w-16" />
             </div>
           ))}
         </div>

@@ -3,19 +3,21 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      // Tokens -> variables CSS (voir index.css) : permet le thème clair/sombre.
+      // Triplets RGB pour garder les modificateurs d'opacité (ex. green-mid/20).
       colors: {
-        'green-deep': '#1A3A1C',
-        'green-mid': '#2D6A27',
-        'green-bright': '#4A9E40',
-        'green-light': '#7FD472',
-        'gold': '#C8A84B',
-        'bg': '#0C150D',
-        'bg2': '#111B12',
-        'card': 'rgba(255,255,255,0.055)',
-        'card-border': 'rgba(255,255,255,0.08)',
-        'text': '#F0F4F0',
-        'text-muted': '#7A9C7A',
-        'text-dim': '#5E7E5E',
+        'green-deep': 'rgb(var(--green-deep) / <alpha-value>)',
+        'green-mid': 'rgb(var(--green-mid) / <alpha-value>)',
+        'green-bright': 'rgb(var(--green-bright) / <alpha-value>)',
+        'green-light': 'rgb(var(--green-light) / <alpha-value>)',
+        'gold': 'rgb(var(--gold) / <alpha-value>)',
+        'bg': 'rgb(var(--bg) / <alpha-value>)',
+        'bg2': 'rgb(var(--bg2) / <alpha-value>)',
+        'card': 'rgb(var(--card) / <alpha-value>)',
+        'card-border': 'rgb(var(--card-border) / <alpha-value>)',
+        'text': 'rgb(var(--tx) / <alpha-value>)',
+        'text-muted': 'rgb(var(--tx-muted) / <alpha-value>)',
+        'text-dim': 'rgb(var(--tx-dim) / <alpha-value>)',
       },
       fontFamily: {
         serif: ['Playfair Display', 'serif'],

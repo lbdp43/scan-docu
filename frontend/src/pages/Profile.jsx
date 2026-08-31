@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { getTheme, setTheme } from '../utils/theme';
 import Toast from '../components/Toast';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const [toast, setToast] = useState(null);
+  const [theme, setThemeState] = useState(getTheme());
+
+  function handleTheme(t) {
+    setThemeState(setTheme(t));
+  }
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -65,6 +71,34 @@ export default function Profile() {
             <p className="text-text text-sm mt-1 capitalize">{user?.role || 'user'}</p>
           </div>
         </div>
+      </div>
+
+      {/* Apparence */}
+      <div className="p-5 rounded-3xl bg-card border border-card-border">
+        <h2 className="text-text font-semibold mb-3">Apparence</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleTheme('dark')}
+            className={`flex-1 py-3 rounded-2xl text-sm font-medium border transition-all ${
+              theme === 'dark'
+                ? 'bg-green-mid/20 border-green-mid text-green-light'
+                : 'bg-bg border-card-border text-text-muted'
+            }`}
+          >
+            {'🌙'} Sombre
+          </button>
+          <button
+            onClick={() => handleTheme('light')}
+            className={`flex-1 py-3 rounded-2xl text-sm font-medium border transition-all ${
+              theme === 'light'
+                ? 'bg-green-mid/20 border-green-mid text-green-light'
+                : 'bg-bg border-card-border text-text-muted'
+            }`}
+          >
+            {'☀️'} Clair
+          </button>
+        </div>
+        <p className="text-text-dim text-[11px] mt-2">M{'é'}moris{'é'} sur cet appareil.</p>
       </div>
 
       {/* Change password */}
