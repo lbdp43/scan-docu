@@ -53,3 +53,19 @@ export async function disablePush() {
     await sub.unsubscribe();
   }
 }
+
+// iPhone/iPad — sur iOS, les notifications web n'existent QUE si l'app est
+// installée sur l'écran d'accueil (PWA). Dans Safari simple, PushManager est absent.
+export function isIOS() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export function isStandalone() {
+  return window.matchMedia?.('(display-mode: standalone)')?.matches
+    || window.navigator.standalone === true;
+}
+
+export function pushPermission() {
+  return typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+}
