@@ -89,6 +89,8 @@ const PERIODS = [
 const PAYMENT_FILTERS = [
   { key: '', label: 'Tout' },
   { key: 'carte', label: 'Carte pro' },
+  { key: 'cheque', label: 'Chèque' },
+  { key: 'virement', label: 'Virement' },
   { key: 'note_frais', label: 'Notes de frais' },
   { key: 'caisse', label: 'Espèces caisse' },
 ];
