@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../utils/api';
+import { eur } from '../utils/format';
 import Toast from '../components/Toast';
 
 const TABS = [
@@ -117,7 +118,7 @@ export default function AdminReimbursements() {
                   </div>
                   {r.description && <p className="text-text-dim text-[11px] mt-1">{r.description}</p>}
                 </div>
-                <p className="font-serif text-lg font-semibold text-text shrink-0">{Number(r.amount).toFixed(2)} {'€'}</p>
+                <p className="font-serif text-lg font-semibold text-text shrink-0">{eur(r.amount)}</p>
               </div>
 
               {r.status === 'pending' ? (

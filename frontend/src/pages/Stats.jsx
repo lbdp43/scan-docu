@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
+import { eur } from '../utils/format';
 
 const MONTH_LABELS = {
   '01': 'Jan', '02': 'F\u00E9v', '03': 'Mar', '04': 'Avr',
@@ -246,7 +247,6 @@ export default function Stats() {
     ? (customFrom && customTo ? `${customFrom} → ${customTo}` : 'période perso')
     : (PERIODS.find(p => p.key === period)?.label || period);
   const activeMonths = monthly.filter(m => m.total > 0).length;
-  const eur = (n) => Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
   // Paiements non justifiés par utilisateur (depuis le snapshot des manquants).
   // missByUser : tous les manquants (exercice). nonCatByUser : filtré sur la période
@@ -362,7 +362,7 @@ export default function Stats() {
           <div className="p-4 rounded-2xl bg-card border border-card-border">
             <p className="text-text-muted text-[10px] uppercase tracking-widest">Total {periodLabel}</p>
             <p className="font-serif text-2xl font-bold text-green-light mt-1">
-              {summary.grandTotal.toFixed(2)}{'\u20AC'}
+              {eur(summary.grandTotal)}
             </p>
             <p className="text-text-dim text-[10px] mt-0.5">
               {(PAYMENT_FILTERS.find(f => f.key === paymentFilter)?.label || 'Tout')}{selectedUserId ? ' \u00B7 1 personne' : ''}
@@ -371,7 +371,7 @@ export default function Stats() {
           <div className="p-4 rounded-2xl bg-card border border-card-border">
             <p className="text-text-muted text-[10px] uppercase tracking-widest">Moyenne / mois actif</p>
             <p className="font-serif text-2xl font-bold text-text mt-1">
-              {summary.avgMonthly.toFixed(2)}{'\u20AC'}
+              {eur(summary.avgMonthly)}
             </p>
             <p className="text-text-dim text-[10px] mt-0.5">
               sur {summary.activeMonths ?? activeMonths} mois avec d{'\u00E9'}penses
@@ -420,7 +420,7 @@ export default function Stats() {
                 >
                   {/* Amount label */}
                   <span className={`font-mono font-medium leading-none ${
-                    monthly.length <= 6 ? 'text-[11px]' : 'text-[9px]'
+                    monthly.length <= 6 ? 'text-[11px]' : 'text-[11px]'
                   } ${isMax ? 'text-green-light font-bold' : m.total > 0 ? 'text-text-muted' : 'text-transparent'}`}>
                     {m.total > 0 ? `${Math.round(m.total)}` : '·'}
                   </span>
@@ -439,7 +439,7 @@ export default function Stats() {
                   />
                   {/* Month label */}
                   <span className={`font-medium leading-none ${
-                    monthly.length <= 6 ? 'text-[11px]' : 'text-[9px]'
+                    monthly.length <= 6 ? 'text-[11px]' : 'text-[11px]'
                   } ${m.total > 0 ? 'text-text' : 'text-text-dim'}`}>
                     {MONTH_LABELS[monthKey] || monthKey}
                   </span>
@@ -450,7 +450,7 @@ export default function Stats() {
                     </span>
                   )}
                   {/* Count */}
-                  <span className="text-[9px] text-text-dim leading-none">{m.count || ''}</span>
+                  <span className="text-[11px] text-text-dim leading-none">{m.count || ''}</span>
                 </div>
               );
             })}
@@ -470,7 +470,7 @@ export default function Stats() {
                     {MONTH_LABELS_FULL[monthKey]} {year}
                   </p>
                   <p className="font-serif text-lg font-bold text-green-light">
-                    {m.total.toFixed(2)}{'\u20AC'}
+                    {eur(m.total)}
                   </p>
                 </div>
                 {Object.keys(byType).length > 0 ? (
@@ -491,7 +491,7 @@ export default function Stats() {
                               />
                             </div>
                             <span className="text-text text-xs font-mono font-medium w-16 text-right">
-                              {Number(total).toFixed(2)}{'\u20AC'}
+                              {eur(total)}
                             </span>
                           </div>
                         );
@@ -528,7 +528,7 @@ export default function Stats() {
                           <span className="text-text text-sm font-medium">{info.label}</span>
                         </div>
                         <span className="text-text font-serif font-semibold">
-                          {t.total.toFixed(2)}{'\u20AC'}
+                          {eur(t.total)}
                         </span>
                       </div>
                       <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -662,11 +662,11 @@ export default function Stats() {
                                 {tx.card?.label ? ` \u00B7 ${tx.card.label}` : (tx.card?.last4 ? ` \u00B7 \u2022\u2022\u2022\u2022 ${tx.card.last4}` : '')}
                               </p>
                             </div>
-                            <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{Number(tx.amount).toFixed(2)}{'\u20AC'}</p>
+                            <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{eur(tx.amount)}</p>
                           </div>
                           <div className="flex gap-2 mt-1.5">
-                            <a href={`/?${params}`} className="flex-1 text-center py-1 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">{'\uD83D\uDCF7'} Scanner</a>
-                            <a href={`/manual?${params}`} className="flex-1 text-center py-1 rounded-lg bg-card border border-card-border text-text-muted text-[10px] font-medium">{'\u270D\uFE0F'} Saisie</a>
+                            <a href={`/?${params}`} className="flex-1 text-center py-2 rounded-lg bg-green-mid/20 text-green-light text-xs font-medium">{'\uD83D\uDCF7'} Scanner</a>
+                            <a href={`/manual?${params}`} className="flex-1 text-center py-2 rounded-lg bg-card border border-card-border text-text-muted text-xs font-medium">{'\u270D\uFE0F'} Saisie</a>
                           </div>
                         </div>
                       );
@@ -750,9 +750,10 @@ export default function Stats() {
           </div>
         )}
 
-        {/* Monthly Detail Table */}
-        <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
-          <p className="text-text-muted text-[10px] uppercase tracking-widest mb-4">D{'\u00E9'}tail par mois</p>
+        {/* Détail par mois — replié (le graphe donne déjà la tendance) */}
+        <details className="p-5 rounded-3xl bg-card border border-card-border mt-6">
+          <summary className="text-text-muted text-[10px] uppercase tracking-widest cursor-pointer select-none">D{'\u00E9'}tail par mois (tableau)</summary>
+          <div className="mt-3">
           <div className="space-y-0">
             {monthly.map((m) => {
               const monthKey = m.month.split('-')[1];
@@ -771,7 +772,7 @@ export default function Stats() {
                       <span className="text-text-dim text-xs">({m.count})</span>
                     </div>
                     <span className={`font-serif font-semibold ${m.total > 0 ? 'text-text' : 'text-text-dim'}`}>
-                      {m.total.toFixed(2)}{'\u20AC'}
+                      {eur(m.total)}
                     </span>
                   </div>
                   {/* Mini progress bar */}
@@ -788,7 +789,8 @@ export default function Stats() {
               );
             })}
           </div>
-        </div>
+          </div>
+        </details>
       </div>
     </div>
   );

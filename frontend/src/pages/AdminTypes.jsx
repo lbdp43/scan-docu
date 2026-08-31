@@ -196,7 +196,7 @@ export default function AdminTypes() {
                 required
                 className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
               />
-              <p className="text-text-dim text-[9px] mt-0.5">Minuscules, sans espaces</p>
+              <p className="text-text-dim text-[11px] mt-0.5">Minuscules, sans espaces</p>
             </div>
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
@@ -338,7 +338,7 @@ export default function AdminTypes() {
                   <div className="flex items-center gap-2">
                     <p className="text-text text-sm font-semibold">{type.label}</p>
                     {!type.is_active && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
                         D{'\u00E9'}sactiv{'\u00E9'}
                       </span>
                     )}

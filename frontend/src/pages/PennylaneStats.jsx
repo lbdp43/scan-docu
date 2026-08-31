@@ -222,7 +222,7 @@ export default function PennylaneStats({ toast }) {
             const isMax = m.total > 0 && m.total === maxMonth;
             return (
               <div key={m.mm} className="flex-1 flex flex-col items-center gap-1">
-                <span className={`font-mono leading-none text-[9px] ${
+                <span className={`font-mono leading-none text-[11px] ${
                   isMax ? 'text-green-light font-bold' : m.total > 0 ? 'text-text-muted' : 'text-transparent'
                 }`}>
                   {m.total > 0 ? Math.round(m.total) : '·'}
@@ -235,7 +235,7 @@ export default function PennylaneStats({ toast }) {
                       : 'rgba(255,255,255,0.06)',
                     boxShadow: isMax ? '0 0 12px rgba(90,191,80,0.35)' : 'none',
                   }} />
-                <span className={`text-[9px] leading-none ${m.total > 0 ? 'text-text' : 'text-text-dim'}`}>
+                <span className={`text-[11px] leading-none ${m.total > 0 ? 'text-text' : 'text-text-dim'}`}>
                   {MONTH_LABELS[m.mm]}
                 </span>
               </div>
@@ -279,8 +279,8 @@ export default function PennylaneStats({ toast }) {
                       </div>
                       {(t.nature || t.vehicle) && (
                         <div className="flex gap-1.5 mt-1">
-                          {t.nature && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-mid/15 text-green-light">{t.nature}</span>}
-                          {t.vehicle && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">{'🚐'} {t.vehicle}</span>}
+                          {t.nature && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-green-mid/15 text-green-light">{t.nature}</span>}
+                          {t.vehicle && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">{'🚐'} {t.vehicle}</span>}
                         </div>
                       )}
                     </button>
@@ -292,7 +292,7 @@ export default function PennylaneStats({ toast }) {
                           det.invoice ? (
                             <>
                               <div>
-                                <p className="text-text-muted text-[9px] uppercase tracking-widest">Justificatif</p>
+                                <p className="text-text-muted text-[11px] uppercase tracking-widest">Justificatif</p>
                                 <p className="text-text text-[11px] truncate">
                                   {det.scan?.merchant || det.invoice.label || det.invoice.filename || `Facture #${det.invoice.id}`}
                                 </p>
@@ -371,7 +371,7 @@ export default function PennylaneStats({ toast }) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${s.matched ? 'bg-green-mid/20 text-green-light' : 'bg-white/5 text-text-dim'}`}>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${s.matched ? 'bg-green-mid/20 text-green-light' : 'bg-white/5 text-text-dim'}`}>
                           {s.matched ? 'rapproché' : 'non rapproché'}
                         </span>
                         <span className="font-serif text-sm font-semibold text-text">{eur(s.amount)}</span>
@@ -388,7 +388,7 @@ export default function PennylaneStats({ toast }) {
                           {det.transaction ? (
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-text-muted text-[9px] uppercase tracking-widest">Transaction liée</p>
+                                <p className="text-text-muted text-[11px] uppercase tracking-widest">Transaction liée</p>
                                 <p className="text-text text-[11px] truncate">{det.transaction.label || 'Transaction'}</p>
                                 <p className="text-text-muted text-[10px]">
                                   {new Date(det.transaction.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}

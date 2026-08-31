@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { eur, eurInt } from '../utils/format';
 import { getPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import Toast from '../components/Toast';
@@ -192,7 +193,7 @@ export default function Dashboard() {
                 {myMissing.summary.missing} paiement{myMissing.summary.missing > 1 ? 's' : ''} à justifier
               </p>
               <p className="text-text-muted text-xs">
-                {Number(myMissing.summary.amountMissing).toFixed(2)} {'€'} {'·'} scanne le justificatif
+                {eur(myMissing.summary.amountMissing)} {'·'} scanne le justificatif
               </p>
             </div>
           </div>
@@ -211,13 +212,13 @@ export default function Dashboard() {
                         {tx.card?.label ? ` · ${tx.card.label}` : (tx.card?.last4 ? ` · •••• ${tx.card.last4}` : '')}
                       </p>
                     </div>
-                    <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{Number(tx.amount).toFixed(2)}{'€'}</p>
+                    <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{eur(tx.amount)}</p>
                   </div>
                   <div className="flex gap-2 mt-2">
-                    <Link viewTransition to={scanUrl} className="flex-1 text-center py-1.5 rounded-lg bg-green-mid/20 text-green-light text-[11px] font-medium transition-transform active:scale-[0.96]">
+                    <Link viewTransition to={scanUrl} className="flex-1 text-center py-2 rounded-lg bg-green-mid/20 text-green-light text-xs font-medium transition-transform active:scale-[0.96]">
                       {'📷'} Scanner
                     </Link>
-                    <Link viewTransition to={manualUrl} className="flex-1 text-center py-1.5 rounded-lg bg-card border border-card-border text-text-muted text-[11px] font-medium transition-transform active:scale-[0.96]">
+                    <Link viewTransition to={manualUrl} className="flex-1 text-center py-2 rounded-lg bg-card border border-card-border text-text-muted text-xs font-medium transition-transform active:scale-[0.96]">
                       {'✍️'} Saisie
                     </Link>
                   </div>
@@ -242,36 +243,41 @@ export default function Dashboard() {
         <div className="relative z-10">
           <p className="text-text-muted text-sm mb-2">Total du mois</p>
           <p className="font-serif text-[46px] font-bold text-white leading-tight">
-            {stats?.month?.total ? Number(stats.month.total).toFixed(2) : '0.00'}
+            {Number(stats?.month?.total || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             <span className="text-2xl ml-1">{'€'}</span>
           </p>
           {stats?.prevMonth && (
             <p className="text-text-muted text-xs mt-1 font-light">
-              {stats.prevMonth.label ? `${stats.prevMonth.label.charAt(0).toUpperCase()}${stats.prevMonth.label.slice(1)}` : 'Mois précédent'} : {Number(stats.prevMonth.total || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {'€'}
+              {stats.prevMonth.label ? `${stats.prevMonth.label.charAt(0).toUpperCase()}${stats.prevMonth.label.slice(1)}` : 'Mois précédent'} : {eur(stats.prevMonth.total)}
             </p>
           )}
         </div>
 
-        {/* Stats row */}
-        <div className="relative z-10 flex mt-6 pt-4 border-t border-white/10">
-          {stats?.byType?.map((t, i) => {
-            const typeInfo = TYPE_ICONS[t.type] || TYPE_ICONS.autre;
-            const prev = (stats?.prevByType || []).find(p => p.type === t.type);
-            const prevAbbr = stats?.prevMonth?.label ? stats.prevMonth.label.slice(0, 4) + '.' : 'mois -1';
-            return (
-              <div key={t.type} className={`flex-1 text-center flex flex-col items-center ${i > 0 ? 'border-l border-white/10' : ''}`}>
-                <span className="text-green-light/70"><TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={20} /></span>
-                <p className="text-green-light font-semibold text-lg mt-1 leading-none">{t.count}</p>
-                <p className="text-text-muted text-[10px] uppercase tracking-wider mt-1">{t.type}</p>
-                <p className="text-green-light/60 text-[10px] font-light mt-0.5">
-                  {Number(t.total).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
-                </p>
-                <p className="text-text-dim text-[9px] font-light leading-none mt-0.5">
-                  {prevAbbr} {(prev ? Number(prev.total) : 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
-                </p>
-              </div>
-            );
-          })}
+        {/* Stats — une ligne par catégorie : lisible, avec vrai libellé */}
+        <div className="relative z-10 mt-6 pt-4 border-t border-white/10 space-y-2.5">
+          {(stats?.byType || [])
+            .slice()
+            .sort((a, b) => Number(b.total) - Number(a.total))
+            .map((t) => {
+              const typeInfo = TYPE_ICONS[t.type] || TYPE_ICONS.autre;
+              const prev = (stats?.prevByType || []).find(p => p.type === t.type);
+              const prevAbbr = stats?.prevMonth?.label ? stats.prevMonth.label.slice(0, 4) + '.' : 'mois -1';
+              return (
+                <div key={t.type} className="flex items-center gap-3">
+                  <span className="text-green-light/80 shrink-0"><TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={18} /></span>
+                  <p className="text-text text-sm flex-1 min-w-0 truncate">
+                    {typeInfo.label || t.type}
+                    <span className="text-text-muted text-xs ml-1.5">× {t.count}</span>
+                  </p>
+                  <div className="text-right shrink-0">
+                    <p className="text-green-light font-semibold text-sm leading-tight">{eurInt(t.total)}</p>
+                    <p className="text-text-muted/80 text-[11px] font-light leading-tight">
+                      {prevAbbr} {eurInt(prev ? prev.total : 0)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           {(!stats?.byType || stats.byType.length === 0) && (
             <p className="text-text-muted text-sm text-center w-full">Aucune d{'é'}pense ce mois</p>
           )}
@@ -355,7 +361,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right shrink-0 flex items-center gap-2">
                     <p className="font-serif text-lg font-semibold text-text">
-                      {Number(expense.amount).toFixed(2)}{'€'}
+                      {eur(expense.amount)}
                     </p>
                     <button
                       onClick={() => handleDeletePending(expense.id)}
@@ -411,7 +417,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-serif text-lg font-semibold text-text">
-                    {Number(expense.amount).toFixed(2)}{'€'}
+                    {eur(expense.amount)}
                   </p>
                   <span className={`text-xs ${
                     expense.upload_status === 'error' ? 'text-red-400' :

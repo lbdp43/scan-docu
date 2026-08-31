@@ -644,13 +644,13 @@ export default function Scan() {
             {imagePreview && (
               <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-card-border">
                 <img src={imagePreview} alt="Page 1" className="w-full h-full object-cover" />
-                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center">1</span>
+                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[11px] text-center">1</span>
               </div>
             )}
             {extraPhotos.map((p, i) => (
               <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-card-border">
                 <img src={p.url} alt={`Page ${i + 2}`} className="w-full h-full object-cover" />
-                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center">{i + 2}</span>
+                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[11px] text-center">{i + 2}</span>
                 <button
                   type="button"
                   onClick={() => removeExtraPhoto(i)}
@@ -667,7 +667,7 @@ export default function Scan() {
               className="w-16 h-16 rounded-xl border border-dashed border-green-mid/40 flex flex-col items-center justify-center text-green-light gap-1 active:scale-95 transition-transform"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-              <span className="text-[9px] leading-none">Photo</span>
+              <span className="text-[11px] leading-none">Photo</span>
             </button>
           </div>
           <p className="text-[10px] text-text-dim mt-1.5">

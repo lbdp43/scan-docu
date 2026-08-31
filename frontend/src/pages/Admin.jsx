@@ -344,7 +344,7 @@ export default function Admin() {
               >
                 Ouvrir Google Console → Identifiants
               </a>
-              <p className="text-text-dim text-[9px] leading-relaxed">
+              <p className="text-text-dim text-[11px] leading-relaxed">
                 Identifiants → votre client OAuth 2.0 → « URI de redirection autoris{'é'}s » → Ajouter → coller l'URL → Enregistrer. Ensuite le bouton « Reconnecter » fonctionnera directement.
               </p>
             </div>
@@ -665,7 +665,7 @@ export default function Admin() {
                       {expense.merchant || 'Sans commer\u00E7ant'}
                     </p>
                     {!expense.has_receipt && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 whitespace-nowrap">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 whitespace-nowrap">
                         Sans ticket
                       </span>
                     )}

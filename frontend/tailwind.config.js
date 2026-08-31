@@ -15,7 +15,7 @@ export default {
         'card-border': 'rgba(255,255,255,0.08)',
         'text': '#F0F4F0',
         'text-muted': '#7A9C7A',
-        'text-dim': '#3D5C3D',
+        'text-dim': '#5E7E5E',
       },
       fontFamily: {
         serif: ['Playfair Display', 'serif'],

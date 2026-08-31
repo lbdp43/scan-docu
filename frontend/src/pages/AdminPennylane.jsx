@@ -402,25 +402,30 @@ export default function AdminPennylane() {
         </div>
       )}
 
-      {/* Debug section */}
+      {/* Outils techniques — repliés par défaut, hors du chemin quotidien */}
       {status?.connected && (
-        <div className="space-y-2">
-          {status.responseKeys && (
-            <p className="text-text-dim text-[10px] font-mono">API response keys: {JSON.stringify(status.responseKeys)}</p>
-          )}
-          <button
-            onClick={handleDebug}
-            disabled={loadingDebug}
-            className="text-text-muted text-[11px] underline underline-offset-2"
-          >
-            {loadingDebug ? 'Chargement...' : 'Debug: voir la réponse brute API'}
-          </button>
-          {debugData && (
-            <pre className="p-3 rounded-xl bg-card border border-card-border text-[9px] text-text-muted font-mono overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
-              {JSON.stringify(debugData, null, 2)}
-            </pre>
-          )}
-        </div>
+        <details className="group">
+          <summary className="text-text-dim text-[11px] cursor-pointer select-none list-none">
+            <span className="underline underline-offset-2">Mode avanc{'é'} (d{'é'}bogage)</span>
+          </summary>
+          <div className="space-y-2 mt-2 p-3 rounded-xl bg-card border border-card-border">
+            {status.responseKeys && (
+              <p className="text-text-dim text-[11px] font-mono">API response keys: {JSON.stringify(status.responseKeys)}</p>
+            )}
+            <button
+              onClick={handleDebug}
+              disabled={loadingDebug}
+              className="text-text-muted text-xs underline underline-offset-2"
+            >
+              {loadingDebug ? 'Chargement...' : 'Voir la réponse brute API'}
+            </button>
+            {debugData && (
+              <pre className="p-3 rounded-xl bg-bg border border-card-border text-[11px] text-text-muted font-mono overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+                {JSON.stringify(debugData, null, 2)}
+              </pre>
+            )}
+          </div>
+        </details>
       )}
 
       {/* Main content - only when connected */}
@@ -543,10 +548,11 @@ export default function AdminPennylane() {
                     </div>
                   </div>
 
-                  {/* Diagnostics */}
+                  {/* Diagnostics — repliés : utiles seulement en cas de problème */}
                   {results.diagnostics && (
-                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-1">
-                      <p className="text-blue-400 text-[10px] font-medium uppercase tracking-widest">Diagnostic</p>
+                    <details className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
+                      <summary className="text-blue-400 text-[11px] font-medium uppercase tracking-widest cursor-pointer select-none">Diagnostic technique</summary>
+                      <div className="space-y-1 mt-2">
                       <p className="text-text-muted text-[10px]">
                         {results.diagnostics.totalInvoices} factures Pennylane ({results.diagnostics.unreconciledInvoices} non rapproch{'é'}es) en {results.diagnostics.invoicePages} page(s)
                       </p>
@@ -561,14 +567,15 @@ export default function AdminPennylane() {
                           <summary className="text-text-dim text-[10px] cursor-pointer">Exemples de factures Pennylane</summary>
                           <div className="mt-1 space-y-1">
                             {results.diagnostics.sampleInvoices.map(inv => (
-                              <p key={inv.id} className="text-text-dim text-[9px] font-mono truncate">
+                              <p key={inv.id} className="text-text-dim text-[11px] font-mono truncate">
                                 {inv.filename || '(pas de filename)'} — {inv.label?.substring(0, 40)} — {Number(inv.amount || 0).toFixed(2)}{'€'} — {inv.date}
                               </p>
                             ))}
                           </div>
                         </details>
                       )}
-                    </div>
+                      </div>
+                    </details>
                   )}
 
                   {/* Detail list */}
@@ -617,10 +624,10 @@ export default function AdminPennylane() {
                         )}
                         {r.bestCandidates?.length > 0 && (
                           <details className="mt-1">
-                            <summary className="text-text-dim text-[9px] cursor-pointer">Meilleurs candidats ({r.bestCandidates.length})</summary>
+                            <summary className="text-text-dim text-[11px] cursor-pointer">Meilleurs candidats ({r.bestCandidates.length})</summary>
                             <div className="mt-1 space-y-0.5">
                               {r.bestCandidates.map((c, j) => (
-                                <p key={j} className="text-text-dim text-[9px] font-mono truncate">
+                                <p key={j} className="text-text-dim text-[11px] font-mono truncate">
                                   score={c.score} — {c.filename || '(no filename)'} — {Number(c.amount || 0).toFixed(2)}{'€'}
                                 </p>
                               ))}
@@ -789,9 +796,9 @@ export default function AdminPennylane() {
                                       <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">-{Number(tx.amount).toFixed(2)}{'€'}</p>
                                     </div>
                                     <div className="flex gap-2 mt-1.5">
-                                      <Link to={`/?${params}`} className="flex-1 text-center py-1 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">{'📷'} Scanner</Link>
-                                      <Link to={`/manual?${params}`} className="flex-1 text-center py-1 rounded-lg bg-bg border border-card-border text-text-muted text-[10px] font-medium">{'✍️'} Saisie</Link>
-                                      <button onClick={() => handleIgnoreMissing(tx)} className="px-2 py-1 rounded-lg bg-bg border border-card-border text-text-dim text-[10px] font-medium">{'🚫'} Ignorer</button>
+                                      <Link to={`/?${params}`} className="flex-1 text-center py-2 rounded-lg bg-green-mid/20 text-green-light text-xs font-medium">{'📷'} Scanner</Link>
+                                      <Link to={`/manual?${params}`} className="flex-1 text-center py-2 rounded-lg bg-bg border border-card-border text-text-muted text-xs font-medium">{'✍️'} Saisie</Link>
+                                      <button onClick={() => handleIgnoreMissing(tx)} className="px-3 py-2 rounded-lg bg-bg border border-card-border text-text-muted text-xs font-medium">{'🚫'} Ignorer</button>
                                     </div>
                                   </div>
                                 );
