@@ -2,10 +2,10 @@
 // "note_frais" couvre l'argent avancé par le collaborateur (espèces perso ou carte perso).
 export const PAYMENT_OPTIONS = [
   { value: 'carte', label: 'Carte pro' },
-  { value: 'cheque', label: 'Chèque' },
-  { value: 'virement', label: 'Virement (société)' },
-  { value: 'caisse', label: 'Espèces (caisse)' },
   { value: 'note_frais', label: 'Note de frais' },
+  { value: 'caisse', label: 'Espèces (caisse)' },
+  { value: 'virement', label: 'Virement (société)' },
+  { value: 'cheque', label: 'Chèque' },
 ];
 
 // Modes générant une demande de remboursement (argent avancé par le collaborateur).
