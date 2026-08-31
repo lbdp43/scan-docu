@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
+import { localDate } from '../utils/format';
 import { savePendingExpense } from '../utils/offline';
 import { PAYMENT_OPTIONS, REIMBURSABLE_METHODS } from '../utils/payment';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
@@ -55,7 +56,7 @@ export default function Manual() {
   const fromMissing = Boolean(prefillAmount || prefillDate || prefillMerchant);
 
   const [amount, setAmount] = useState(prefillAmount);
-  const [dateTicket, setDateTicket] = useState(prefillDate || new Date().toISOString().slice(0, 10));
+  const [dateTicket, setDateTicket] = useState(prefillDate || localDate());
   const [type, setType] = useState('autre');
   const [paymentMethod, setPaymentMethod] = useState('carte');
   const [merchant, setMerchant] = useState(prefillMerchant.slice(0, 100));
@@ -179,8 +180,8 @@ export default function Manual() {
     await doSubmit();
   };
 
-  const today = new Date().toISOString().slice(0, 10);
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = localDate();
+  const thirtyDaysAgo = localDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
   // Si on justifie un paiement plus ancien, on autorise sa date
   const dateMin = (prefillDate && prefillDate < thirtyDaysAgo) ? prefillDate : thirtyDaysAgo;
 
