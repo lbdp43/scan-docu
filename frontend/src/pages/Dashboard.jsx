@@ -257,6 +257,7 @@ export default function Dashboard() {
           {stats?.byType?.map((t, i) => {
             const typeInfo = TYPE_ICONS[t.type] || TYPE_ICONS.autre;
             const prev = (stats?.prevByType || []).find(p => p.type === t.type);
+            const prevAbbr = stats?.prevMonth?.label ? stats.prevMonth.label.slice(0, 4) + '.' : 'mois -1';
             return (
               <div key={t.type} className={`flex-1 text-center flex flex-col items-center ${i > 0 ? 'border-l border-white/10' : ''}`}>
                 <span className="text-green-light/70"><TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={20} /></span>
@@ -265,8 +266,8 @@ export default function Dashboard() {
                 <p className="text-green-light/60 text-[10px] font-light mt-0.5">
                   {Number(t.total).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
                 </p>
-                <p className="text-text-dim text-[9px] font-light leading-none">
-                  {(prev ? Number(prev.total) : 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
+                <p className="text-text-dim text-[9px] font-light leading-none mt-0.5">
+                  {prevAbbr} {(prev ? Number(prev.total) : 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
                 </p>
               </div>
             );
