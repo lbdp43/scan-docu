@@ -109,6 +109,10 @@ export default function Stats() {
   const [period, setPeriod] = useState('6m');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [expandedMonth, setExpandedMonth] = useState(null);
+  // Drill-down : liste des dépenses d'un collaborateur sélectionné
+  const [userExpenses, setUserExpenses] = useState(null);
+  const [loadingUserExp, setLoadingUserExp] = useState(false);
+  const [drillType, setDrillType] = useState('');
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -120,6 +124,30 @@ export default function Stats() {
     if (!loadedRef.current) return;
     loadStats();
   }, [selectedUserId, period, paymentFilter]);
+
+  // Charge la liste détaillée quand un collaborateur est sélectionné
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    setDrillType('');
+    if (!selectedUserId) { setUserExpenses(null); return; }
+    loadUserExpenses();
+  }, [selectedUserId, period, paymentFilter]);
+
+  async function loadUserExpenses() {
+    setLoadingUserExp(true);
+    try {
+      const { from, to } = getDateRange(period);
+      const params = { userId: selectedUserId, from: fmt(from), to: fmt(to), limit: 300 };
+      if (paymentFilter) params.payment_method = paymentFilter;
+      const data = await api.getExpenses(params);
+      setUserExpenses(data.expenses || []);
+    } catch (err) {
+      console.error('User expenses error:', err);
+      setUserExpenses([]);
+    } finally {
+      setLoadingUserExp(false);
+    }
+  }
 
   async function loadInitial() {
     try {
@@ -154,6 +182,11 @@ export default function Stats() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function openReceipt(e) {
+    if (e.drive_file_url) window.open(e.drive_file_url, '_blank');
+    else if (e.has_receipt) window.open(api.getReceiptUrl(e.id), '_blank');
   }
 
   if (loading && !data) {
@@ -468,6 +501,78 @@ export default function Stats() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Drill-down : d\u00E9penses d\u00E9taill\u00E9es du collaborateur s\u00E9lectionn\u00E9 */}
+        {selectedUserId && (
+          <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
+            {(() => {
+              const list = userExpenses || [];
+              const counts = {};
+              list.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
+              const shown = drillType ? list.filter(e => e.type === drillType) : list;
+              const uName = users.find(u => String(u.id) === String(selectedUserId))?.name || 'Collaborateur';
+              const typesPresent = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+              return (
+                <>
+                  <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">D{'\u00E9'}penses de {uName}</p>
+                  <p className="text-text-dim text-[10px] mb-3">Touche une cat{'\u00E9'}gorie pour filtrer, une ligne pour voir le justificatif</p>
+
+                  {/* Category chips with counts */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3">
+                    <button
+                      onClick={() => setDrillType('')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${!drillType ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-bg border border-card-border text-text-muted'}`}
+                    >
+                      Tout ({list.length})
+                    </button>
+                    {typesPresent.map(t => {
+                      const info = typesMap[t] || typesMap.autre || { icon: '\uD83D\uDCC4', label: t };
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setDrillType(t)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${drillType === t ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-bg border border-card-border text-text-muted'}`}
+                        >
+                          {info.icon} {info.label} ({counts[t]})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {loadingUserExp ? (
+                    <div className="flex justify-center py-8"><span className="w-5 h-5 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" /></div>
+                  ) : shown.length === 0 ? (
+                    <p className="text-text-dim text-sm text-center py-6">Aucune d{'\u00E9'}pense</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+                      {shown.map(e => {
+                        const info = typesMap[e.type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: e.type };
+                        return (
+                          <button
+                            key={e.id}
+                            onClick={() => openReceipt(e)}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl bg-bg border border-card-border text-left active:scale-[0.98] transition-transform"
+                          >
+                            <span className="text-lg shrink-0">{info.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-text text-sm font-medium truncate">{e.merchant || info.label}</p>
+                              <p className="text-text-muted text-xs">
+                                {new Date(e.date_ticket).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {e.has_receipt ? ' \u00B7 \uD83D\uDCCE justificatif' : ' \u00B7 sans photo'}
+                              </p>
+                            </div>
+                            <span className="font-serif font-semibold text-text shrink-0">{eur(e.amount)}</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted shrink-0"><path d="M9 18l6-6-6-6" /></svg>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
