@@ -312,7 +312,7 @@ export default function Manual() {
               onCreated={(newValue) => {
                 setType(newValue);
                 setShowCreateType(false);
-                setToast({ message: 'Type cr\u00E9\u00E9', type: 'success' });
+                setToast({ message: 'Type créé', type: 'success' });
               }}
               onCancel={() => setShowCreateType(false)}
             />

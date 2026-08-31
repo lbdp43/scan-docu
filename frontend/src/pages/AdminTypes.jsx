@@ -78,7 +78,7 @@ export default function AdminTypes() {
         icon: newIcon,
         color: newColor,
       });
-      setToast({ message: 'Type cr\u00E9\u00E9', type: 'success' });
+      setToast({ message: 'Type créé', type: 'success' });
       setShowCreate(false);
       setNewValue('');
       setNewLabel('');
@@ -108,7 +108,7 @@ export default function AdminTypes() {
         icon: editIcon,
         color: editColor,
       });
-      setToast({ message: 'Type modifi\u00E9', type: 'success' });
+      setToast({ message: 'Type modifié', type: 'success' });
       setEditingId(null);
       await loadTypes();
       refreshGlobalTypes();
@@ -123,7 +123,7 @@ export default function AdminTypes() {
     try {
       await api.updateExpenseType(type.id, { is_active: !type.is_active });
       setToast({
-        message: type.is_active ? 'Type d\u00E9sactiv\u00E9' : 'Type r\u00E9activ\u00E9',
+        message: type.is_active ? 'Type désactivé' : 'Type réactivé',
         type: 'success',
       });
       await loadTypes();
@@ -140,7 +140,7 @@ export default function AdminTypes() {
       if (result.deactivated) {
         setToast({ message: result.message, type: 'warning' });
       } else {
-        setToast({ message: 'Type supprim\u00E9', type: 'success' });
+        setToast({ message: 'Type supprimé', type: 'success' });
       }
       await loadTypes();
       refreshGlobalTypes();
@@ -206,7 +206,7 @@ export default function AdminTypes() {
                 type="text"
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
-                placeholder="ex: H\u00F4tel"
+                placeholder="ex: Hôtel"
                 maxLength={50}
                 required
                 className="w-full bg-bg border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
@@ -215,12 +215,12 @@ export default function AdminTypes() {
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-              Ic{'\u00F4'}ne
+              Ic{'ô'}ne
             </label>
             <IconPicker value={newIcon} onChange={setNewIcon} color={newColor} />
             {newIcon && (
               <p className="text-text-muted text-[10px] mt-1.5">
-                S{'\u00E9'}lectionn{'\u00E9'} : <span className="text-green-light font-medium">{ICON_LABELS[newIcon] || newIcon}</span>
+                S{'é'}lectionn{'é'} : <span className="text-green-light font-medium">{ICON_LABELS[newIcon] || newIcon}</span>
               </p>
             )}
           </div>
@@ -257,7 +257,7 @@ export default function AdminTypes() {
               {creating ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                'Cr\u00E9er'
+                'Créer'
               )}
             </button>
           </div>
@@ -281,7 +281,7 @@ export default function AdminTypes() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                      Libell{'\u00E9'}
+                      Libell{'é'}
                     </label>
                     <input
                       type="text"
@@ -305,7 +305,7 @@ export default function AdminTypes() {
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                    Ic{'\u00F4'}ne
+                    Ic{'ô'}ne
                   </label>
                   <IconPicker value={editIcon} onChange={setEditIcon} color={editColor} />
                 </div>
@@ -339,7 +339,7 @@ export default function AdminTypes() {
                     <p className="text-text text-sm font-semibold">{type.label}</p>
                     {!type.is_active && (
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
-                        D{'\u00E9'}sactiv{'\u00E9'}
+                        D{'é'}sactiv{'é'}
                       </span>
                     )}
                   </div>
@@ -364,7 +364,7 @@ export default function AdminTypes() {
                         ? 'text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/10'
                         : 'text-green-light/60 hover:text-green-light hover:bg-green-mid/10'
                     }`}
-                    title={type.is_active ? 'D\u00E9sactiver' : 'R\u00E9activer'}
+                    title={type.is_active ? 'Désactiver' : 'Réactiver'}
                   >
                     {type.is_active ? (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>

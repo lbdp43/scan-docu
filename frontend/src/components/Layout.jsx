@@ -181,7 +181,7 @@ export default function Layout() {
       {/* Offline banner */}
       {!isOnline && (
         <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-600 text-white text-xs text-center py-2 font-medium">
-          Hors ligne — les d{'\u00E9'}penses seront envoy{'\u00E9'}es au retour du r{'\u00E9'}seau
+          Hors ligne — les d{'é'}penses seront envoy{'é'}es au retour du r{'é'}seau
         </div>
       )}
 
@@ -195,7 +195,7 @@ export default function Layout() {
             </>
           ) : (
             <>
-              {pendingCount} d{'\u00E9'}pense{pendingCount > 1 ? 's' : ''} en attente
+              {pendingCount} d{'é'}pense{pendingCount > 1 ? 's' : ''} en attente
               <button
                 onClick={syncPending}
                 className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-[10px] font-semibold"

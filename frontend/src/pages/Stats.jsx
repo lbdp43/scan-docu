@@ -3,17 +3,18 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { eur } from '../utils/format';
+import TypeIcon from '../components/TypeIcon';
 
 const MONTH_LABELS = {
-  '01': 'Jan', '02': 'F\u00E9v', '03': 'Mar', '04': 'Avr',
-  '05': 'Mai', '06': 'Juin', '07': 'Juil', '08': 'Ao\u00FB',
-  '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'D\u00E9c',
+  '01': 'Jan', '02': 'Fév', '03': 'Mar', '04': 'Avr',
+  '05': 'Mai', '06': 'Juin', '07': 'Juil', '08': 'Aoû',
+  '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Déc',
 };
 
 const MONTH_LABELS_FULL = {
-  '01': 'Janvier', '02': 'F\u00E9vrier', '03': 'Mars', '04': 'Avril',
-  '05': 'Mai', '06': 'Juin', '07': 'Juillet', '08': 'Ao\u00FBt',
-  '09': 'Septembre', '10': 'Octobre', '11': 'Novembre', '12': 'D\u00E9cembre',
+  '01': 'Janvier', '02': 'Février', '03': 'Mars', '04': 'Avril',
+  '05': 'Mai', '06': 'Juin', '07': 'Juillet', '08': 'Août',
+  '09': 'Septembre', '10': 'Octobre', '11': 'Novembre', '12': 'Décembre',
 };
 
 const CACHE_KEY = 'stats_v2';
@@ -365,7 +366,7 @@ export default function Stats() {
               {eur(summary.grandTotal)}
             </p>
             <p className="text-text-dim text-[10px] mt-0.5">
-              {(PAYMENT_FILTERS.find(f => f.key === paymentFilter)?.label || 'Tout')}{selectedUserId ? ' \u00B7 1 personne' : ''}
+              {(PAYMENT_FILTERS.find(f => f.key === paymentFilter)?.label || 'Tout')}{selectedUserId ? ' · 1 personne' : ''}
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-card border border-card-border">
@@ -374,11 +375,11 @@ export default function Stats() {
               {eur(summary.avgMonthly)}
             </p>
             <p className="text-text-dim text-[10px] mt-0.5">
-              sur {summary.activeMonths ?? activeMonths} mois avec d{'\u00E9'}penses
+              sur {summary.activeMonths ?? activeMonths} mois avec d{'é'}penses
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-card border border-card-border">
-            <p className="text-text-muted text-[10px] uppercase tracking-widest">Nb d{'\u00E9'}penses</p>
+            <p className="text-text-muted text-[10px] uppercase tracking-widest">Nb d{'é'}penses</p>
             <p className="font-serif text-2xl font-bold text-text mt-1">{summary.totalExpenses}</p>
             <p className="text-text-dim text-[10px] mt-0.5">
               sur {activeMonths} mois actif{activeMonths > 1 ? 's' : ''}
@@ -389,10 +390,10 @@ export default function Stats() {
             <p className="font-serif text-2xl font-bold text-text mt-1">
               {summary.totalExpenses > 0
                 ? `${Math.round((summary.withReceipt / summary.totalExpenses) * 100)}%`
-                : '\u2014'}
+                : '—'}
             </p>
             <p className="text-text-dim text-[10px] mt-0.5">
-              {summary.withReceipt}/{summary.totalExpenses} tickets scann{'\u00e9'}s
+              {summary.withReceipt}/{summary.totalExpenses} tickets scann{'é'}s
             </p>
           </div>
         </div>
@@ -478,11 +479,11 @@ export default function Stats() {
                     {Object.entries(byType)
                       .sort((a, b) => b[1] - a[1])
                       .map(([type, total]) => {
-                        const info = typesMap[type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: type, hexColor: '#6B7280' };
+                        const info = typesMap[type] || typesMap.autre || { icon: '📄', label: type, hexColor: '#6B7280' };
                         const pct = m.total > 0 ? (total / m.total) * 100 : 0;
                         return (
                           <div key={type} className="flex items-center gap-2">
-                            <span className="text-sm">{info.icon}</span>
+                            <TypeIcon icon={info.icon} color={info.hexColor} size={16} className="shrink-0" />
                             <span className="text-text text-xs flex-1">{info.label}</span>
                             <div className="w-20 h-1.5 rounded-full bg-card-border/50 overflow-hidden">
                               <div
@@ -498,9 +499,9 @@ export default function Stats() {
                       })}
                   </div>
                 ) : (
-                  <p className="text-text-dim text-xs">Aucune d{'\u00E9'}pense ce mois</p>
+                  <p className="text-text-dim text-xs">Aucune d{'é'}pense ce mois</p>
                 )}
-                <p className="text-text-dim text-[10px] mt-2">{m.count} op{'\u00E9'}ration{m.count > 1 ? 's' : ''}</p>
+                <p className="text-text-dim text-[10px] mt-2">{m.count} op{'é'}ration{m.count > 1 ? 's' : ''}</p>
               </div>
             );
           })()}
@@ -508,23 +509,23 @@ export default function Stats() {
 
         {/* Type Breakdown */}
         <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
-          <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">R{'\u00E9'}partition par type</p>
+          <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">R{'é'}partition par type</p>
           {nonCatScope > 0 && (
-            <p className="text-text-dim text-[10px] mb-3">{'\u2753'} Non cat\u00E9goris\u00E9e = paiements carte sans ticket ({eur(nonCatScope)})</p>
+            <p className="text-text-dim text-[10px] mb-3">{'❓'} Non catégorisée = paiements carte sans ticket ({eur(nonCatScope)})</p>
           )}
           {(typeTotals.length > 0 || nonCatScope > 0) ? (
             <div className="space-y-3">
               {(nonCatScope > 0 ? [...typeTotals, { type: '__noncat__', total: nonCatScope }] : typeTotals)
                 .sort((a, b) => b.total - a.total)
                 .map((t) => {
-                  const info = t.type === '__noncat__' ? NONCAT : (typesMap[t.type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: t.type, hexColor: '#6B7280' });
+                  const info = t.type === '__noncat__' ? NONCAT : (typesMap[t.type] || typesMap.autre || { icon: '📄', label: t.type, hexColor: '#6B7280' });
                   const denom = summary.grandTotal + nonCatScope;
                   const pct = denom > 0 ? (t.total / denom) * 100 : 0;
                   return (
                     <div key={t.type}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{info.icon}</span>
+                          {t.type === '__noncat__' ? <span className="text-lg">{info.icon}</span> : <TypeIcon icon={info.icon} color={info.hexColor} size={18} className="shrink-0" />}
                           <span className="text-text text-sm font-medium">{info.label}</span>
                         </div>
                         <span className="text-text font-serif font-semibold">
@@ -548,7 +549,7 @@ export default function Stats() {
                 })}
             </div>
           ) : (
-            <p className="text-text-dim text-sm text-center py-4">Aucune donn{'\u00E9'}e</p>
+            <p className="text-text-dim text-sm text-center py-4">Aucune donn{'é'}e</p>
           )}
         </div>
 
@@ -556,7 +557,7 @@ export default function Stats() {
         {isAdmin && !selectedUserId && byUser.length > 0 && (
           <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
             <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">Par collaborateur</p>
-            <p className="text-text-dim text-[10px] mb-4">D{'\u00E9'}pense de chacun sur la p{'\u00E9'}riode, par cat{'\u00E9'}gorie</p>
+            <p className="text-text-dim text-[10px] mb-4">D{'é'}pense de chacun sur la p{'é'}riode, par cat{'é'}gorie</p>
             <div className="space-y-3">
               {byUser.map((u) => {
                 const cats = Object.entries(u.byType || {}).sort((a, b) => b[1] - a[1]);
@@ -586,22 +587,22 @@ export default function Stats() {
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
                       {cats.map(([type, total]) => {
-                        const info = typesMap[type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: type };
+                        const info = typesMap[type] || typesMap.autre || { icon: '📄', label: type };
                         return (
                           <span key={type} className="text-[11px] text-text-muted whitespace-nowrap">
-                            <span className="mr-0.5">{info.icon}</span>{info.label} <span className="text-text font-medium">{eur(total)}</span>
+                            <TypeIcon icon={info.icon} color={info.hexColor} size={12} className="inline-block mr-1 align-[-1px]" />{info.label} <span className="text-text font-medium">{eur(total)}</span>
                           </span>
                         );
                       })}
                       {nonCat > 0 && (
                         <span className="text-[11px] text-amber-300/90 whitespace-nowrap">
-                          <span className="mr-0.5">{'\u2753'}</span>Non cat\u00E9goris\u00E9e <span className="font-medium">{eur(nonCat)}</span>
+                          <span className="mr-0.5">{'❓'}</span>Non catégorisée <span className="font-medium">{eur(nonCat)}</span>
                         </span>
                       )}
                     </div>
                     <p className="text-text-dim text-[10px] mt-1.5">
-                      {u.count} d{'\u00E9'}pense{u.count > 1 ? 's' : ''}
-                      {nonCat > 0 ? ` \u00B7 total r\u00E9el ${eur(u.total + nonCat)}` : ''} \u00B7 voir le d{'\u00E9'}tail {'\u203A'}
+                      {u.count} d{'é'}pense{u.count > 1 ? 's' : ''}
+                      {nonCat > 0 ? ` · total réel ${eur(u.total + nonCat)}` : ''} · voir le d{'é'}tail {'›'}
                     </p>
                   </button>
                 );
@@ -610,7 +611,7 @@ export default function Stats() {
           </div>
         )}
 
-        {/* Paiements carte non justifi\u00E9s du collaborateur (exercice en cours) */}
+        {/* Paiements carte non justifiés du collaborateur (exercice en cours) */}
         {selectedUserId && missingSnap && (() => {
           const uid = String(selectedUserId);
           const userCards = (missingSnap.cards || []).filter(c => c.masked && String(c.userId) === uid);
@@ -620,8 +621,8 @@ export default function Stats() {
           if (userCards.length === 0) {
             return (
               <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
-                <p className="text-text-muted text-[10px] uppercase tracking-widest mb-2">Paiements carte non justifi{'\u00E9'}s</p>
-                <p className="text-text-dim text-xs">Aucune carte attribu{'\u00E9'}e {'\u00E0'} ce collaborateur.</p>
+                <p className="text-text-muted text-[10px] uppercase tracking-widest mb-2">Paiements carte non justifi{'é'}s</p>
+                <p className="text-text-dim text-xs">Aucune carte attribu{'é'}e {'à'} ce collaborateur.</p>
               </div>
             );
           }
@@ -630,22 +631,22 @@ export default function Stats() {
           return (
             <div className={`p-5 rounded-3xl mt-6 border ${miss.length > 0 ? 'bg-amber-500/5 border-amber-500/25' : 'bg-card border-card-border'}`}>
               <div className="flex items-center justify-between mb-1">
-                <p className="text-text-muted text-[10px] uppercase tracking-widest">Paiements carte non justifi{'\u00E9'}s</p>
+                <p className="text-text-muted text-[10px] uppercase tracking-widest">Paiements carte non justifi{'é'}s</p>
                 <span className="text-text-dim text-[10px]">exercice en cours</span>
               </div>
               <p className="text-text-dim text-[11px] mb-1">
-                {cardMatched}/{cardTotal} paiements carte justifi{'\u00E9'}s
+                {cardMatched}/{cardTotal} paiements carte justifi{'é'}s
               </p>
               {miss.length === 0 ? (
-                <p className="text-green-400 text-sm mt-1">{'\u2713'} Tout est justifi{'\u00E9'} sur ses cartes</p>
+                <p className="text-green-400 text-sm mt-1">{'✓'} Tout est justifi{'é'} sur ses cartes</p>
               ) : (
                 <>
-                  <p className="text-amber-400 font-serif text-lg font-bold">{miss.length} paiement{miss.length > 1 ? 's' : ''} \u00B7 {eur(missAmount)}</p>
-                  {/* R\u00E9cap par carte */}
+                  <p className="text-amber-400 font-serif text-lg font-bold">{miss.length} paiement{miss.length > 1 ? 's' : ''} · {eur(missAmount)}</p>
+                  {/* Récap par carte */}
                   <div className="flex flex-wrap gap-2 mt-2 mb-3">
                     {userCards.map(c => (
                       <span key={c.masked} className="text-[10px] text-text-muted bg-bg border border-card-border rounded-full px-2 py-0.5">
-                        {c.label || (c.last4 ? `\u2022\u2022\u2022\u2022 ${c.last4}` : 'carte')} : {c.missing} manquant{c.missing > 1 ? 's' : ''}
+                        {c.label || (c.last4 ? `•••• ${c.last4}` : 'carte')} : {c.missing} manquant{c.missing > 1 ? 's' : ''}
                       </span>
                     ))}
                   </div>
@@ -659,14 +660,14 @@ export default function Stats() {
                               <p className="text-text text-xs font-medium truncate">{tx.label || 'Paiement carte'}</p>
                               <p className="text-text-muted text-[10px]">
                                 {new Date(tx.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                                {tx.card?.label ? ` \u00B7 ${tx.card.label}` : (tx.card?.last4 ? ` \u00B7 \u2022\u2022\u2022\u2022 ${tx.card.last4}` : '')}
+                                {tx.card?.label ? ` · ${tx.card.label}` : (tx.card?.last4 ? ` · •••• ${tx.card.last4}` : '')}
                               </p>
                             </div>
                             <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{eur(tx.amount)}</p>
                           </div>
                           <div className="flex gap-2 mt-1.5">
-                            <a href={`/?${params}`} className="flex-1 text-center py-2 rounded-lg bg-green-mid/20 text-green-light text-xs font-medium">{'\uD83D\uDCF7'} Scanner</a>
-                            <a href={`/manual?${params}`} className="flex-1 text-center py-2 rounded-lg bg-card border border-card-border text-text-muted text-xs font-medium">{'\u270D\uFE0F'} Saisie</a>
+                            <a href={`/?${params}`} className="flex-1 text-center py-2 rounded-lg bg-green-mid/20 text-green-light text-xs font-medium">{'📷'} Scanner</a>
+                            <a href={`/manual?${params}`} className="flex-1 text-center py-2 rounded-lg bg-card border border-card-border text-text-muted text-xs font-medium">{'✍️'} Saisie</a>
                           </div>
                         </div>
                       );
@@ -678,7 +679,7 @@ export default function Stats() {
           );
         })()}
 
-        {/* Drill-down : d\u00E9penses d\u00E9taill\u00E9es du collaborateur s\u00E9lectionn\u00E9 */}
+        {/* Drill-down : dépenses détaillées du collaborateur sélectionné */}
         {selectedUserId && (
           <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
             {(() => {
@@ -690,8 +691,8 @@ export default function Stats() {
               const typesPresent = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
               return (
                 <>
-                  <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">D{'\u00E9'}penses de {uName}</p>
-                  <p className="text-text-dim text-[10px] mb-3">Touche une cat{'\u00E9'}gorie pour filtrer, une ligne pour voir le justificatif</p>
+                  <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">D{'é'}penses de {uName}</p>
+                  <p className="text-text-dim text-[10px] mb-3">Touche une cat{'é'}gorie pour filtrer, une ligne pour voir le justificatif</p>
 
                   {/* Category chips with counts */}
                   <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3">
@@ -702,14 +703,14 @@ export default function Stats() {
                       Tout ({list.length})
                     </button>
                     {typesPresent.map(t => {
-                      const info = typesMap[t] || typesMap.autre || { icon: '\uD83D\uDCC4', label: t };
+                      const info = typesMap[t] || typesMap.autre || { icon: '📄', label: t };
                       return (
                         <button
                           key={t}
                           onClick={() => setDrillType(t)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${drillType === t ? 'bg-green-mid/20 border border-green-mid text-green-light' : 'bg-bg border border-card-border text-text-muted'}`}
                         >
-                          {info.icon} {info.label} ({counts[t]})
+                          <TypeIcon icon={info.icon} color={info.hexColor} size={12} className="inline-block mr-1 align-[-1px]" />{info.label} ({counts[t]})
                         </button>
                       );
                     })}
@@ -718,23 +719,23 @@ export default function Stats() {
                   {loadingUserExp ? (
                     <div className="flex justify-center py-8"><span className="w-5 h-5 border-2 border-green-mid/30 border-t-green-mid rounded-full animate-spin" /></div>
                   ) : shown.length === 0 ? (
-                    <p className="text-text-dim text-sm text-center py-6">Aucune d{'\u00E9'}pense</p>
+                    <p className="text-text-dim text-sm text-center py-6">Aucune d{'é'}pense</p>
                   ) : (
                     <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
                       {shown.map(e => {
-                        const info = typesMap[e.type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: e.type };
+                        const info = typesMap[e.type] || typesMap.autre || { icon: '📄', label: e.type };
                         return (
                           <button
                             key={e.id}
                             onClick={() => openReceipt(e)}
                             className="w-full flex items-center gap-3 p-3 rounded-xl bg-bg border border-card-border text-left active:scale-[0.98] transition-transform"
                           >
-                            <span className="text-lg shrink-0">{info.icon}</span>
+                            <TypeIcon icon={info.icon} color={info.hexColor} size={18} className="shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-text text-sm font-medium truncate">{e.merchant || info.label}</p>
                               <p className="text-text-muted text-xs">
                                 {new Date(e.date_ticket).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                {e.has_receipt ? ' \u00B7 \uD83D\uDCCE justificatif' : ' \u00B7 sans photo'}
+                                {e.has_receipt ? ' · 📎 justificatif' : ' · sans photo'}
                               </p>
                             </div>
                             <span className="font-serif font-semibold text-text shrink-0">{eur(e.amount)}</span>
@@ -752,7 +753,7 @@ export default function Stats() {
 
         {/* Détail par mois — replié (le graphe donne déjà la tendance) */}
         <details className="p-5 rounded-3xl bg-card border border-card-border mt-6">
-          <summary className="text-text-muted text-[10px] uppercase tracking-widest cursor-pointer select-none">D{'\u00E9'}tail par mois (tableau)</summary>
+          <summary className="text-text-muted text-[10px] uppercase tracking-widest cursor-pointer select-none">D{'é'}tail par mois (tableau)</summary>
           <div className="mt-3">
           <div className="space-y-0">
             {monthly.map((m) => {
