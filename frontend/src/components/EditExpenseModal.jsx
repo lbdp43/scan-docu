@@ -104,12 +104,12 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
         {/* Fixed header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <div>
-            <h3 className="font-serif text-lg font-semibold text-text">Modifier la d{'\u00E9'}pense</h3>
+            <h3 className="font-serif text-lg font-semibold text-text">Modifier la d{'é'}pense</h3>
             {isAdmin && expense.user?.name && (
               <p className="text-xs text-green-light/80 mt-0.5">Par {expense.user.name}</p>
             )}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-card text-text-muted text-lg leading-none">{'\u00D7'}</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-card text-text-muted text-lg leading-none">{'×'}</button>
         </div>
 
         {/* Scrollable content */}
@@ -145,14 +145,14 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                       onClick={(e) => e.stopPropagation()}
                       className="px-3 py-1 rounded-lg bg-green-mid/20 text-xs text-green-light font-medium"
                     >
-                      {'\u2B07'} T{'\u00E9'}l{'\u00E9'}charger
+                      {'⬇'} T{'é'}l{'é'}charger
                     </a>
                   </div>
                 </div>
               ) : expense.upload_status === 'exported' ? (
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <span className="text-xs text-blue-400">
-                    Export{'\u00E9'} via ZIP
+                    Export{'é'} via ZIP
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -168,14 +168,14 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                       onClick={(e) => e.stopPropagation()}
                       className="px-3 py-1 rounded-lg bg-blue-500/20 text-xs text-blue-400 font-medium"
                     >
-                      {'\u2B07'} T{'\u00E9'}l{'\u00E9'}charger
+                      {'⬇'} T{'é'}l{'é'}charger
                     </a>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <span className="text-xs text-amber-400">
-                    Drive {'\u00E9'}chou{'\u00E9'} — image sauvegard{'\u00E9'}e localement
+                    Drive {'é'}chou{'é'} — image sauvegard{'é'}e localement
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -191,7 +191,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                       onClick={(e) => e.stopPropagation()}
                       className="px-3 py-1 rounded-lg bg-amber-500/20 text-xs text-amber-400 font-medium"
                     >
-                      {'\u2B07'} T{'\u00E9'}l{'\u00E9'}charger
+                      {'⬇'} T{'é'}l{'é'}charger
                     </a>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                  Montant ({'\u20AC'})
+                  Montant ({'€'})
                 </label>
                 <input
                   type="number"
@@ -313,14 +313,14 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
             {/* Merchant */}
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-                Commer{'\u00E7'}ant
+                Commer{'ç'}ant
               </label>
               <input
                 type="text"
                 value={merchant}
                 onChange={(e) => setMerchant(e.target.value)}
                 maxLength={255}
-                placeholder="Nom du commer\u00E7ant"
+                placeholder="Nom du commerçant"
                 className="w-full bg-bg border border-card-border rounded-xl px-3 py-2.5 text-text text-sm focus:outline-none focus:border-green-mid"
               />
             </div>
@@ -379,12 +379,12 @@ export default function EditExpenseModal({ expense, onClose, onSaved, onDeleted 
                   onClick={() => setShowDeleteConfirm(true)}
                   className="w-full py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium transition-transform active:scale-[0.97]"
                 >
-                  Supprimer cette d{'\u00E9'}pense
+                  Supprimer cette d{'é'}pense
                 </button>
               ) : (
                 <div className="space-y-3">
                   <p className="text-red-400/80 text-xs text-center">
-                    Cette action est irr{'\u00E9'}versible. Le fichier Drive sera aussi supprim{'\u00E9'}.
+                    Cette action est irr{'é'}versible. Le fichier Drive sera aussi supprim{'é'}.
                   </p>
                   <div className="flex gap-3">
                     <button

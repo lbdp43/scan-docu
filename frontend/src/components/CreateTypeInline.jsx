@@ -14,7 +14,7 @@ export default function CreateTypeInline({ onCreated, onCancel }) {
   async function handleCreate(e) {
     e.preventDefault();
     if (!label.trim() || !icon) {
-      setError('Nom et ic\u00F4ne requis');
+      setError('Nom et icône requis');
       return;
     }
 
@@ -26,13 +26,13 @@ export default function CreateTypeInline({ onCreated, onCancel }) {
       .trim()
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_|_$/g, '')
       .slice(0, 30);
 
     if (value.length < 2) {
-      setError('Nom trop court (2 caract\u00E8res minimum)');
+      setError('Nom trop court (2 caractères minimum)');
       setCreating(false);
       return;
     }
@@ -42,7 +42,7 @@ export default function CreateTypeInline({ onCreated, onCancel }) {
       await refresh();
       onCreated?.(result.type.value);
     } catch (err) {
-      setError(err.message || 'Erreur lors de la cr\u00E9ation');
+      setError(err.message || 'Erreur lors de la création');
       setCreating(false);
     }
   }
@@ -50,13 +50,13 @@ export default function CreateTypeInline({ onCreated, onCancel }) {
   return (
     <div className="p-4 rounded-2xl bg-card border border-green-mid/30 space-y-3 animate-fade-up">
       <div className="flex items-center justify-between">
-        <p className="text-text text-sm font-semibold">Nouveau type de d{'\u00E9'}pense</p>
+        <p className="text-text text-sm font-semibold">Nouveau type de d{'é'}pense</p>
         <button
           type="button"
           onClick={onCancel}
           className="w-7 h-7 flex items-center justify-center rounded-full bg-bg text-text-muted text-sm leading-none"
         >
-          {'\u00D7'}
+          {'×'}
         </button>
       </div>
 
@@ -82,7 +82,7 @@ export default function CreateTypeInline({ onCreated, onCancel }) {
 
         <div>
           <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-            Ic{'\u00F4'}ne
+            Ic{'ô'}ne
           </label>
           <IconPicker value={icon} onChange={setIcon} color={color} />
         </div>
@@ -126,7 +126,7 @@ export default function CreateTypeInline({ onCreated, onCancel }) {
             {creating ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
-              'Cr\u00E9er'
+              'Créer'
             )}
           </button>
         </div>

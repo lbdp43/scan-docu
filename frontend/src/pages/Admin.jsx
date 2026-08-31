@@ -183,7 +183,7 @@ export default function Admin() {
       const result = await api.retryAllDriveUploads();
       const { uploaded, failed } = result.summary || {};
       setToast({
-        message: `Retry termin\u00E9 : ${uploaded || 0} envoy\u00E9(s), ${failed || 0} \u00E9chec(s)`,
+        message: `Retry terminé : ${uploaded || 0} envoyé(s), ${failed || 0} échec(s)`,
         type: uploaded > 0 ? 'success' : 'error',
       });
       await loadExpenses();
@@ -207,7 +207,7 @@ export default function Admin() {
       a.click();
       URL.revokeObjectURL(url);
       setZipDownloaded(true);
-      setToast({ message: 'Export ZIP t\u00E9l\u00E9charg\u00E9 — confirmez la r\u00E9ception ci-dessous', type: 'success' });
+      setToast({ message: 'Export ZIP téléchargé — confirmez la réception ci-dessous', type: 'success' });
     } catch (err) {
       setToast({ message: err.message || 'Erreur export', type: 'error' });
     } finally {
@@ -221,7 +221,7 @@ export default function Admin() {
       const result = await api.acknowledgeZipDownload();
       setZipDownloaded(false);
       setToast({
-        message: `${result.count} justificatif(s) valid\u00E9(s) — alerte effac\u00E9e`,
+        message: `${result.count} justificatif(s) validé(s) — alerte effacée`,
         type: 'success',
       });
       await loadExpenses();
@@ -562,7 +562,7 @@ export default function Admin() {
         <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-3">
           <div className="flex items-center gap-2">
             <p className="text-amber-400 text-sm font-medium">
-              {expenses.filter(e => e.upload_status === 'error').length} justificatif(s) non envoy{'\u00E9'}(s) sur Drive
+              {expenses.filter(e => e.upload_status === 'error').length} justificatif(s) non envoy{'é'}(s) sur Drive
             </p>
           </div>
           <div className="flex gap-2">
@@ -591,7 +591,7 @@ export default function Admin() {
                   Export...
                 </>
               ) : (
-                <>T{'\u00E9'}l{'\u00E9'}charger le ZIP</>
+                <>T{'é'}l{'é'}charger le ZIP</>
               )}
             </button>
           </div>
@@ -607,7 +607,7 @@ export default function Admin() {
                   Validation...
                 </>
               ) : (
-                <>J'ai bien t{'\u00E9'}l{'\u00E9'}charg{'\u00E9'} le ZIP — valider</>
+                <>J'ai bien t{'é'}l{'é'}charg{'é'} le ZIP — valider</>
               )}
             </button>
           )}
@@ -662,7 +662,7 @@ export default function Admin() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-text text-sm font-medium truncate">
-                      {expense.merchant || 'Sans commer\u00E7ant'}
+                      {expense.merchant || 'Sans commerçant'}
                     </p>
                     {!expense.has_receipt && (
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 whitespace-nowrap">
@@ -673,7 +673,7 @@ export default function Admin() {
                   <p className="text-text-muted text-xs">{expense.user?.name} · {date}</p>
                 </div>
                 <p className="font-serif text-base font-semibold text-text shrink-0 mr-1">
-                  {Number(expense.amount).toFixed(2)}\u20AC
+                  {Number(expense.amount).toFixed(2)}€
                 </p>
                 <button
                   type="button"
@@ -728,14 +728,14 @@ export default function Admin() {
         onClose={() => setEditingExpense(null)}
         onSaved={(driveUpdated) => {
           setToast({
-            message: driveUpdated ? 'D\u00E9pense modifi\u00E9e et Drive mis \u00E0 jour' : 'D\u00E9pense modifi\u00E9e',
+            message: driveUpdated ? 'Dépense modifiée et Drive mis à jour' : 'Dépense modifiée',
             type: 'success',
           });
           loadExpenses();
           api.getAdminStats().then(setStats).catch(() => {});
         }}
         onDeleted={() => {
-          setToast({ message: 'D\u00E9pense supprim\u00E9e', type: 'success' });
+          setToast({ message: 'Dépense supprimée', type: 'success' });
           loadExpenses();
           api.getAdminStats().then(setStats).catch(() => {});
         }}
