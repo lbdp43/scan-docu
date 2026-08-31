@@ -144,12 +144,12 @@ export default function Stats() {
     loadUserExpenses();
   }, [selectedUserId, period, paymentFilter, customFrom, customTo]);
 
-  // Paiements carte non justifiés du collaborateur sélectionné (admin)
+  // Snapshot des paiements non justifiés (admin) — chargé une fois, utilisé pour
+  // le tableau "Par collaborateur" ET le détail d'un collaborateur sélectionné.
   useEffect(() => {
-    if (!loadedRef.current) return;
-    if (!isAdmin || !selectedUserId) { setMissingSnap(null); return; }
+    if (!isAdmin) return;
     api.getPennylaneMissing().then(setMissingSnap).catch(() => setMissingSnap(null));
-  }, [selectedUserId]);
+  }, [isAdmin]);
 
   async function loadUserExpenses() {
     const r = currentRange();
@@ -247,6 +247,20 @@ export default function Stats() {
     : (PERIODS.find(p => p.key === period)?.label || period);
   const activeMonths = monthly.filter(m => m.total > 0).length;
   const eur = (n) => Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+  // Paiements non justifiés par utilisateur (depuis le snapshot des manquants)
+  const missByUser = {};
+  if (missingSnap) {
+    const cardUserMap = {};
+    (missingSnap.cards || []).forEach(c => { if (c.masked && c.userId != null) cardUserMap[c.masked] = String(c.userId); });
+    (missingSnap.transactions || []).forEach(t => {
+      const uid = t.card?.masked ? cardUserMap[t.card.masked] : null;
+      if (!uid) return;
+      if (!missByUser[uid]) missByUser[uid] = { count: 0, amount: 0 };
+      missByUser[uid].count++;
+      missByUser[uid].amount += Number(t.amount || 0);
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -528,8 +542,13 @@ export default function Stats() {
               {byUser.map((u) => {
                 const cats = Object.entries(u.byType || {}).sort((a, b) => b[1] - a[1]);
                 const pct = summary.grandTotal > 0 ? (u.total / summary.grandTotal) * 100 : 0;
+                const mu = missByUser[String(u.userId)];
                 return (
-                  <div key={u.userId} className="p-3 rounded-2xl bg-bg border border-card-border">
+                  <button
+                    key={u.userId}
+                    onClick={() => setSelectedUserId(String(u.userId))}
+                    className="w-full text-left p-3 rounded-2xl bg-bg border border-card-border active:scale-[0.99] transition-transform"
+                  >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 rounded-full bg-green-mid/25 flex items-center justify-center text-green-light text-xs font-semibold shrink-0">
@@ -539,6 +558,9 @@ export default function Stats() {
                       </div>
                       <span className="font-serif font-semibold text-green-light shrink-0">{eur(u.total)}</span>
                     </div>
+                    {mu && mu.count > 0 && (
+                      <p className="text-amber-400 text-[11px] mb-1">{'⚠️'} {mu.count} paiement{mu.count > 1 ? 's' : ''} non justifi{'é'}{mu.count > 1 ? 's' : ''} · {eur(mu.amount)}</p>
+                    )}
                     <div className="h-1 rounded-full bg-white/5 overflow-hidden mb-2">
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #2D6A27, #5ABF50)' }} />
                     </div>
@@ -552,8 +574,8 @@ export default function Stats() {
                         );
                       })}
                     </div>
-                    <p className="text-text-dim text-[10px] mt-1.5">{u.count} d{'\u00E9'}pense{u.count > 1 ? 's' : ''}</p>
-                  </div>
+                    <p className="text-text-dim text-[10px] mt-1.5">{u.count} d{'\u00E9'}pense{u.count > 1 ? 's' : ''} \u00B7 voir le d{'\u00E9'}tail {'\u203A'}</p>
+                  </button>
                 );
               })}
             </div>
