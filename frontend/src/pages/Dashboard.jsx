@@ -245,19 +245,28 @@ export default function Dashboard() {
             {stats?.month?.total ? Number(stats.month.total).toFixed(2) : '0.00'}
             <span className="text-2xl ml-1">{'€'}</span>
           </p>
+          {stats?.prevMonth && (
+            <p className="text-text-muted text-xs mt-1 font-light">
+              {stats.prevMonth.label ? `${stats.prevMonth.label.charAt(0).toUpperCase()}${stats.prevMonth.label.slice(1)}` : 'Mois précédent'} : {Number(stats.prevMonth.total || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {'€'}
+            </p>
+          )}
         </div>
 
         {/* Stats row */}
         <div className="relative z-10 flex mt-6 pt-4 border-t border-white/10">
           {stats?.byType?.map((t, i) => {
             const typeInfo = TYPE_ICONS[t.type] || TYPE_ICONS.autre;
+            const prev = (stats?.prevByType || []).find(p => p.type === t.type);
             return (
               <div key={t.type} className={`flex-1 text-center flex flex-col items-center ${i > 0 ? 'border-l border-white/10' : ''}`}>
                 <span className="text-green-light/70"><TypeIcon icon={typeInfo.icon} color={typeInfo.hexColor} size={20} /></span>
                 <p className="text-green-light font-semibold text-lg mt-1 leading-none">{t.count}</p>
                 <p className="text-text-muted text-[10px] uppercase tracking-wider mt-1">{t.type}</p>
-                <p className="text-green-light/50 text-[10px] font-light mt-0.5">
-                  ({Number(t.total).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'})
+                <p className="text-green-light/60 text-[10px] font-light mt-0.5">
+                  {Number(t.total).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
+                </p>
+                <p className="text-text-dim text-[9px] font-light leading-none">
+                  {(prev ? Number(prev.total) : 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} {'€'}
                 </p>
               </div>
             );
