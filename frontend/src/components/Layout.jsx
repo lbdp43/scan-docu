@@ -22,8 +22,8 @@ function NavIcon({ name, active }) {
 const navItems = [
   { path: '/', label: 'Scanner', icon: 'scan' },
   { path: '/dashboard', label: 'Accueil', icon: 'home' },
-  { path: '/history', label: 'Historique', icon: 'history' },
   { path: '/stats', label: 'Stats', icon: 'stats' },
+  { path: '/history', label: 'Historique', icon: 'history' },
 ];
 
 const adminNavItem = { path: '/admin', label: 'Admin', icon: 'admin' };
