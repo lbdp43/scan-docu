@@ -300,10 +300,10 @@ export default function AdminUsers() {
                 <div className="flex items-center gap-2">
                   <p className="text-text font-medium text-sm truncate">{u.name}</p>
                   {u.role === 'admin' && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-gold/20 text-gold">Admin</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-gold/20 text-gold">Admin</span>
                   )}
                   {!u.is_active && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">Inactif</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">Inactif</span>
                   )}
                 </div>
                 <p className="text-text-muted text-xs truncate">{u.email}</p>
