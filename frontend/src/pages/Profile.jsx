@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { getTheme, setTheme } from '../utils/theme';
+import { getPushState, enablePush, disablePush, isIOS, isStandalone, pushPermission } from '../utils/push';
 import Toast from '../components/Toast';
 
 export default function Profile() {
@@ -11,6 +12,40 @@ export default function Profile() {
 
   function handleTheme(t) {
     setThemeState(setTheme(t));
+  }
+
+  // — Notifications push (état + activer/désactiver sur CET appareil)
+  const [push, setPush] = useState(null);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    getPushState().then(setPush).catch(() => setPush({ supported: false, configured: false, subscribed: false }));
+  }, []);
+
+  async function handleEnablePush() {
+    setPushBusy(true);
+    try {
+      await enablePush(); // déclenche la demande d'autorisation du téléphone
+      setToast({ message: 'Notifications activées 🔔', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Activation refusée', type: 'error' });
+    } finally {
+      getPushState().then(setPush).catch(() => {});
+      setPushBusy(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushBusy(true);
+    try {
+      await disablePush();
+      setToast({ message: 'Notifications désactivées sur cet appareil', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message || 'Erreur', type: 'error' });
+    } finally {
+      getPushState().then(setPush).catch(() => {});
+      setPushBusy(false);
+    }
   }
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -71,6 +106,51 @@ export default function Profile() {
             <p className="text-text text-sm mt-1 capitalize">{user?.role || 'user'}</p>
           </div>
         </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="p-5 rounded-3xl bg-card border border-card-border">
+        <h2 className="text-text font-semibold mb-1">{'🔔'} Notifications</h2>
+        <p className="text-text-muted text-xs mb-3">
+          Rappels des paiements {'à'} justifier, remboursements, alertes.
+        </p>
+        {push === null ? (
+          <div className="h-11 rounded-2xl bg-bg animate-pulse" />
+        ) : push.subscribed ? (
+          <div className="flex items-center gap-2">
+            <span className="flex-1 py-3 px-4 rounded-2xl bg-green-mid/15 border border-green-mid/40 text-green-light text-sm font-medium">
+              {'✓'} Activ{'é'}es sur cet appareil
+            </span>
+            <button
+              onClick={handleDisablePush}
+              disabled={pushBusy}
+              className="px-4 py-3 rounded-2xl bg-bg border border-card-border text-text-muted text-sm font-medium disabled:opacity-50"
+            >
+              D{'é'}sactiver
+            </button>
+          </div>
+        ) : pushPermission() === 'denied' ? (
+          <p className="text-amber-400 text-xs p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25">
+            Le t{'é'}l{'é'}phone a refus{'é'} les notifications pour cette app. Pour les r{'é'}activer :
+            r{'é'}glages du t{'é'}l{'é'}phone {'→'} notifications {'→'} autoriser, puis reviens ici.
+          </p>
+        ) : !push.supported && isIOS() && !isStandalone() ? (
+          <p className="text-text-muted text-xs p-3 rounded-2xl bg-bg border border-card-border">
+            Sur iPhone, installe d'abord l'app : <span className="text-text">Partager {'→'} {'«'} Sur l'{'é'}cran d'accueil {'»'}</span>, puis reviens activer les notifications ici.
+          </p>
+        ) : !push.supported || !push.configured ? (
+          <p className="text-text-dim text-xs p-3 rounded-2xl bg-bg border border-card-border">
+            Notifications non disponibles sur ce navigateur.
+          </p>
+        ) : (
+          <button
+            onClick={handleEnablePush}
+            disabled={pushBusy}
+            className="w-full py-3 rounded-2xl bg-green-mid text-white font-medium text-sm transition-transform active:scale-[0.97] disabled:opacity-50"
+          >
+            {pushBusy ? 'Activation…' : 'Activer les notifications'}
+          </button>
+        )}
       </div>
 
       {/* Apparence */}

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getPendingExpenses, syncPendingExpenses, removePendingExpense, storableToFile } from '../utils/offline';
 import { api } from '../utils/api';
 import { haptic } from '../utils/haptic';
+import PushPrompt from './PushPrompt';
 
 function NavIcon({ name, active }) {
   const color = active ? 'currentColor' : 'currentColor';
@@ -270,6 +271,9 @@ export default function Layout() {
       <main className={`max-w-lg mx-auto px-4 pt-6 ${(swWaiting || !isOnline || showInstallBanner || (isOnline && pendingCount > 0)) ? 'mt-12' : ''}`}>
         <Outlet context={{ isOnline, refreshPendingCount }} />
       </main>
+
+      {/* Proposition d'activer les notifications (une fois par appareil) */}
+      <PushPrompt />
 
       {/* Bottom Navigation — named so it stays fixed during page transitions */}
       <nav className="fixed bottom-0 left-0 right-0 h-[84px] bg-bg2/95 backdrop-blur-xl border-t border-card-border z-50 [view-transition-name:bottom-nav]">
