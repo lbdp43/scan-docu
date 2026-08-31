@@ -122,6 +122,8 @@ export default function Stats() {
   const [userExpenses, setUserExpenses] = useState(null);
   const [loadingUserExp, setLoadingUserExp] = useState(false);
   const [drillType, setDrillType] = useState('');
+  // Paiements carte non justifiés (snapshot des manquants) pour l'utilisateur sélectionné
+  const [missingSnap, setMissingSnap] = useState(null);
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -141,6 +143,13 @@ export default function Stats() {
     if (!selectedUserId) { setUserExpenses(null); return; }
     loadUserExpenses();
   }, [selectedUserId, period, paymentFilter, customFrom, customTo]);
+
+  // Paiements carte non justifiés du collaborateur sélectionné (admin)
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    if (!isAdmin || !selectedUserId) { setMissingSnap(null); return; }
+    api.getPennylaneMissing().then(setMissingSnap).catch(() => setMissingSnap(null));
+  }, [selectedUserId]);
 
   async function loadUserExpenses() {
     const r = currentRange();
@@ -550,6 +559,69 @@ export default function Stats() {
             </div>
           </div>
         )}
+
+        {/* Paiements carte non justifi\u00E9s du collaborateur (exercice en cours) */}
+        {selectedUserId && missingSnap && (() => {
+          const uid = String(selectedUserId);
+          const userCards = (missingSnap.cards || []).filter(c => c.masked && String(c.userId) === uid);
+          const maskedSet = new Set(userCards.map(c => c.masked));
+          const miss = (missingSnap.transactions || []).filter(t => t.card?.masked && maskedSet.has(t.card.masked));
+          const missAmount = miss.reduce((s, t) => s + Number(t.amount || 0), 0);
+          if (userCards.length === 0) {
+            return (
+              <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
+                <p className="text-text-muted text-[10px] uppercase tracking-widest mb-2">Paiements carte non justifi{'\u00E9'}s</p>
+                <p className="text-text-dim text-xs">Aucune carte attribu{'\u00E9'}e {'\u00E0'} ce collaborateur.</p>
+              </div>
+            );
+          }
+          return (
+            <div className={`p-5 rounded-3xl mt-6 border ${miss.length > 0 ? 'bg-amber-500/5 border-amber-500/25' : 'bg-card border-card-border'}`}>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-text-muted text-[10px] uppercase tracking-widest">Paiements carte non justifi{'\u00E9'}s</p>
+                <span className="text-text-dim text-[10px]">exercice en cours</span>
+              </div>
+              {miss.length === 0 ? (
+                <p className="text-green-400 text-sm mt-1">{'\u2713'} Tout est justifi{'\u00E9'} sur ses cartes</p>
+              ) : (
+                <>
+                  <p className="text-amber-400 font-serif text-lg font-bold">{miss.length} paiement{miss.length > 1 ? 's' : ''} \u00B7 {eur(missAmount)}</p>
+                  {/* R\u00E9cap par carte */}
+                  <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                    {userCards.map(c => (
+                      <span key={c.masked} className="text-[10px] text-text-muted bg-bg border border-card-border rounded-full px-2 py-0.5">
+                        {c.label || (c.last4 ? `\u2022\u2022\u2022\u2022 ${c.last4}` : 'carte')} : {c.missing} manquant{c.missing > 1 ? 's' : ''}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+                    {miss.sort((a, b) => (a.date < b.date ? 1 : -1)).map(tx => {
+                      const params = `amount=${encodeURIComponent(Number(tx.amount).toFixed(2))}&date=${encodeURIComponent(tx.date)}&merchant=${encodeURIComponent(tx.label || '')}`;
+                      return (
+                        <div key={tx.transactionId} className="p-2.5 rounded-xl bg-bg border border-card-border">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-text text-xs font-medium truncate">{tx.label || 'Paiement carte'}</p>
+                              <p className="text-text-muted text-[10px]">
+                                {new Date(tx.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                {tx.card?.label ? ` \u00B7 ${tx.card.label}` : (tx.card?.last4 ? ` \u00B7 \u2022\u2022\u2022\u2022 ${tx.card.last4}` : '')}
+                              </p>
+                            </div>
+                            <p className="font-serif text-sm font-semibold text-amber-400 shrink-0">{Number(tx.amount).toFixed(2)}{'\u20AC'}</p>
+                          </div>
+                          <div className="flex gap-2 mt-1.5">
+                            <a href={`/?${params}`} className="flex-1 text-center py-1 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">{'\uD83D\uDCF7'} Scanner</a>
+                            <a href={`/manual?${params}`} className="flex-1 text-center py-1 rounded-lg bg-card border border-card-border text-text-muted text-[10px] font-medium">{'\u270D\uFE0F'} Saisie</a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Drill-down : d\u00E9penses d\u00E9taill\u00E9es du collaborateur s\u00E9lectionn\u00E9 */}
         {selectedUserId && (
