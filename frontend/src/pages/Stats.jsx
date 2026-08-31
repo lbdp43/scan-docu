@@ -43,6 +43,11 @@ function getDateRange(period) {
       const to = new Date(y, m + 1, 0);
       return { from, to };
     }
+    case 'lastmonth': {
+      const from = new Date(y, m - 1, 1);
+      const to = new Date(y, m, 0);
+      return { from, to };
+    }
     case '3m': {
       const from = new Date(y, m - 2, 1);
       const to = new Date(y, m + 1, 0);
@@ -79,11 +84,13 @@ function fmt(d) {
 
 const PERIODS = [
   { key: '1m', label: 'Ce mois' },
+  { key: 'lastmonth', label: 'Mois dernier' },
   { key: '3m', label: '3 mois' },
   { key: '6m', label: '6 mois' },
   { key: '12m', label: '12 mois' },
   { key: 'year', label: String(new Date().getFullYear()) },
   { key: 'lastyear', label: String(new Date().getFullYear() - 1) },
+  { key: 'custom', label: '📅 Perso' },
 ];
 
 const PAYMENT_FILTERS = [
@@ -107,6 +114,8 @@ export default function Stats() {
   const [users, setUsers] = useState(cached?.users ?? []);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [period, setPeriod] = useState('6m');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [expandedMonth, setExpandedMonth] = useState(null);
   // Drill-down : liste des dépenses d'un collaborateur sélectionné
@@ -123,7 +132,7 @@ export default function Stats() {
   useEffect(() => {
     if (!loadedRef.current) return;
     loadStats();
-  }, [selectedUserId, period, paymentFilter]);
+  }, [selectedUserId, period, paymentFilter, customFrom, customTo]);
 
   // Charge la liste détaillée quand un collaborateur est sélectionné
   useEffect(() => {
@@ -131,13 +140,14 @@ export default function Stats() {
     setDrillType('');
     if (!selectedUserId) { setUserExpenses(null); return; }
     loadUserExpenses();
-  }, [selectedUserId, period, paymentFilter]);
+  }, [selectedUserId, period, paymentFilter, customFrom, customTo]);
 
   async function loadUserExpenses() {
+    const r = currentRange();
+    if (!r.ready) { setUserExpenses([]); return; }
     setLoadingUserExp(true);
     try {
-      const { from, to } = getDateRange(period);
-      const params = { userId: selectedUserId, from: fmt(from), to: fmt(to), limit: 300 };
+      const params = { userId: selectedUserId, from: r.from, to: r.to, limit: 300 };
       if (paymentFilter) params.payment_method = paymentFilter;
       const data = await api.getExpenses(params);
       setUserExpenses(data.expenses || []);
@@ -168,11 +178,20 @@ export default function Stats() {
     }
   }
 
+  function currentRange() {
+    if (period === 'custom') {
+      return { from: customFrom, to: customTo, ready: !!(customFrom && customTo) };
+    }
+    const { from, to } = getDateRange(period);
+    return { from: fmt(from), to: fmt(to), ready: true };
+  }
+
   async function loadStats() {
+    const r = currentRange();
+    if (!r.ready) return; // période perso incomplète
     setLoading(true);
     try {
-      const { from, to } = getDateRange(period);
-      const params = { from: fmt(from), to: fmt(to) };
+      const params = { from: r.from, to: r.to };
       if (selectedUserId) params.userId = selectedUserId;
       if (paymentFilter) params.payment_method = paymentFilter;
       const result = await api.getAdvancedStats(params);
@@ -214,7 +233,9 @@ export default function Stats() {
 
   const { monthly, typeTotals, summary, byUser = [] } = data;
   const maxMonthTotal = Math.max(...monthly.map(m => m.total), 1);
-  const periodLabel = PERIODS.find(p => p.key === period)?.label || period;
+  const periodLabel = period === 'custom'
+    ? (customFrom && customTo ? `${customFrom} → ${customTo}` : 'période perso')
+    : (PERIODS.find(p => p.key === period)?.label || period);
   const activeMonths = monthly.filter(m => m.total > 0).length;
   const eur = (n) => Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
@@ -238,6 +259,32 @@ export default function Stats() {
           </button>
         ))}
       </div>
+
+      {/* Custom date range */}
+      {period === 'custom' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-text-muted text-xs">Du</label>
+          <input
+            type="date"
+            value={customFrom}
+            max={customTo || undefined}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid [color-scheme:dark]"
+          />
+          <label className="text-text-muted text-xs">au</label>
+          <input
+            type="date"
+            value={customTo}
+            min={customFrom || undefined}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setCustomTo(e.target.value)}
+            className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid [color-scheme:dark]"
+          />
+          {!(customFrom && customTo) && (
+            <span className="text-amber-400 text-[10px] w-full">Choisis une date de début et de fin</span>
+          )}
+        </div>
+      )}
 
       {/* Payment method filter */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
