@@ -86,6 +86,13 @@ const PERIODS = [
   { key: 'lastyear', label: String(new Date().getFullYear() - 1) },
 ];
 
+const PAYMENT_FILTERS = [
+  { key: '', label: 'Tout' },
+  { key: 'carte', label: 'Carte pro' },
+  { key: 'note_frais', label: 'Notes de frais' },
+  { key: 'caisse', label: 'Espèces caisse' },
+];
+
 export default function Stats() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -98,6 +105,7 @@ export default function Stats() {
   const [users, setUsers] = useState(cached?.users ?? []);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [period, setPeriod] = useState('6m');
+  const [paymentFilter, setPaymentFilter] = useState('');
   const [expandedMonth, setExpandedMonth] = useState(null);
 
   useEffect(() => {
@@ -109,7 +117,7 @@ export default function Stats() {
   useEffect(() => {
     if (!loadedRef.current) return;
     loadStats();
-  }, [selectedUserId, period]);
+  }, [selectedUserId, period, paymentFilter]);
 
   async function loadInitial() {
     try {
@@ -136,6 +144,7 @@ export default function Stats() {
       const { from, to } = getDateRange(period);
       const params = { from: fmt(from), to: fmt(to) };
       if (selectedUserId) params.userId = selectedUserId;
+      if (paymentFilter) params.payment_method = paymentFilter;
       const result = await api.getAdvancedStats(params);
       setData(result);
     } catch (err) {
@@ -168,10 +177,11 @@ export default function Stats() {
     );
   }
 
-  const { monthly, typeTotals, summary } = data;
+  const { monthly, typeTotals, summary, byUser = [] } = data;
   const maxMonthTotal = Math.max(...monthly.map(m => m.total), 1);
   const periodLabel = PERIODS.find(p => p.key === period)?.label || period;
   const activeMonths = monthly.filter(m => m.total > 0).length;
+  const eur = (n) => Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
   return (
     <div className="space-y-6">
@@ -190,6 +200,23 @@ export default function Stats() {
             }`}
           >
             {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Payment method filter */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {PAYMENT_FILTERS.map((f) => (
+          <button
+            key={f.key || 'all'}
+            onClick={() => setPaymentFilter(f.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+              paymentFilter === f.key
+                ? 'bg-green-mid/20 border border-green-mid text-green-light'
+                : 'bg-card border border-card-border text-text-muted'
+            }`}
+          >
+            {f.label}
           </button>
         ))}
       </div>
@@ -217,11 +244,17 @@ export default function Stats() {
             <p className="font-serif text-2xl font-bold text-green-light mt-1">
               {summary.grandTotal.toFixed(2)}{'\u20AC'}
             </p>
+            <p className="text-text-dim text-[10px] mt-0.5">
+              {(PAYMENT_FILTERS.find(f => f.key === paymentFilter)?.label || 'Tout')}{selectedUserId ? ' \u00B7 1 personne' : ''}
+            </p>
           </div>
           <div className="p-4 rounded-2xl bg-card border border-card-border">
-            <p className="text-text-muted text-[10px] uppercase tracking-widest">Moyenne / mois</p>
+            <p className="text-text-muted text-[10px] uppercase tracking-widest">Moyenne / mois actif</p>
             <p className="font-serif text-2xl font-bold text-text mt-1">
               {summary.avgMonthly.toFixed(2)}{'\u20AC'}
+            </p>
+            <p className="text-text-dim text-[10px] mt-0.5">
+              sur {summary.activeMonths ?? activeMonths} mois avec d{'\u00E9'}penses
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-card border border-card-border">
@@ -394,6 +427,47 @@ export default function Stats() {
             <p className="text-text-dim text-sm text-center py-4">Aucune donn{'\u00E9'}e</p>
           )}
         </div>
+
+        {/* Par collaborateur (admin, vue "Tous") */}
+        {isAdmin && !selectedUserId && byUser.length > 0 && (
+          <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
+            <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">Par collaborateur</p>
+            <p className="text-text-dim text-[10px] mb-4">D{'\u00E9'}pense de chacun sur la p{'\u00E9'}riode, par cat{'\u00E9'}gorie</p>
+            <div className="space-y-3">
+              {byUser.map((u) => {
+                const cats = Object.entries(u.byType || {}).sort((a, b) => b[1] - a[1]);
+                const pct = summary.grandTotal > 0 ? (u.total / summary.grandTotal) * 100 : 0;
+                return (
+                  <div key={u.userId} className="p-3 rounded-2xl bg-bg border border-card-border">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-green-mid/25 flex items-center justify-center text-green-light text-xs font-semibold shrink-0">
+                          {(u.name || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-text text-sm font-medium truncate">{u.name}</span>
+                      </div>
+                      <span className="font-serif font-semibold text-green-light shrink-0">{eur(u.total)}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-white/5 overflow-hidden mb-2">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #2D6A27, #5ABF50)' }} />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {cats.map(([type, total]) => {
+                        const info = typesMap[type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: type };
+                        return (
+                          <span key={type} className="text-[11px] text-text-muted whitespace-nowrap">
+                            <span className="mr-0.5">{info.icon}</span>{info.label} <span className="text-text font-medium">{eur(total)}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <p className="text-text-dim text-[10px] mt-1.5">{u.count} d{'\u00E9'}pense{u.count > 1 ? 's' : ''}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Monthly Detail Table */}
         <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">

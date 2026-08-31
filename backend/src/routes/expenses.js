@@ -342,6 +342,11 @@ router.get('/stats/advanced', async (req, res) => {
       const userId = parseInt(req.query.userId, 10);
       if (!isNaN(userId)) where.user_id = userId;
     }
+    // Filtre optionnel par mode de paiement (défaut : toutes les dépenses)
+    const pm = req.query.payment_method;
+    if (pm && ['carte', 'caisse', 'especes', 'note_frais'].includes(pm)) {
+      where.payment_method = pm;
+    }
 
     const now = new Date();
     let fromDate, toDate;
@@ -364,6 +369,8 @@ router.get('/stats/advanced', async (req, res) => {
         date_ticket: true,
         has_receipt: true,
         upload_status: true,
+        user_id: true,
+        user: { select: { name: true } },
       },
       orderBy: { date_ticket: 'asc' },
     });
@@ -381,6 +388,7 @@ router.get('/stats/advanced', async (req, res) => {
     const typeTotals = {};
     let withReceipt = 0;
     let withoutReceipt = 0;
+    const userMap = {}; // user_id -> { userId, name, total, count, byType }
 
     for (const exp of expenses) {
       const d = new Date(exp.date_ticket);
@@ -398,7 +406,18 @@ router.get('/stats/advanced', async (req, res) => {
 
       if (exp.has_receipt) withReceipt++;
       else withoutReceipt++;
+
+      // Répartition par collaborateur (× catégorie)
+      const uid = exp.user_id;
+      if (!userMap[uid]) {
+        userMap[uid] = { userId: uid, name: exp.user?.name || `#${uid}`, total: 0, count: 0, byType: {} };
+      }
+      userMap[uid].total += amt;
+      userMap[uid].count++;
+      userMap[uid].byType[exp.type] = (userMap[uid].byType[exp.type] || 0) + amt;
     }
+
+    const byUser = Object.values(userMap).sort((a, b) => b.total - a.total);
 
     const monthly = Object.values(monthlyMap);
     const activeMonths = monthly.filter(m => m.count > 0);
@@ -453,10 +472,12 @@ router.get('/stats/advanced', async (req, res) => {
     res.json({
       monthly,
       typeTotals: Object.entries(typeTotals).map(([type, total]) => ({ type, total })),
+      byUser,
       summary: {
         grandTotal,
         totalExpenses: expenses.length,
         avgMonthly: Math.round(avgMonthly * 100) / 100,
+        activeMonths: activeMonths.length,
         withReceipt,
         withoutReceipt,
       },
