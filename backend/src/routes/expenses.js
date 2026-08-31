@@ -115,14 +115,17 @@ function parsePagination(rawPage, rawLimit) {
 // GET /api/expenses — user sees own, admin sees all
 router.get('/', async (req, res) => {
   try {
-    const { type, month, year, q } = req.query;
+    const { type, month, year, q, from, to } = req.query;
     const { page, limit, skip } = parsePagination(req.query.page, req.query.limit);
 
     const where = {};
 
-    // User cloisonnement: non-admin only sees own expenses
+    // User cloisonnement: non-admin only sees own expenses ; admin peut cibler un collaborateur
     if (req.user.role !== 'admin') {
       where.user_id = req.user.userId;
+    } else if (req.query.userId) {
+      const uid = parseInt(req.query.userId, 10);
+      if (!isNaN(uid)) where.user_id = uid;
     }
 
     // Filters
@@ -130,7 +133,16 @@ router.get('/', async (req, res) => {
       where.type = type;
     }
 
-    if (month && year) {
+    // Filtre optionnel par mode de paiement
+    const pm = req.query.payment_method;
+    if (pm && ['carte', 'cheque', 'virement', 'caisse', 'especes', 'note_frais'].includes(pm)) {
+      where.payment_method = pm;
+    }
+
+    // Plage de dates : from/to (prioritaire) sinon month/year
+    if (from && to) {
+      where.date_ticket = { gte: new Date(from), lte: new Date(to) };
+    } else if (month && year) {
       const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
       const endDate = new Date(parseInt(year), parseInt(month), 0);
       where.date_ticket = {
