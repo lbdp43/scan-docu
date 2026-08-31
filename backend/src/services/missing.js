@@ -53,7 +53,12 @@ async function computeMissing(db) {
   if (bankId) txFilter.push({ field: 'bank_account_id', operator: 'eq', value: bankId });
 
   const allTx = await paginate(pennylane.getTransactions, txFilter);
-  const expenseTx = allTx.filter((t) => Number(t.amount || t.currency_amount) < 0);
+  // Paiements marqués "ignorés" par l'admin : on ne les affiche plus (ni total, ni manquants).
+  const ignoredList = await pennylane.getIgnoredMissing();
+  const ignoredSet = new Set(ignoredList.map((e) => String(e.id)));
+  const expenseTx = allTx.filter(
+    (t) => Number(t.amount || t.currency_amount) < 0 && !ignoredSet.has(String(t.id)),
+  );
 
   // Factures actives uniquement : les doublons archivés (2-PDF) ne doivent pas
   // servir de justificatifs fantômes.
@@ -130,7 +135,8 @@ async function computeMissing(db) {
   const matched = cards.reduce((n, c) => n + c.matched, 0);
 
   return { ...base, connection: { ok: true }, cards, transactions: unmatched,
-    summary: { totalBankTransactions: expenseTx.length, matched, unmatched: unmatched.length, totalExpenses: expRows.length } };
+    ignored: ignoredList,
+    summary: { totalBankTransactions: expenseTx.length, matched, unmatched: unmatched.length, totalExpenses: expRows.length, ignored: ignoredList.length } };
 }
 
 async function buildAndStore(db) {
