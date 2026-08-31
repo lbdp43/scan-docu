@@ -199,6 +199,10 @@ export const api = {
     request('/pennylane/reconcile', { method: 'POST' }),
   getPennylaneMissing: ({ refresh = false } = {}) =>
     request(`/pennylane/missing${refresh ? '?refresh=1' : ''}`),
+  ignoreMissing: (tx) =>
+    request('/pennylane/missing/ignore', { method: 'POST', body: JSON.stringify(tx) }),
+  unignoreMissing: (transactionId) =>
+    request('/pennylane/missing/unignore', { method: 'POST', body: JSON.stringify({ transactionId }) }),
   pennylaneMatch: (expenseId, invoiceId, transactionId) =>
     request('/pennylane/match', { method: 'POST', body: JSON.stringify({ expenseId, invoiceId, transactionId }) }),
   pennylaneUnmatch: (id, transactionId) =>

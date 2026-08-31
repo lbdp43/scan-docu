@@ -240,6 +240,44 @@ async function saveCardVehicle(masked, categoryId) {
   });
 }
 
+// --- Paiements "ignorés" par l'admin (ne plus afficher dans les manquants) ---
+// Setting "missing_ignored_tx" -> JSON [{ id, label, amount, date }]
+const IGNORED_KEY = 'missing_ignored_tx';
+
+async function getIgnoredMissing() {
+  try {
+    const row = await settingsPrisma.setting.findUnique({ where: { key: IGNORED_KEY } });
+    const arr = row?.value ? JSON.parse(row.value) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+async function addIgnoredMissing(entry) {
+  if (!entry?.id) throw new Error('transactionId requis');
+  const list = await getIgnoredMissing();
+  const id = String(entry.id);
+  if (!list.some((e) => String(e.id) === id)) {
+    list.push({ id, label: entry.label || null, amount: entry.amount ?? null, date: entry.date || null });
+    await settingsPrisma.setting.upsert({
+      where: { key: IGNORED_KEY },
+      update: { value: JSON.stringify(list) },
+      create: { key: IGNORED_KEY, value: JSON.stringify(list) },
+    });
+  }
+}
+
+async function removeIgnoredMissing(id) {
+  const list = await getIgnoredMissing();
+  const next = list.filter((e) => String(e.id) !== String(id));
+  await settingsPrisma.setting.upsert({
+    where: { key: IGNORED_KEY },
+    update: { value: JSON.stringify(next) },
+    create: { key: IGNORED_KEY, value: JSON.stringify(next) },
+  });
+}
+
 // Toutes les factures fournisseur de l'exercice (montant + date), pour savoir si un
 // paiement est justifié dans Pennylane (facture présente), au-delà des scans scan-docu.
 async function getFiscalYearSupplierInvoices() {
@@ -421,6 +459,9 @@ module.exports = {
   saveCardUser,
   getCardVehicles,
   saveCardVehicle,
+  getIgnoredMissing,
+  addIgnoredMissing,
+  removeIgnoredMissing,
   getFiscalYearSupplierInvoices,
   justifiedByInvoice,
   getMatchedTransactions,

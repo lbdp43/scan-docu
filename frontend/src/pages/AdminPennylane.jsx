@@ -179,6 +179,26 @@ export default function AdminPennylane() {
     }
   }
 
+  async function handleIgnoreMissing(tx) {
+    try {
+      const data = await api.ignoreMissing({ transactionId: tx.transactionId, label: tx.label, amount: Number(tx.amount), date: tx.date });
+      setMissing(m => m ? { ...m, transactions: (m.transactions || []).filter(t => t.transactionId !== tx.transactionId), ignored: data.ignored || m.ignored, summary: data.summary || m.summary } : m);
+      setToast({ message: 'Paiement masqué', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  }
+
+  async function handleUnignoreMissing(id) {
+    try {
+      await api.unignoreMissing(id);
+      setToast({ message: 'Paiement réaffiché', type: 'success' });
+      loadMissing({ refresh: true });
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  }
+
   function cardName(card) {
     if (!card) return 'Carte inconnue';
     if (card.label) return card.label;
@@ -771,6 +791,7 @@ export default function AdminPennylane() {
                                     <div className="flex gap-2 mt-1.5">
                                       <Link to={`/?${params}`} className="flex-1 text-center py-1 rounded-lg bg-green-mid/20 text-green-light text-[10px] font-medium">{'📷'} Scanner</Link>
                                       <Link to={`/manual?${params}`} className="flex-1 text-center py-1 rounded-lg bg-bg border border-card-border text-text-muted text-[10px] font-medium">{'✍️'} Saisie</Link>
+                                      <button onClick={() => handleIgnoreMissing(tx)} className="px-2 py-1 rounded-lg bg-bg border border-card-border text-text-dim text-[10px] font-medium">{'🚫'} Ignorer</button>
                                     </div>
                                   </div>
                                 );
@@ -781,6 +802,29 @@ export default function AdminPennylane() {
                       );
                     })}
                   </div>
+                )}
+
+                {/* Paiements ignorés (masqués volontairement) */}
+                {(missing.ignored || []).length > 0 && (
+                  <details className="mt-4">
+                    <summary className="text-text-dim text-[11px] cursor-pointer">
+                      Paiements ignor{'é'}s ({missing.ignored.length})
+                    </summary>
+                    <div className="mt-2 space-y-1.5">
+                      {missing.ignored.map(ig => (
+                        <div key={ig.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-bg border border-card-border">
+                          <div className="min-w-0">
+                            <p className="text-text-muted text-xs truncate">{ig.label || `Transaction ${ig.id}`}</p>
+                            <p className="text-text-dim text-[10px]">
+                              {ig.date ? new Date(ig.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
+                              {ig.amount != null ? ` · ${Number(ig.amount).toFixed(2)}€` : ''}
+                            </p>
+                          </div>
+                          <button onClick={() => handleUnignoreMissing(ig.id)} className="text-green-light text-[10px] font-medium shrink-0">R{'é'}afficher</button>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 )}
                 </>
               )}
