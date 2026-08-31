@@ -370,14 +370,14 @@ export default function Stats() {
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-card border border-card-border">
-            <p className="text-text-muted text-[10px] uppercase tracking-widest">Avec justificatif</p>
+            <p className="text-text-muted text-[10px] uppercase tracking-widest">Tickets avec photo</p>
             <p className="font-serif text-2xl font-bold text-text mt-1">
               {summary.totalExpenses > 0
                 ? `${Math.round((summary.withReceipt / summary.totalExpenses) * 100)}%`
                 : '\u2014'}
             </p>
             <p className="text-text-dim text-[10px] mt-0.5">
-              {summary.withReceipt}/{summary.totalExpenses}
+              {summary.withReceipt}/{summary.totalExpenses} tickets scann{'\u00e9'}s
             </p>
           </div>
         </div>
@@ -597,12 +597,17 @@ export default function Stats() {
               </div>
             );
           }
+          const cardTotal = userCards.reduce((s, c) => s + (c.total || 0), 0);
+          const cardMatched = userCards.reduce((s, c) => s + (c.matched || 0), 0);
           return (
             <div className={`p-5 rounded-3xl mt-6 border ${miss.length > 0 ? 'bg-amber-500/5 border-amber-500/25' : 'bg-card border-card-border'}`}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-text-muted text-[10px] uppercase tracking-widest">Paiements carte non justifi{'\u00E9'}s</p>
                 <span className="text-text-dim text-[10px]">exercice en cours</span>
               </div>
+              <p className="text-text-dim text-[11px] mb-1">
+                {cardMatched}/{cardTotal} paiements carte justifi{'\u00E9'}s
+              </p>
               {miss.length === 0 ? (
                 <p className="text-green-400 text-sm mt-1">{'\u2713'} Tout est justifi{'\u00E9'} sur ses cartes</p>
               ) : (
