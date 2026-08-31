@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { api } from '../utils/api';
+import { localDate } from '../utils/format';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 import TypeIcon from '../components/TypeIcon';
@@ -203,7 +204,7 @@ export default function Admin() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `justificatifs-echec-drive-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.download = `justificatifs-echec-drive-${localDate()}.zip`;
       a.click();
       URL.revokeObjectURL(url);
       setZipDownloaded(true);
@@ -240,7 +241,7 @@ export default function Admin() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `notes-de-frais-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `notes-de-frais-${localDate()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       setToast({ message: 'Export CSV téléchargé', type: 'success' });

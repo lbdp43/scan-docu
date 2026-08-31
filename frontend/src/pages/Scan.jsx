@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate, useOutletContext, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
+import { localDate } from '../utils/format';
 import { savePendingExpense } from '../utils/offline';
 import { PAYMENT_OPTIONS, REIMBURSABLE_METHODS } from '../utils/payment';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
@@ -86,7 +87,7 @@ export default function Scan() {
     setImagePreview(URL.createObjectURL(file));
     setHasImage(true);
     // Si on justifie un paiement précis, on garde son montant + sa date (la photo = le justificatif)
-    setDateTicket(fromMissing && targetDate ? targetDate : new Date().toISOString().slice(0, 10));
+    setDateTicket(fromMissing && targetDate ? targetDate : localDate());
     setAmount(fromMissing ? targetAmount : '');
     setMerchant(fromMissing ? targetMerchant.slice(0, 255) : '');
     setDescription('');
@@ -158,7 +159,7 @@ export default function Scan() {
 
   const doSubmit = async () => {
     setSubmitting(true);
-    const date = dateTicket || new Date().toISOString().slice(0, 10);
+    const date = dateTicket || localDate();
 
     if (!navigator.onLine) {
       try {
@@ -234,7 +235,7 @@ export default function Scan() {
 
     if (!skipDuplicateCheck && navigator.onLine) {
       try {
-        const date = dateTicket || new Date().toISOString().slice(0, 10);
+        const date = dateTicket || localDate();
         const { duplicate } = await api.checkDuplicate({ amount, date_ticket: date, merchant });
         if (duplicate) {
           haptic('medium');
@@ -515,7 +516,7 @@ export default function Scan() {
             type="date"
             value={dateTicket}
             onChange={(e) => setDateTicket(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
+            max={localDate()}
             className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid"
           />
         </div>

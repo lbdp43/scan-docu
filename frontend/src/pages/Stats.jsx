@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { useExpenseTypes } from '../context/ExpenseTypesContext';
 import { eur } from '../utils/format';
+import { localDate } from '../utils/format';
 import TypeIcon from '../components/TypeIcon';
 
 const MONTH_LABELS = {
@@ -81,7 +82,7 @@ function getDateRange(period) {
 }
 
 function fmt(d) {
-  return d.toISOString().slice(0, 10);
+  return localDate(d);
 }
 
 const PERIODS = [
@@ -315,7 +316,7 @@ export default function Stats() {
             type="date"
             value={customTo}
             min={customFrom || undefined}
-            max={new Date().toISOString().slice(0, 10)}
+            max={localDate()}
             onChange={(e) => setCustomTo(e.target.value)}
             className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
           />
