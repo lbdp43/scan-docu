@@ -274,7 +274,7 @@ export default function Manual() {
             min={dateMin}
             max={today}
             required
-            className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid [color-scheme:dark]"
+            className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid"
           />
         </div>
 

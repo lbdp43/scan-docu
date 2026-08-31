@@ -26,7 +26,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6"
+    <div className="force-dark min-h-screen flex items-center justify-center px-6"
       style={{ background: 'radial-gradient(ellipse at center, #1A3A1C 0%, #0C150D 70%)' }}>
 
       <div className="w-full max-w-sm animate-fade-up">

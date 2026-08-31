@@ -346,7 +346,7 @@ export default function AdminTypes() {
                   <p className="text-text-muted text-xs font-mono">{type.value}</p>
                 </div>
                 <div
-                  className="w-5 h-5 rounded-full border-2 border-white/10"
+                  className="w-5 h-5 rounded-full border-2 border-card-border"
                   style={{ backgroundColor: type.color }}
                 />
                 <div className="flex gap-1">

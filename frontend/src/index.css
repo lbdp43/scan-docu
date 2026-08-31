@@ -2,6 +2,80 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────
+   Thème — triplets RGB consommés par tailwind.config.js.
+   Sombre par défaut ; clair via <html data-theme="light">.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --bg: 12 21 13;            /* #0C150D */
+  --bg2: 17 27 18;           /* #111B12 */
+  --card: 25 34 26;          /* équiv. solide de l'ancien blanc 5.5% */
+  --card-border: 34 44 35;
+  --tx: 240 244 240;         /* #F0F4F0 */
+  --tx-muted: 122 156 122;   /* #7A9C7A */
+  --tx-dim: 94 126 94;       /* #5E7E5E */
+  --green-deep: 26 58 28;
+  --green-mid: 45 106 39;
+  --green-bright: 74 158 64;
+  --green-light: 127 212 114;
+  --gold: 200 168 75;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: 243 246 242;         /* #F3F6F2 */
+  --bg2: 232 238 231;
+  --card: 252 253 252;       /* cartes quasi blanches, élévation douce */
+  --card-border: 208 220 206;
+  --tx: 26 43 28;            /* #1A2B1C */
+  --tx-muted: 74 106 76;
+  --tx-dim: 122 148 124;
+  --green-deep: 26 58 28;
+  --green-mid: 45 106 39;
+  --green-bright: 58 130 50;
+  --green-light: 40 122 32;  /* accent lisible sur fond clair */
+  --gold: 158 128 42;
+  color-scheme: light;
+}
+
+/* Couleurs d'état (Tailwind stock) : versions foncées lisibles sur fond clair.
+   Les sélecteurs [class*=…] attrapent aussi les variantes /opacité. */
+[data-theme="light"] [class*="text-amber-2"],
+[data-theme="light"] [class*="text-amber-3"],
+[data-theme="light"] [class*="text-amber-4"] { color: rgb(180 83 9); }
+[data-theme="light"] [class*="text-red-3"],
+[data-theme="light"] [class*="text-red-4"] { color: rgb(185 28 28); }
+[data-theme="light"] [class*="text-blue-3"],
+[data-theme="light"] [class*="text-blue-4"] { color: rgb(29 78 216); }
+[data-theme="light"] [class*="text-green-3"],
+[data-theme="light"] [class*="text-green-4"] { color: rgb(21 128 61); }
+/* …mais pas dans les zones toujours sombres */
+[data-theme="light"] .force-dark [class*="text-amber-2"],
+[data-theme="light"] .force-dark [class*="text-amber-3"],
+[data-theme="light"] .force-dark [class*="text-amber-4"] { color: rgb(252 211 77); }
+[data-theme="light"] .force-dark [class*="text-red-3"],
+[data-theme="light"] .force-dark [class*="text-red-4"] { color: rgb(252 165 165); }
+[data-theme="light"] .force-dark [class*="text-blue-3"],
+[data-theme="light"] .force-dark [class*="text-blue-4"] { color: rgb(147 197 253); }
+[data-theme="light"] .force-dark [class*="text-green-3"],
+[data-theme="light"] .force-dark [class*="text-green-4"] { color: rgb(134 239 172); }
+
+/* Zones de marque toujours sombres (héros, login) : on réaffirme la
+   palette sombre localement — les tokens enfants suivent. */
+.force-dark {
+  --bg: 12 21 13;
+  --bg2: 17 27 18;
+  --card: 25 34 26;
+  --card-border: 34 44 35;
+  --tx: 240 244 240;
+  --tx-muted: 122 156 122;
+  --tx-dim: 94 126 94;
+  --green-light: 127 212 114;
+  --green-bright: 74 158 64;
+  --gold: 200 168 75;
+  color-scheme: dark;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -10,8 +84,8 @@
 }
 
 html, body {
-  background-color: #0C150D;
-  color: #F0F4F0;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--tx));
   font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
@@ -22,7 +96,7 @@ html, body {
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #111B12;
+  background: rgb(var(--bg2));
 }
 ::-webkit-scrollbar-thumb {
   background: #2D6A27;
@@ -38,8 +112,8 @@ html, body {
 
 /* Input autofill override */
 input:-webkit-autofill {
-  -webkit-box-shadow: 0 0 0 30px #111B12 inset !important;
-  -webkit-text-fill-color: #F0F4F0 !important;
+  -webkit-box-shadow: 0 0 0 30px rgb(var(--bg2)) inset !important;
+  -webkit-text-fill-color: rgb(var(--tx)) !important;
 }
 
 html {

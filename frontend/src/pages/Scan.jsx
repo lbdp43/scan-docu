@@ -516,7 +516,7 @@ export default function Scan() {
             value={dateTicket}
             onChange={(e) => setDateTicket(e.target.value)}
             max={new Date().toISOString().slice(0, 10)}
-            className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid [color-scheme:dark]"
+            className="w-full bg-card border border-card-border rounded-2xl px-5 py-4 text-text focus:outline-none focus:border-green-mid"
           />
         </div>
 

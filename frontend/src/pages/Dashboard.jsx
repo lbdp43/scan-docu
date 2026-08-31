@@ -238,7 +238,7 @@ export default function Dashboard() {
       ) : null}
 
       {/* Hero Card — Monthly Total */}
-      <div className="relative overflow-hidden rounded-4xl p-7"
+      <div className="force-dark relative overflow-hidden rounded-4xl p-7"
         style={{ background: 'linear-gradient(135deg, #1C3A1E, #243F26)' }}>
         <div className="relative z-10">
           <p className="text-text-muted text-sm mb-2">Total du mois</p>

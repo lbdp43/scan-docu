@@ -307,7 +307,7 @@ export default function Stats() {
             value={customFrom}
             max={customTo || undefined}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid [color-scheme:dark]"
+            className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
           />
           <label className="text-text-muted text-xs">au</label>
           <input
@@ -316,7 +316,7 @@ export default function Stats() {
             min={customFrom || undefined}
             max={new Date().toISOString().slice(0, 10)}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid [color-scheme:dark]"
+            className="bg-card border border-card-border rounded-xl px-3 py-2 text-text text-sm focus:outline-none focus:border-green-mid"
           />
           {!(customFrom && customTo) && (
             <span className="text-amber-400 text-[10px] w-full">Choisis une date de début et de fin</span>
@@ -464,7 +464,7 @@ export default function Stats() {
             const year = m.month.split('-')[0];
             const byType = m.byType || {};
             return (
-              <div className="mt-4 pt-4 border-t border-white/5 animate-fade-up">
+              <div className="mt-4 pt-4 border-t border-card-border/60 animate-fade-up">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-text text-sm font-semibold">
                     {MONTH_LABELS_FULL[monthKey]} {year}
@@ -484,7 +484,7 @@ export default function Stats() {
                           <div key={type} className="flex items-center gap-2">
                             <span className="text-sm">{info.icon}</span>
                             <span className="text-text text-xs flex-1">{info.label}</span>
-                            <div className="w-20 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                            <div className="w-20 h-1.5 rounded-full bg-card-border/50 overflow-hidden">
                               <div
                                 className="h-full rounded-full"
                                 style={{ width: `${pct}%`, backgroundColor: info.hexColor }}
@@ -531,7 +531,7 @@ export default function Stats() {
                           {eur(t.total)}
                         </span>
                       </div>
-                      <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-2 rounded-full bg-card-border/50 overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{
@@ -581,7 +581,7 @@ export default function Stats() {
                     {mu && mu.count > 0 && (
                       <p className="text-amber-400 text-[11px] mb-1">{'⚠️'} {mu.count} paiement{mu.count > 1 ? 's' : ''} non justifi{'é'}{mu.count > 1 ? 's' : ''} · {eur(mu.amount)}</p>
                     )}
-                    <div className="h-1 rounded-full bg-white/5 overflow-hidden mb-2">
+                    <div className="h-1 rounded-full bg-card-border/50 overflow-hidden mb-2">
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #2D6A27, #5ABF50)' }} />
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -762,7 +762,7 @@ export default function Stats() {
               return (
                 <div
                   key={m.month}
-                  className="py-2.5 border-b border-white/5 last:border-0"
+                  className="py-2.5 border-b border-card-border/60 last:border-0"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
@@ -776,7 +776,7 @@ export default function Stats() {
                     </span>
                   </div>
                   {/* Mini progress bar */}
-                  <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                  <div className="h-1 rounded-full bg-card-border/50 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{

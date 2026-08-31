@@ -138,7 +138,7 @@ export default function PennylaneStats({ toast }) {
               <span className="text-text text-xs">{fmtLabel ? fmtLabel(r.k) : r.k}</span>
               <span className="text-text font-mono text-xs font-medium">{eur(r.v)}</span>
             </div>
-            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-2 rounded-full bg-card-border/60 overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500"
                 style={{ width: `${(r.v / max) * 100}%`, backgroundColor: PALETTE[i % PALETTE.length] }} />
             </div>
@@ -371,7 +371,7 @@ export default function PennylaneStats({ toast }) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${s.matched ? 'bg-green-mid/20 text-green-light' : 'bg-white/5 text-text-dim'}`}>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${s.matched ? 'bg-green-mid/20 text-green-light' : 'bg-card-border/60 text-text-dim'}`}>
                           {s.matched ? 'rapproché' : 'non rapproché'}
                         </span>
                         <span className="font-serif text-sm font-semibold text-text">{eur(s.amount)}</span>
