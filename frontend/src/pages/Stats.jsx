@@ -248,19 +248,34 @@ export default function Stats() {
   const activeMonths = monthly.filter(m => m.total > 0).length;
   const eur = (n) => Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
-  // Paiements non justifiés par utilisateur (depuis le snapshot des manquants)
+  // Paiements non justifiés par utilisateur (depuis le snapshot des manquants).
+  // missByUser : tous les manquants (exercice). nonCatByUser : filtré sur la période
+  // affichée -> montant "Non catégorisé" (paiements carte sans ticket) par utilisateur.
   const missByUser = {};
+  const nonCatByUser = {};
   if (missingSnap) {
     const cardUserMap = {};
     (missingSnap.cards || []).forEach(c => { if (c.masked && c.userId != null) cardUserMap[c.masked] = String(c.userId); });
+    const range = currentRange();
     (missingSnap.transactions || []).forEach(t => {
       const uid = t.card?.masked ? cardUserMap[t.card.masked] : null;
-      if (!uid) return;
-      if (!missByUser[uid]) missByUser[uid] = { count: 0, amount: 0 };
-      missByUser[uid].count++;
-      missByUser[uid].amount += Number(t.amount || 0);
+      if (uid) {
+        if (!missByUser[uid]) missByUser[uid] = { count: 0, amount: 0 };
+        missByUser[uid].count++;
+        missByUser[uid].amount += Number(t.amount || 0);
+      }
+      const d = (t.date || '').slice(0, 10);
+      if (range.ready && d >= range.from && d <= range.to) {
+        const k = uid || '__none__';
+        nonCatByUser[k] = (nonCatByUser[k] || 0) + Number(t.amount || 0);
+      }
     });
   }
+  // Montant "Non catégorisé" pour le périmètre affiché (1 collaborateur ou tous)
+  const nonCatScope = selectedUserId
+    ? (nonCatByUser[String(selectedUserId)] || 0)
+    : Object.values(nonCatByUser).reduce((a, b) => a + b, 0);
+  const NONCAT = { icon: '❓', label: 'Non catégorisée', hexColor: '#9CA3AF' };
 
   return (
     <div className="space-y-6">
@@ -493,14 +508,18 @@ export default function Stats() {
 
         {/* Type Breakdown */}
         <div className="p-5 rounded-3xl bg-card border border-card-border mt-6">
-          <p className="text-text-muted text-[10px] uppercase tracking-widest mb-4">R{'\u00E9'}partition par type</p>
-          {typeTotals.length > 0 ? (
+          <p className="text-text-muted text-[10px] uppercase tracking-widest mb-1">R{'\u00E9'}partition par type</p>
+          {nonCatScope > 0 && (
+            <p className="text-text-dim text-[10px] mb-3">{'\u2753'} Non cat\u00E9goris\u00E9e = paiements carte sans ticket ({eur(nonCatScope)})</p>
+          )}
+          {(typeTotals.length > 0 || nonCatScope > 0) ? (
             <div className="space-y-3">
-              {typeTotals
+              {(nonCatScope > 0 ? [...typeTotals, { type: '__noncat__', total: nonCatScope }] : typeTotals)
                 .sort((a, b) => b.total - a.total)
                 .map((t) => {
-                  const info = typesMap[t.type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: t.type, hexColor: '#6B7280' };
-                  const pct = summary.grandTotal > 0 ? (t.total / summary.grandTotal) * 100 : 0;
+                  const info = t.type === '__noncat__' ? NONCAT : (typesMap[t.type] || typesMap.autre || { icon: '\uD83D\uDCC4', label: t.type, hexColor: '#6B7280' });
+                  const denom = summary.grandTotal + nonCatScope;
+                  const pct = denom > 0 ? (t.total / denom) * 100 : 0;
                   return (
                     <div key={t.type}>
                       <div className="flex items-center justify-between mb-1.5">
@@ -543,6 +562,7 @@ export default function Stats() {
                 const cats = Object.entries(u.byType || {}).sort((a, b) => b[1] - a[1]);
                 const pct = summary.grandTotal > 0 ? (u.total / summary.grandTotal) * 100 : 0;
                 const mu = missByUser[String(u.userId)];
+                const nonCat = nonCatByUser[String(u.userId)] || 0;
                 return (
                   <button
                     key={u.userId}
@@ -573,8 +593,16 @@ export default function Stats() {
                           </span>
                         );
                       })}
+                      {nonCat > 0 && (
+                        <span className="text-[11px] text-amber-300/90 whitespace-nowrap">
+                          <span className="mr-0.5">{'\u2753'}</span>Non cat\u00E9goris\u00E9e <span className="font-medium">{eur(nonCat)}</span>
+                        </span>
+                      )}
                     </div>
-                    <p className="text-text-dim text-[10px] mt-1.5">{u.count} d{'\u00E9'}pense{u.count > 1 ? 's' : ''} \u00B7 voir le d{'\u00E9'}tail {'\u203A'}</p>
+                    <p className="text-text-dim text-[10px] mt-1.5">
+                      {u.count} d{'\u00E9'}pense{u.count > 1 ? 's' : ''}
+                      {nonCat > 0 ? ` \u00B7 total r\u00E9el ${eur(u.total + nonCat)}` : ''} \u00B7 voir le d{'\u00E9'}tail {'\u203A'}
+                    </p>
                   </button>
                 );
               })}
