@@ -5,5 +5,8 @@
   "scripts": {
     "build": "cd frontend && npm install --include=dev && npm run build && cd ../backend && npm install --include=dev && npx prisma generate",
     "start": "cd backend && NODE_ENV=production npm start"
+  },
+  "dependencies": {
+    "sharp": "^0.35.4"
   }
 }
