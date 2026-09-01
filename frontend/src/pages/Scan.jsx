@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useOutletContext, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { localDate } from '../utils/format';
@@ -43,6 +43,7 @@ export default function Scan() {
   const { isOnline, refreshPendingCount } = useOutletContext() || {};
   const { types: EXPENSE_TYPES } = useExpenseTypes();
   const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const addPhotoInputRef = useRef(null);
   const amountRef = useRef(null);
 
@@ -77,6 +78,15 @@ export default function Scan() {
   const [lastResult, setLastResult] = useState(null);
 
   const userEdited = useRef({ amount: false, merchant: false });
+
+  // Arrivée via le raccourci/widget « Scanner » : on tente d'ouvrir la caméra
+  // directement. Si le navigateur exige un geste, le gros bouton reste là.
+  const fromShortcut = searchParams.get('src');
+  useEffect(() => {
+    if (!fromShortcut || fromMissing) return;
+    const t = setTimeout(() => fileInputRef.current?.click(), 350);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCapture = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -267,6 +277,7 @@ export default function Scan() {
     setLastResult(null);
     setSkipDuplicateCheck(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
   const scanAnother = () => {
@@ -274,16 +285,28 @@ export default function Scan() {
     setTimeout(() => fileInputRef.current?.click(), 200);
   };
 
-  // ── Hidden file input (shared across all screens) ────────────
+  // ── Hidden file inputs (shared across all screens) ───────────
+  // Caméra : images SEULEMENT + capture -> Android ouvre l'appareil photo
+  // direct (avec un accept contenant des PDF, `capture` est ignoré et le
+  // sélecteur de fichiers s'ouvrait à la place).
   const fileInput = (
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept="image/jpeg,image/png,image/webp,application/pdf"
-      capture="environment"
-      onChange={handleCapture}
-      className="hidden"
-    />
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleCapture}
+        className="hidden"
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        onChange={handleCapture}
+        className="hidden"
+      />
+    </>
   );
 
   // Input dédié à l'ajout d'une page supplémentaire (ne réinitialise pas le formulaire)
@@ -385,10 +408,17 @@ export default function Scan() {
               <p className="text-text font-semibold text-base">
                 {scanCount > 0 ? 'Scanner le ticket suivant' : 'Prendre une photo'}
               </p>
-              <p className="text-text-muted text-sm mt-1">ou choisir depuis la galerie</p>
+              <p className="text-text-muted text-sm mt-1">l'appareil photo s'ouvre directement</p>
             </div>
           </button>
         </div>
+
+        <button
+          onClick={() => galleryInputRef.current?.click()}
+          className="w-full py-3 mb-3 rounded-2xl border border-card-border text-text-muted text-sm font-medium transition-transform active:scale-[0.98]"
+        >
+          {'🖼️'} Choisir depuis la galerie ou un PDF
+        </button>
 
         {fileInput}
 
