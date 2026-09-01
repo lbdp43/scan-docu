@@ -302,7 +302,7 @@ export default function Scan() {
       <input
         ref={galleryInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,application/pdf"
+        accept="application/pdf,image/jpeg,image/png,image/webp"
         onChange={handleCapture}
         className="hidden"
       />
@@ -392,7 +392,7 @@ export default function Scan() {
           </div>
         )}
 
-        <div className="flex-1 flex items-center justify-center py-8">
+        <div className="flex-1 flex flex-col items-center justify-center py-8 gap-4">
           <button
             onClick={() => fileInputRef.current?.click()}
             className="w-full border border-green-mid/25 rounded-3xl p-12 flex flex-col items-center gap-5 bg-green-mid/[0.04] transition-all hover:bg-green-mid/[0.08] hover:border-green-mid/40 active:scale-[0.98]"
@@ -411,14 +411,14 @@ export default function Scan() {
               <p className="text-text-muted text-sm mt-1">l'appareil photo s'ouvre directement</p>
             </div>
           </button>
-        </div>
 
-        <button
-          onClick={() => galleryInputRef.current?.click()}
-          className="w-full py-3 mb-3 rounded-2xl border border-card-border text-text-muted text-sm font-medium transition-transform active:scale-[0.98]"
-        >
-          {'🖼️'} Choisir depuis la galerie ou un PDF
-        </button>
+          <button
+            onClick={() => galleryInputRef.current?.click()}
+            className="w-full py-3.5 rounded-2xl border border-card-border bg-card text-text-muted text-sm font-medium transition-transform active:scale-[0.98]"
+          >
+            Choisir depuis la galerie ou un PDF
+          </button>
+        </div>
 
         {fileInput}
 
