@@ -1,0 +1,23 @@
+name: Bilan mensuel admins
+
+# Le 1er du mois : push aux administrateurs récapitulant les paiements du
+# mois écoulé restés sans justificatif (agrégés par collaborateur).
+on:
+  schedule:
+    - cron: "10 6 1 * *" # 1er du mois, 06h10 UTC (après le cron quotidien)
+  workflow_dispatch: {} # déclenchement manuel possible
+
+jobs:
+  monthly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déclencher le bilan mensuel
+        run: |
+          echo "POST ${APP_URL}/api/cron/monthly"
+          curl -fsS -X POST "${APP_URL}/api/cron/monthly" \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 | head -c 2000
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
