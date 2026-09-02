@@ -181,19 +181,6 @@ export default function Profile() {
         <p className="text-text-dim text-[11px] mt-2">M{'é'}moris{'é'} sur cet appareil.</p>
       </div>
 
-      {/* Raccourcis & widget */}
-      <a
-        href="/raccourcis"
-        className="flex items-center gap-3 p-4 rounded-3xl bg-card border border-card-border transition-transform active:scale-[0.98]"
-      >
-        <img src="/shortcut-scan.png" alt="" className="w-10 h-10 rounded-xl bg-white shrink-0" />
-        <div className="flex-1">
-          <p className="text-text text-sm font-medium">Raccourcis & widget</p>
-          <p className="text-text-muted text-xs">Bouton « Prendre une photo » sur l'écran d'accueil</p>
-        </div>
-        <span className="text-text-dim text-xl">›</span>
-      </a>
-
       {/* Change password */}
       <div className="p-5 rounded-3xl bg-card border border-card-border">
         <h2 className="text-text font-semibold mb-4">Changer le mot de passe</h2>
