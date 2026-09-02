@@ -16,7 +16,6 @@ const AdminTypes = lazy(() => import('./pages/AdminTypes'));
 const AdminPennylane = lazy(() => import('./pages/AdminPennylane'));
 const AdminReimbursements = lazy(() => import('./pages/AdminReimbursements'));
 const Profile = lazy(() => import('./pages/Profile'));
-const Shortcuts = lazy(() => import('./pages/Shortcuts'));
 const Stats = lazy(() => import('./pages/Stats'));
 
 function PageFallback() {
@@ -86,7 +85,6 @@ const router = createBrowserRouter([
       { path: 'history', element: page(History) },
       { path: 'stats', element: page(Stats) },
       { path: 'profile', element: page(Profile) },
-      { path: 'raccourcis', element: page(Shortcuts) },
       { path: 'admin', element: <PrivateRoute adminOnly>{page(Admin)}</PrivateRoute> },
       { path: 'admin/users', element: <PrivateRoute adminOnly>{page(AdminUsers)}</PrivateRoute> },
       { path: 'admin/types', element: <PrivateRoute adminOnly>{page(AdminTypes)}</PrivateRoute> },
