@@ -14,6 +14,9 @@ const { getSecret, sameSecret } = require('../services/mcpSecret');
 const { fiscalYear } = require('../services/fiscalYear');
 const { PAYMENT_LABELS } = require('../services/payment');
 const missing = require('../services/missing');
+const pennylane = require('../services/pennylane');
+const { loadBankExpenses } = require('../services/bankExpenses');
+const { VEHICLE_CATEGORIES } = require('../services/categorize');
 
 const router = express.Router();
 
@@ -25,7 +28,9 @@ const NOTE_MONTANTS = 'Tous les montants sont TTC (toutes taxes comprises) : c\'
 
 const INSTRUCTIONS = `Serveur en lecture seule des notes de frais de La Brasserie des Plantes (LBDP).
 ${NOTE_MONTANTS}
-Commencer par « contexte » pour les conventions (exercice fiscal, modes de paiement, catégories).
+Commencer par « contexte » pour les conventions (exercice fiscal, modes de paiement, catégories, cartes, véhicules).
+Deux sources : les tickets saisis dans l'app (resume_depenses, lister_depenses, evolution_mensuelle : par personne qui a saisi le ticket, par catégorie, par mode de paiement)
+et le relevé bancaire du compte pro (depenses_compte_pro : par carte, par véhicule, par titulaire de carte, par catégorie comptable Pennylane).
 Dates au format AAAA-MM-JJ. Sans dates, la période par défaut est le mois en cours.
 Toujours préciser « TTC » en citant un montant.`;
 
@@ -54,7 +59,7 @@ const TOOLS = [
   {
     name: 'resume_depenses',
     title: 'Total des dépenses et répartition',
-    description: 'Combien a-t-on dépensé sur une période : total TTC, nombre de tickets, et répartition par catégorie, par mode de paiement et par collaborateur. Filtres optionnels.',
+    description: 'Combien a-t-on dépensé sur une période d\'après les tickets saisis dans l\'app : total TTC, nombre de tickets, et répartition par catégorie, par mode de paiement et par collaborateur (personne qui a saisi le ticket). Filtres optionnels. Pour une répartition par carte ou par véhicule, utiliser depenses_compte_pro.',
     inputSchema: { type: 'object', properties: { ...periodProps, ...filterProps }, additionalProperties: false },
     annotations: READ_ONLY,
   },
@@ -85,6 +90,26 @@ const TOOLS = [
     title: 'Paiements carte sans justificatif',
     description: 'Paiements de la carte pro (relevé bancaire Pennylane) pour lesquels aucun ticket n\'a été fourni, sur l\'exercice en cours. Filtre optionnel par collaborateur.',
     inputSchema: { type: 'object', properties: { collaborateur: filterProps.collaborateur }, additionalProperties: false },
+    annotations: READ_ONLY,
+  },
+  {
+    name: 'depenses_compte_pro',
+    title: 'Dépenses du compte pro par carte et véhicule',
+    description: 'Paiements réellement débités sur le compte pro (relevé bancaire Pennylane) : total TTC et répartition par carte, par véhicule, par titulaire de carte et par catégorie comptable, avec le nombre de paiements sans justificatif. '
+      + 'Par défaut : paiements par carte du mois en cours. Filtres optionnels, et liste détaillée avec « limite ».',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...periodProps,
+        carte: { type: 'string', description: 'Carte : intitulé (ex. « Kangoo ») ou 4 derniers chiffres.' },
+        vehicule: { type: 'string', description: `Véhicule : ${VEHICLE_CATEGORIES.map((v) => v.label).join(', ')}.` },
+        titulaire: { type: 'string', description: 'Collaborateur à qui la carte est attribuée (nom ou partie du nom).' },
+        categorie: { type: 'string', description: 'Catégorie comptable Pennylane (ex. « Carburant », « Péages et Parking »).' },
+        inclure_hors_carte: { type: 'boolean', description: 'Inclure aussi les débits sans carte (prélèvements, virements, frais bancaires). Défaut : non.' },
+        limite: { type: 'integer', minimum: 0, maximum: 200, description: 'Nombre de paiements à lister en détail (défaut 20, 0 = aucun).' },
+      },
+      additionalProperties: false,
+    },
     annotations: READ_ONLY,
   },
 ];
@@ -185,6 +210,26 @@ async function fetchExpenses(prisma, args, refs, { defaultFiscal = false } = {})
   return { period, rows, filtres };
 }
 
+async function cardsSummary(refs) {
+  try {
+    const [labels, users, vehicles] = await Promise.all([
+      pennylane.getCardLabels(), pennylane.getCardUsers(), pennylane.getCardVehicles(),
+    ]);
+    const vehById = Object.fromEntries(VEHICLE_CATEGORIES.map((v) => [v.id, v.label]));
+    const snap = await missing.readSnapshot().catch(() => null);
+    const masked = new Set([...Object.keys(labels), ...Object.keys(users), ...Object.keys(vehicles),
+      ...((snap?.cards || []).map((c) => c.masked).filter(Boolean))]);
+    return [...masked].map((m) => ({
+      carte: `•••• ${m.slice(-4)}`,
+      intitule: labels[m] || null,
+      vehicule: vehicles[m] ? (vehById[vehicles[m]] || null) : null,
+      titulaire: users[m] ? (refs.userName[users[m]] || null) : null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function groupBy(rows, keyFn, labelFn, total) {
   const map = new Map();
   for (const r of rows) {
@@ -225,6 +270,12 @@ const HANDLERS = {
       },
       categories: refs.types.map((t) => ({ code: t.value, libelle: t.label })),
       collaborateurs: refs.users.map((u) => ({ id: u.id, nom: u.name, actif: u.is_active })),
+      vehicules: VEHICLE_CATEGORIES.map((v) => v.label),
+      cartes: await cardsSummary(refs),
+      sources: {
+        tickets: 'Tickets saisis dans l\'app (resume_depenses, lister_depenses, evolution_mensuelle) : « collaborateur » = personne qui a saisi le ticket.',
+        compte_pro: 'Relevé bancaire Pennylane (depenses_compte_pro) : par carte, véhicule, titulaire de carte, catégorie comptable.',
+      },
       periode_par_defaut: 'Mois en cours (sauf evolution_mensuelle : exercice fiscal en cours)',
     };
   },
@@ -345,6 +396,111 @@ const HANDLERS = {
       par_collaborateur: parCollab,
       paiements: tx.slice(0, 200).map(({ _uid, ...t }) => t),
       montants: 'Montants TTC débités sur le compte bancaire (carte pro). Le HT n\'est pas disponible.',
+    };
+  },
+
+  async depenses_compte_pro(prisma, args) {
+    const period = parsePeriod(args);
+    if (!(await pennylane.getToken())) {
+      return { disponible: false, raison: 'Pennylane n\'est pas connecté : le relevé bancaire n\'est pas accessible.' };
+    }
+    const refs = await loadRefs(prisma);
+    let all;
+    try {
+      all = await loadBankExpenses(period, { cached: true });
+    } catch (e) {
+      throw new ToolError(`Relevé bancaire Pennylane indisponible pour le moment (${e.message}).`);
+    }
+    const snap = await missing.readSnapshot().catch(() => null);
+    const covered = snap?.connection?.ok && snap.fiscalYear ? snap.fiscalYear : null;
+    const unjustified = new Set((snap?.transactions || []).map((t) => String(t.transactionId)));
+
+    const cardName = (t) => (t.masked ? (t.cardLabel ? `${t.cardLabel} (•••• ${t.last4})` : `•••• ${t.last4}`) : 'Hors carte (prélèvement, virement…)');
+    const holder = (t) => {
+      if (!t.masked) return 'Hors carte';
+      if (t.userId && refs.userName[t.userId]) return refs.userName[t.userId];
+      return t.employee ? `${t.employee} (titulaire Pennylane)` : 'Carte non attribuée';
+    };
+    let rows = all.map((t) => {
+      const day = String(t.date || '').slice(0, 10);
+      const inCover = covered && day >= covered.from && day <= covered.to;
+      return {
+        ...t,
+        day,
+        _carte: cardName(t),
+        _titulaire: holder(t),
+        _justifie: inCover ? !unjustified.has(String(t.id)) : null,
+      };
+    });
+
+    const filtres = {};
+    if (!args.inclure_hors_carte) rows = rows.filter((t) => t.masked);
+    else filtres.hors_carte = 'inclus';
+    if (args.carte) {
+      const q = norm(args.carte);
+      const before = rows;
+      rows = rows.filter((t) => t.masked && (t.last4 === String(args.carte).trim() || norm(t.cardLabel).includes(q)));
+      if (!rows.length && before.length) {
+        const cards = [...new Set(before.filter((t) => t.masked).map((t) => t._carte))];
+        throw new ToolError(`Aucune carte ne correspond à « ${args.carte} ». Cartes sur la période : ${cards.join(', ') || 'aucune'}.`);
+      }
+      filtres.carte = args.carte;
+    }
+    if (args.vehicule) {
+      const q = norm(args.vehicule);
+      rows = rows.filter((t) => t.vehicle && norm(t.vehicle).includes(q));
+      filtres.vehicule = args.vehicule;
+    }
+    if (args.titulaire) {
+      const ids = resolveUser(args.titulaire, refs.users);
+      const q = norm(args.titulaire);
+      rows = rows.filter((t) => (t.userId && ids.includes(t.userId)) || (!t.userId && norm(t.employee).includes(q)));
+      filtres.titulaire = ids.map((id) => refs.userName[id]).join(', ');
+    }
+    if (args.categorie) {
+      const q = norm(args.categorie);
+      rows = rows.filter((t) => t.categories.some((c) => norm(c).includes(q)));
+      filtres.categorie = args.categorie;
+    }
+
+    const total = rows.reduce((s, t) => s + t.amount, 0);
+    const checked = rows.filter((t) => t._justifie !== null);
+    const missingRows = checked.filter((t) => !t._justifie);
+    const limite = args.limite === undefined ? 20 : Math.min(Math.max(parseInt(args.limite, 10) || 0, 0), 200);
+    const sorted = [...rows].sort((a, b) => (a.day < b.day ? 1 : -1));
+
+    return {
+      source: 'Relevé bancaire du compte pro (Pennylane) : paiements réellement débités.',
+      periode: { debut: period.from, fin: period.to },
+      filtres,
+      total_ttc: r2(total),
+      nombre_paiements: rows.length,
+      par_carte: groupBy(rows, (t) => t._carte, (k) => k, total),
+      par_vehicule: groupBy(rows, (t) => t.vehicle || 'Véhicule non renseigné', (k) => k, total),
+      par_titulaire: groupBy(rows, (t) => t._titulaire, (k) => k, total),
+      par_categorie: groupBy(rows, (t) => t.nature || 'Non catégorisé', (k) => k, total),
+      justificatifs: covered
+        ? {
+          verifies: checked.length,
+          sans_justificatif: missingRows.length,
+          montant_sans_justificatif_ttc: r2(missingRows.reduce((s, t) => s + t.amount, 0)),
+          note: checked.length < rows.length ? `Statut connu seulement pour l'exercice ${covered.from} → ${covered.to}.` : undefined,
+        }
+        : { note: 'Statut des justificatifs pas encore calculé.' },
+      affiches: Math.min(limite, rows.length),
+      paiements: sorted.slice(0, limite).map((t) => ({
+        date: t.day,
+        montant_ttc: r2(t.amount),
+        libelle_bancaire: t.label || null,
+        carte: t._carte,
+        vehicule: t.vehicle,
+        titulaire: t._titulaire,
+        categories: t.categories,
+        justifie: t._justifie,
+      })),
+      a_savoir: 'Le titulaire est le collaborateur à qui la carte est attribuée dans l\'app. Les cartes restent dans les véhicules et peuvent être utilisées par n\'importe qui : '
+        + 'pour savoir qui a réellement fait une dépense, voir les tickets saisis (resume_depenses, par collaborateur).',
+      montants: 'Montants TTC débités sur le compte bancaire. Le HT n\'est pas disponible — ne pas le calculer ni l\'estimer.',
     };
   },
 };

@@ -4,6 +4,7 @@ const pennylane = require('../services/pennylane');
 const missing = require('../services/missing');
 const { fiscalYear } = require('../services/fiscalYear');
 const { VEHICLE_CATEGORIES } = require('../services/categorize');
+const { loadBankExpenses } = require('../services/bankExpenses');
 
 const router = express.Router();
 
@@ -609,51 +610,7 @@ router.get('/stats', async (req, res) => {
     const to = `${startYear + 1}-06-30`;
     const availableYears = [curStart, curStart - 1, curStart - 2];
 
-    const filter = [
-      { field: 'date', operator: 'gteq', value: from },
-      { field: 'date', operator: 'lteq', value: to },
-    ];
-    const bankId = await pennylane.getSavedBankAccountId();
-    if (bankId) filter.push({ field: 'bank_account_id', operator: 'eq', value: bankId });
-
-    let allTx = [];
-    let cursor;
-    do {
-      const b = await pennylane.getTransactions({ filter, limit: 100, cursor });
-      allTx = allTx.concat(b.items);
-      cursor = b.has_more ? b.next_cursor : null;
-      if (cursor) await pennylane.sleep(pennylane.RATE_LIMIT_DELAY);
-    } while (cursor);
-    const expenseTx = allTx.filter((t) => Number(t.amount || t.currency_amount) < 0);
-
-    const cardLabels = await pennylane.getCardLabels();
-    const cardUsers = await pennylane.getCardUsers();
-    const cardVehicles = await pennylane.getCardVehicles();
-    const vehById = Object.fromEntries(VEHICLE_CATEGORIES.map((v) => [v.id, v.label]));
-    const vehIds = VEHICLE_CATEGORIES.map((v) => v.id);
-
-    const transactions = expenseTx.map((t) => {
-      const ci = pennylane.cardInfo(t);
-      const cats = t.categories || [];
-      const vehFromCat = cats.map((c) => vehById[c.id]).find(Boolean);
-      const vehicle = vehFromCat
-        || (ci.masked && cardVehicles[ci.masked] ? vehById[cardVehicles[ci.masked]] : null)
-        || null;
-      const natureCat = cats.find((c) => !vehIds.includes(c.id));
-      return {
-        id: t.id,
-        amount: Math.abs(Number(t.amount || t.currency_amount || 0)),
-        date: t.date,
-        label: t.label,
-        masked: ci.masked,
-        last4: ci.last4,
-        cardLabel: ci.masked ? (cardLabels[ci.masked] || null) : null,
-        userId: ci.masked ? (cardUsers[ci.masked] || null) : null,
-        vehicle,
-        nature: natureCat ? natureCat.label : null,
-        categories: cats.map((c) => c.label),
-      };
-    });
+    const transactions = await loadBankExpenses({ from, to });
 
     const expRows = await req.prisma.expense.findMany({
       where: { date_ticket: { gte: new Date(from), lte: new Date(to) } },
