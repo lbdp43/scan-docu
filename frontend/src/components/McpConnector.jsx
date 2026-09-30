@@ -53,7 +53,7 @@ export default function McpConnector({ onToast }) {
         </div>
         <div className="flex-1">
           <p className="text-text text-sm font-medium">Connecteur IA (Claude, ChatGPT)</p>
-          <p className="text-text-muted text-xs">Lecture seule : dépenses par catégorie, totaux, évolution — montants TTC</p>
+          <p className="text-text-muted text-xs">Lecture seule : totaux par catégorie, personne, carte, véhicule, évolution — montants TTC</p>
         </div>
       </div>
 
