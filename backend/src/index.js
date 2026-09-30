@@ -19,6 +19,7 @@ const myPaymentsRoutes = require('./routes/myPayments');
 const reimbursementRoutes = require('./routes/reimbursements');
 const pushRoutes = require('./routes/push');
 const cronRoutes = require('./routes/cron');
+const mcpRoutes = require('./routes/mcp');
 const { warmupWorker } = require('./services/ocr');
 
 const prisma = new PrismaClient();
@@ -98,6 +99,9 @@ app.use('/api/my-payments', myPaymentsRoutes);
 app.use('/api/reimbursements', reimbursementRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/cron', cronRoutes);
+
+// Connecteur MCP lecture seule (Claude / ChatGPT) — /mcp/<clé secrète>
+app.use('/mcp', mcpRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -7,6 +7,7 @@ import { localDate } from '../utils/format';
 import Toast from '../components/Toast';
 import EditExpenseModal from '../components/EditExpenseModal';
 import TypeIcon from '../components/TypeIcon';
+import McpConnector from '../components/McpConnector';
 
 const CACHE_KEY = 'admin_v1';
 const CACHE_TTL = 2 * 60 * 1000;
@@ -557,6 +558,9 @@ export default function Admin() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted"><path d="M9 18l6-6-6-6" /></svg>
         </div>
       </Link>
+
+      {/* Connecteur IA (MCP lecture seule) */}
+      <McpConnector onToast={setToast} />
 
       {/* Drive error management */}
       {expenses.some(e => e.upload_status === 'error') && (

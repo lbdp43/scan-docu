@@ -231,6 +231,11 @@ export const api = {
   // Remboursements (notes de frais / espèces perso)
   getReimbursements: (status) =>
     request(`/reimbursements${status ? `?status=${status}` : ''}`),
+  // Connecteur MCP (Claude / ChatGPT)
+  getMcpInfo: () =>
+    request('/admin/mcp'),
+  regenerateMcp: () =>
+    request('/admin/mcp/regenerate', { method: 'POST' }),
   getReimbursementCount: () =>
     request('/reimbursements/count'),
   getMyReimbursements: () =>
