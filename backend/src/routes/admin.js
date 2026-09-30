@@ -4,6 +4,7 @@ const { z } = require('zod');
 const { authenticateToken, checkAdmin } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { testConnection: testDriveConnection } = require('../services/drive');
+const mcpSecret = require('../services/mcpSecret');
 
 const router = express.Router();
 
@@ -422,6 +423,34 @@ router.get('/drive-status', async (req, res) => {
       folderAccessible: false,
       error: err.message,
     });
+  }
+});
+
+// ── Connecteur MCP (Claude / ChatGPT) ────────────────────────────────
+function mcpUrl(req, secret) {
+  return `${req.protocol}://${req.get('host')}/mcp/${secret}`;
+}
+
+// GET /api/admin/mcp — URL du connecteur (clé générée au premier affichage)
+router.get('/mcp', async (req, res) => {
+  try {
+    const secret = await mcpSecret.getSecret(req.prisma, { create: true });
+    res.json({ url: mcpUrl(req, secret), fromEnv: mcpSecret.fromEnv() });
+  } catch (err) {
+    console.error('[admin] mcp error:', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/admin/mcp/regenerate — nouvelle clé (l'ancienne URL cesse de marcher)
+router.post('/mcp/regenerate', async (req, res) => {
+  try {
+    if (mcpSecret.fromEnv()) return res.status(400).json({ error: 'Clé fixée par la variable MCP_SECRET (Railway)' });
+    const secret = await mcpSecret.regenerate(req.prisma);
+    res.json({ url: mcpUrl(req, secret), fromEnv: false });
+  } catch (err) {
+    console.error('[admin] mcp regenerate error:', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
